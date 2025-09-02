@@ -1,0 +1,315 @@
+from prelude import *
+
+
+class Thread(Expr): ...
+
+
+class Ticket(Expr): ...
+
+
+class TicketSystem(TransitionSystem):
+    zero: Immutable[Ticket]
+    service: Ticket
+    next_ticket: Ticket
+    skolem_thread: Immutable[Thread]
+
+    le: Immutable[Rel[Ticket, Ticket]]
+    pc1: Rel[Thread]
+    pc2: Rel[Thread]
+    pc3: Rel[Thread]
+    m: Rel[Thread, Ticket]
+    scheduled: Rel[Thread]
+
+    @axiom
+    def order_le(self, X: Ticket, Y: Ticket, Z: Ticket) -> BoolRef:
+        return And(
+            # transitive, antisymmetric and total, with zero as minimal
+            Implies(And(self.le(X, Y), self.le(Y, Z)), self.le(X, Z)),
+            Implies(And(self.le(X, Y), self.le(Y, X)), X == Y),
+            Or(self.le(X, Y), self.le(Y, X)),
+            self.le(self.zero, X),
+        )
+
+    @init
+    def initial(self, T: Thread, X: Ticket) -> BoolRef:
+        return And(
+            self.pc1(T),
+            Not(self.pc2(T)),
+            Not(self.pc3(T)),
+            self.service == self.zero,
+            self.next_ticket == self.zero,
+            self.m(T, X) == (X == self.zero),
+        )
+
+    def succ(self, u: Ticket, v: Ticket) -> BoolRef:
+        X = Ticket("X")
+        return And(
+            self.le(u, v),
+            Not(u == v),
+            ForAll(X, Implies(self.le(u, X), Or(self.le(v, X), X == u))),
+        )
+
+    @transition
+    def step12(self, t: Thread) -> BoolRef:
+        T = Thread("T")
+        return And(
+            # guard
+            self.pc1(t),
+            # updates
+            self.m.update(
+                lambda old, new, T, X: new(T, X)
+                == If(T == t, X == self.next_ticket, old(T, X))
+            ),
+            self.pc1.update(lambda old, new, T: new(T) == And(T != t, old(T))),
+            self.pc2.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.pc3.unchanged(),
+            self.service.unchanged(),
+            self.succ(self.next_ticket, self.next.next_ticket),
+            # fairness
+            ForAll(T, self.scheduled(T) == (T == t)),
+        )
+
+    @transition
+    def step22(self, t: Thread, k: Ticket) -> BoolRef:
+        T = Thread("T")
+        return And(
+            # guard
+            self.pc2(t),
+            self.m(t, k),
+            Not(self.le(k, self.service)),
+            # updates
+            self.pc1.unchanged(),
+            self.pc2.unchanged(),
+            self.pc3.unchanged(),
+            self.m.unchanged(),
+            self.service.unchanged(),
+            self.next_ticket.unchanged(),
+            # fairness
+            ForAll(T, self.scheduled(T) == (T == t)),
+        )
+
+    @transition
+    def step23(self, t: Thread, k: Ticket) -> BoolRef:
+        T = Thread("T")
+        return And(
+            # guard
+            self.pc2(t),
+            self.m(t, k),
+            self.le(k, self.service),
+            # updates
+            self.pc1.unchanged(),
+            self.pc2.update(lambda old, new, T: new(T) == And(T != t, old(T))),
+            self.pc3.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.m.unchanged(),
+            self.service.unchanged(),
+            self.next_ticket.unchanged(),
+            # fairness
+            ForAll(T, self.scheduled(T) == (T == t)),
+        )
+
+    @transition
+    def step31(self, t: Thread) -> BoolRef:
+        T = Thread("T")
+        return And(
+            # guard
+            self.pc3(t),
+            # updates
+            self.pc1.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.pc2.unchanged(),
+            self.pc3.update(lambda old, new, T: new(T) == And(T != t, old(T))),
+            self.m.unchanged(),
+            self.succ(self.service, self.next.service),
+            self.next_ticket.unchanged(),
+            # fairness
+            ForAll(T, self.scheduled(T) == (T == t)),
+        )
+
+
+class TicketProof(Proof[TicketSystem]):
+    @invariant
+    def pc_at_least_one(self, T: Thread) -> BoolRef:
+        return Or(self.sys.pc1(T), self.sys.pc2(T), self.sys.pc3(T))
+
+    @invariant
+    def pc_at_most_one(self, T: Thread) -> BoolRef:
+        return And(
+            Or(Not(self.sys.pc1(T)), Not(self.sys.pc2(T))),
+            Or(Not(self.sys.pc1(T)), Not(self.sys.pc3(T))),
+            Or(Not(self.sys.pc2(T)), Not(self.sys.pc3(T))),
+        )
+
+    @invariant
+    def one_ticket_per_thread(self, T: Thread, K1: Ticket, K2: Ticket) -> BoolRef:
+        return Implies(And(self.sys.m(T, K1), self.sys.m(T, K2)), K1 == K2)
+
+    @invariant
+    def safety(self, T1: Thread, T2: Thread) -> BoolRef:
+        return Implies(And(self.sys.pc3(T1), self.sys.pc3(T2)), T1 == T2)
+
+    @invariant
+    def next_ticket_zero_then_all_zero(self, T: Thread) -> BoolRef:
+        return Implies(
+            self.sys.next_ticket == self.sys.zero, self.sys.m(T, self.sys.zero)
+        )
+
+    @invariant
+    def next_ticket_maximal(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.next_ticket != self.sys.zero, self.sys.m(T, K)),
+            Not(self.sys.le(self.sys.next_ticket, K)),
+        )
+
+    @invariant
+    def pc2_or_pc3_next_ticket_nonzero(self, T: Thread) -> BoolRef:
+        return Implies(
+            Or(self.sys.pc2(T), self.sys.pc3(T)), self.sys.next_ticket != self.sys.zero
+        )
+
+    @invariant
+    def one_nonzero_ticket_per_thread(
+        self, T1: Thread, T2: Thread, K: Ticket
+    ) -> BoolRef:
+        return Implies(
+            And(self.sys.m(T1, K), self.sys.m(T2, K), K != self.sys.zero), T1 == T2
+        )
+
+    @invariant
+    def pc2_ticket_larger_than_service(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.pc2(T), self.sys.m(T, K)), self.sys.le(self.sys.service, K)
+        )
+
+    @invariant
+    def pc3_then_service(self, T: Thread) -> BoolRef:
+        return Implies(self.sys.pc3(T), self.sys.m(T, self.sys.service))
+
+    @invariant
+    def service_before_next(self) -> BoolRef:
+        return self.sys.le(self.sys.service, self.sys.next_ticket)
+
+    @invariant
+    def unique_nonzero_tickets_for_non_pc1(self, T1: Thread, T2: Thread) -> BoolRef:
+        return Not(
+            And(
+                Not(self.sys.pc1(T1)),
+                Not(self.sys.pc1(T2)),
+                self.sys.m(T1, self.sys.zero),
+                self.sys.m(T2, self.sys.zero),
+                T1 != T2,
+            )
+        )
+
+    @invariant
+    def nonzero_pc1_ticket_already_serviced(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.pc1(T), self.sys.m(T, K), K != self.sys.zero),
+            Not(self.sys.le(self.sys.service, K)),
+        )
+
+    @invariant
+    def ticket_between_service_and_next_not_pc1(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(
+                Not(self.sys.le(self.sys.next_ticket, K)),
+                self.sys.le(self.sys.service, K),
+            ),
+            Exists(T, And(self.sys.m(T, K), Not(self.sys.pc1(T)))),
+        )
+
+    @invariant
+    def skolem_has_ticket(self) -> BoolRef:
+        X = Ticket("X")
+        return Exists(X, self.sys.m(self.sys.skolem_thread, X))
+
+    @invariant
+    def globally_eventually_scheduled(self, T: Thread) -> BoolRef:
+        return timer_zero(self.t("t_<G(F(scheduled(T)))>")(T))
+
+    @invariant
+    def timer_invariant(self, K: Ticket) -> BoolRef:
+        return Or(
+            timer_finite(
+                self.t("t_<And(pc2(skolem_thread), G(Not(pc3(skolem_thread))))>")()
+            ),
+            And(
+                timer_zero(self.t("t_<G(Not(pc3(skolem_thread)))>")()),
+                self.sys.pc2(self.sys.skolem_thread),
+                ForAll(
+                    K,
+                    Implies(
+                        self.sys.m(self.sys.skolem_thread, K),
+                        self.sys.le(self.sys.service, K),
+                    ),
+                ),
+            ),
+        )
+
+    def negated_prop(self) -> BoolRef:
+        T = Thread("T")
+        return And(
+            ForAll(T, G(F(self.sys.scheduled(T)))),
+            F(
+                And(
+                    self.sys.pc2(self.sys.skolem_thread),
+                    G(Not(self.sys.pc3(self.sys.skolem_thread))),
+                )
+            ),
+        )
+
+    @ts_term
+    def t_locked(self) -> Time:
+        return self.t("t_<And(pc2(skolem_thread), G(Not(pc3(skolem_thread))))>")()
+
+    def rk1(self) -> Rank:
+        return timer_rank(None, self.t_locked)
+
+    @ts_formula
+    def rk2_body(self, k: Ticket) -> BoolRef:
+        X = Ticket("X")
+        return And(
+            self.sys.le(self.sys.service, k),
+            Exists(X, And(self.sys.m(self.sys.skolem_thread, X), self.sys.le(k, X))),
+        )
+
+    @FiniteLemma
+    @ts_formula
+    def rk2_finite_lemma(self, k: Ticket) -> BoolRef:
+        return self.sys.le(k, self.sys.next_ticket)
+
+    def rk2(self) -> Rank:
+        return DomainPointwiseRank.close(
+            BinRank(self.rk2_body),
+            self.rk2_finite_lemma,
+        )
+
+    @BinRank
+    @ts_formula
+    def rk3(self) -> BoolRef:
+        T = Thread("T")
+        return Not(Exists(T, self.sys.pc3(T)))
+
+    @ts_term
+    def scheduled(self, x: Thread) -> Time:
+        return self.t("t_<scheduled(T)>")(x)
+
+    @ts_formula
+    def non_pc1_serviced(self, x: Thread) -> BoolRef:
+        return And(self.sys.m(x, self.sys.service), Not(self.sys.pc1(x)))
+
+    @FiniteLemma
+    @ts_formula
+    def rk4_finite_lemma(self, x: Thread) -> BoolRef:
+        return Not(self.sys.pc1(x))
+
+    def rk4(self) -> Rank:
+        return timer_rank(
+            self.rk4_finite_lemma,
+            self.scheduled,
+            self.non_pc1_serviced,
+        )
+
+    def rank(self) -> ClosedRank:
+        return LexRank(self.rk1(), self.rk2(), self.rk3, self.rk4())
+
+
+TicketProof().check()
