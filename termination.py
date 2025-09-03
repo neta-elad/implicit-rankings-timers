@@ -7,10 +7,16 @@ import z3
 
 from ranks import Rank
 from timers import TimerTransitionSystem, create_timers, TimeFun
-from ts import BaseTransitionSystem, IntersectionTransitionSystem, ts_formula, TSFormula
+from ts import (
+    BaseTransitionSystem,
+    IntersectionTransitionSystem,
+    ts_formula,
+    TSFormula,
+    TransitionSystem,
+)
 
 
-class Proof[T: BaseTransitionSystem](
+class Proof[T: TransitionSystem](
     IntersectionTransitionSystem[T, TimerTransitionSystem], ABC
 ):
     ts: ClassVar[type[BaseTransitionSystem]]
@@ -24,7 +30,7 @@ class Proof[T: BaseTransitionSystem](
         object.__setattr__(self, "left", left)
 
         if right is None:
-            right = create_timers(self.negated_prop(), left)
+            right = create_timers(left.negated_prop(), left)
         object.__setattr__(self, "right", right)
 
     @classmethod
@@ -33,9 +39,6 @@ class Proof[T: BaseTransitionSystem](
             cls._cache[item] = type("tmp", (cls,), {"ts": item})
 
         return cls._cache[item]
-
-    @abstractmethod
-    def negated_prop(self) -> z3.BoolRef: ...
 
     @abstractmethod
     def rank(self) -> Rank: ...

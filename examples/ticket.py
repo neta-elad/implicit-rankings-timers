@@ -124,6 +124,18 @@ class TicketSystem(TransitionSystem):
             ForAll(T, self.scheduled(T) == (T == t)),
         )
 
+    def negated_prop(self) -> BoolRef:
+        T = Thread("T")
+        return And(
+            ForAll(T, G(F(self.scheduled(T)))),
+            F(
+                And(
+                    self.pc2(self.skolem_thread),
+                    G(Not(self.pc3(self.skolem_thread))),
+                )
+            ),
+        )
+
 
 class TicketProof(Proof[TicketSystem]):
     @invariant
@@ -241,18 +253,6 @@ class TicketProof(Proof[TicketSystem]):
                         self.sys.le(self.sys.service, K),
                     ),
                 ),
-            ),
-        )
-
-    def negated_prop(self) -> BoolRef:
-        T = Thread("T")
-        return And(
-            ForAll(T, G(F(self.sys.scheduled(T)))),
-            F(
-                And(
-                    self.sys.pc2(self.sys.skolem_thread),
-                    G(Not(self.sys.pc3(self.sys.skolem_thread))),
-                )
             ),
         )
 

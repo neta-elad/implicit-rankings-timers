@@ -291,6 +291,9 @@ class AlternatingBitProtocol(TransitionSystem):
             self.ack_received == False,
         )
 
+    def negated_prop(self) -> BoolRef:
+        return self.sender_bit
+
 
 class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     """
@@ -498,9 +501,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
                 self.sys.receiver_array(I) == self.sys.sender_array(I),
             ),
         )
-
-    def negated_prop(self) -> BoolRef:
-        return self.sys.sender_bit
 
     def rank(self) -> Rank:
         return LexRank()

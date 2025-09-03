@@ -11,9 +11,9 @@
     make check
     ```
   
-- To run a specific file, e.g., `ticket.py`, run:
+- To run a specific file, e.g., `examples/ticket.py`, run:
     ```shell
-    make ticket.py
+    make examples/ticket.py
     ```
   
 - In case something goes wrong in install run:
@@ -26,7 +26,7 @@
     make precommit
     ```
   
-For a simple example, check out the `ticket.py` file.
+For a simple example, check out the `examples/ticket.py` file.
 
 ## TODOs
 - [ ] Sanity: init is sat, every tr is sat, init & tr is sat

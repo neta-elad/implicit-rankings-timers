@@ -298,6 +298,16 @@ class AlternatingBitProtocol(TransitionSystem):
             self.ack_received == False,
         )
 
+    def negated_prop(self) -> BoolRef:
+        return And(
+            G(F(self.sender_scheduled)),
+            G(F(self.receiver_scheduled)),
+            Implies(G(F(self.data_sent)), G(F(self.data_received))),
+            Implies(G(F(self.ack_sent)), G(F(self.ack_received))),
+            F(self.sender_array(self.skolem_index) != self.bottom),
+            G(self.receiver_array(self.skolem_index) == self.bottom),
+        )
+
 
 class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
@@ -463,16 +473,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
                 self.sys.receiver_array(I) != self.sys.bottom,
                 self.sys.receiver_array(I) == self.sys.sender_array(I),
             ),
-        )
-
-    def negated_prop(self) -> BoolRef:
-        return And(
-            G(F(self.sys.sender_scheduled)),
-            G(F(self.sys.receiver_scheduled)),
-            Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
-            Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
-            F(self.sys.sender_array(self.sys.skolem_index) != self.sys.bottom),
-            G(self.sys.receiver_array(self.sys.skolem_index) == self.sys.bottom),
         )
 
     @invariant

@@ -25,13 +25,13 @@ class TrivialTerminationSystem(TransitionSystem):
             ForAll(T, self.scheduled(T) == (T == t)),
         )
 
-
-class TicketProof(Proof[TrivialTerminationSystem]):
-
     # The property we want to prove -- under fair scheduling, eventually all threads are off, together.
     def negated_prop(self) -> BoolRef:
         T = Thread("T")
-        return And(ForAll(T, G(F(self.sys.scheduled(T)))), G(Exists(T, self.sys.on(T))))
+        return And(ForAll(T, G(F(self.scheduled(T)))), G(Exists(T, self.on(T))))
+
+
+class TicketProof(Proof[TrivialTerminationSystem]):
 
     @invariant
     def timer_invariant(self) -> BoolRef:
