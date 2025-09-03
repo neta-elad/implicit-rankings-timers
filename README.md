@@ -30,10 +30,14 @@ For a simple example, check out the `ticket.py` file.
 
 ## TODOs
 - [ ] Sanity: init is sat, every tr is sat, init & tr is sat
+- [ ] Checking conserved before checking decreases
+- [ ] Add DomPermPW and PW constructors
+- [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
+- [ ] (?) Add modified argument and check to see everything is modified
+- [ ] (?) Printing model to file + link to model 
+- [ ] (?) Integration with invariant inference algorithm
 - [ ] (?) Bounded model-checking: given an array of formulas phi_i,
             check if there exists a trace that satisfies phi_0 
             in state 0, phi_1 in state 1, etc.
-- [ ] (?) Sanity: show the system has infinite traces
-- [ ] Add DomPermPW constructor
-- [ ] (?) Integration with invariant inference algorithm
-- [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
+- [ ] (stretch) Sanity: show the system has infinite traces
+
