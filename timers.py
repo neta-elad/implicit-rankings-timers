@@ -7,7 +7,7 @@ from typing import Any, cast, Self, Protocol
 import z3
 
 from ts import BaseTransitionSystem, ParamSpec, Params
-from typed_z3 import Rel, Fun, Sort, Expr, Int
+from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
 _G = z3.Function("G", z3.BoolSort(), z3.BoolSort())
 _F = z3.Function("F", z3.BoolSort(), z3.BoolSort())
@@ -327,7 +327,7 @@ def create_timers[T: BaseTransitionSystem](
         return timer
 
     def create_timer(formula: z3.ExprRef) -> Timer:
-        assert isinstance(formula, z3.BoolRef)
+        assert isinstance(formula, z3.BoolRef) or isinstance(formula, Bool)
         if z3.is_quantifier(formula) and formula.is_exists():
             variables, body = unpack_quantifier(formula)
             body_timer = create_timer(body)

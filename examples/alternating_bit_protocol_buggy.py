@@ -126,7 +126,7 @@ class AlternatingBitProtocol(TransitionSystem):
             # fairness
             self.sender_scheduled == True,
             self.receiver_scheduled == False,
-            self.data_sent == self.sender_array(self.sender_index) != self.bottom,
+            self.data_sent == (self.sender_array(self.sender_index) != self.bottom),
             self.data_received == False,
             self.ack_sent == False,
             self.ack_received == False,
