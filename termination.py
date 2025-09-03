@@ -85,7 +85,7 @@ class Proof[T: BaseTransitionSystem](
         for name, trans in self.transitions.items():
             results.append(
                 self.check_and_print(
-                    f"reduced in {name}",
+                    f"decreases in {name}",
                     self.invariant,
                     trans,
                     z3.Not(self.rank().decreased(self)),
