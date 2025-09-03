@@ -29,7 +29,7 @@ from ts import (
     ts_term,
     ts_formula,
 )
-from typed_z3 import Expr, Rel, Fun, Finite, WFRel
+from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool
 
 __all__ = [
     "BoolRef",
@@ -70,4 +70,5 @@ __all__ = [
     "Fun",
     "Finite",
     "WFRel",
+    "Bool",
 ]
