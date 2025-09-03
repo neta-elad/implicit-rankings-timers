@@ -1,4 +1,5 @@
-# type: ignore
+import z3
+
 from prelude import *
 
 
@@ -493,7 +494,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index
 
-    @ts_formula
     def btw_gen_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.sys.skolem_index),
@@ -506,7 +506,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             BinRank(self.btw_gen_skolem), FiniteLemma(self.btw_gen_skolem)
         )
 
-    @ts_formula
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.sys.skolem_index),
@@ -519,7 +518,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             BinRank(self.btw_sender_skolem), FiniteLemma(self.btw_sender_skolem)
         )
 
-    @ts_formula
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.sys.skolem_index),
@@ -538,13 +536,11 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             self.gen_minus_sk(), self.sender_minus_sk(), self.receiver_minus_sk()
         )
 
-    @ts_formula
     def sender_outdated(self) -> BoolRef:
         return self.sys.sender_bit != self.sys.receiver_bit
 
-    @ts_formula
     def sender_up_to_date(self) -> BoolRef:
-        return Not(self.__class__.sender_outdated())
+        return Not(self.sender_outdated())
 
     # sender_outdated rank
 
@@ -554,7 +550,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def bad_ack(self, a: AckMsg) -> BoolRef:
         return self.sys.abit(a) != self.sys.sender_bit
 
-    @ts_formula
     def no_good_ack(self, A: AckMsg) -> BoolRef:
         return And(self.in_ack_queue(A), self.bad_ack(A))
 
@@ -566,15 +561,15 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     def total_bad_ack(self) -> Rank:
         return DomainPointwiseRank.close(
-            BinRank(ts_formula(self.__class__.bad_in_ack_queue)),
-            FiniteLemma(ts_formula(self.__class__.in_ack_queue)),
+            BinRank(self.bad_in_ack_queue),
+            FiniteLemma(self.in_ack_queue),
         )
 
     def until_receiver_scheduled(self) -> Rank:
-        return timer_rank(None, ts_term(self.t("receiver_scheduled")), self.no_good_ack)
+        return timer_rank(None, self.t("t_<receiver_scheduled>"), self.no_good_ack)
 
     def until_ack_received(self) -> Rank:
-        return timer_rank(None, ts_term(self.t("ack_received")), None)
+        return timer_rank(None, self.t("t_<ack_received>"), None)
 
     def rank_sender_outdated(self) -> Rank:
         return CondRank(
@@ -584,7 +579,7 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
                 self.bin_no_good_ack(),
                 self.until_receiver_scheduled(),
             ),
-            self.sender_outdated(),
+            self.sender_outdated,
         )
 
     # sender_up_to_date rank
@@ -595,7 +590,6 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def bad_data(self, d: DataMsg) -> BoolRef:
         return self.sys.dbit(d) != self.sys.receiver_bit
 
-    @ts_formula
     def no_good_data(self, D: DataMsg) -> BoolRef:
         return And(self.in_data_queue(D), self.bad_data(D))
 
@@ -607,26 +601,25 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     def total_bad_data(self) -> Rank:
         return DomainPointwiseRank.close(
-            BinRank(ts_formula(self.__class__.bad_in_data_queue)),
-            FiniteLemma(ts_formula(self.__class__.in_data_queue)),
+            BinRank(self.bad_in_data_queue),
+            FiniteLemma(self.in_data_queue),
         )
 
-    @ts_formula
-    def sender_scheduling_is_helpful(self):
+    def sender_scheduling_is_helpful(self) -> z3.BoolRef:
         return And(
-            self.no_good_data,
-            self.sys.sender_array(self.sys.sender_index != self.sys.bottom),
+            self.no_good_data,  # type: ignore # todo@raz: not sure what you meant here
+            self.sys.sender_array(self.sys.sender_index) != self.sys.bottom,
         )
 
     def until_sender_scheduled(self) -> Rank:
         return timer_rank(
             None,
-            ts_term(self.t("sender_scheduled")),
-            ts_formula(self.sender_scheduling_is_helpful()),
+            self.t("t_<sender_scheduled>"),
+            self.sender_scheduling_is_helpful,
         )
 
     def until_data_received(self) -> Rank:
-        return timer_rank(None, ts_term(self.t("data_received")), None)
+        return timer_rank(None, self.t("t_<data_received>"), None)
 
     def rank_sender_uptodate(self) -> Rank:
         return CondRank(
@@ -636,7 +629,7 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
                 self.bin_no_good_data(),
                 self.until_sender_scheduled(),
             ),
-            self.sender_up_to_date(),
+            self.sender_up_to_date,
         )
 
     # ack_fairness_established = lambda sym,param: And(
@@ -717,14 +710,13 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     # rank = LexFreeRank([primary_rank,rank_all_cases])
 
-    @ts_term
     def t_array_skolem_value(self) -> Time:
         return self.t("t_<F(bottom != sender_array(skolem_index))>")()
 
     def rk1(self) -> Rank:
         return timer_rank(None, self.t_array_skolem_value)
 
-    def rank(self) -> ClosedRank:
+    def rank(self) -> Rank:
         return LexRank(self.rk1())
 
 

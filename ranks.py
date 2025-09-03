@@ -8,7 +8,18 @@ import z3
 
 from helpers import order_lt, minimal_in_order_lt, quantify
 from timers import timer_order, Time
-from ts import BaseTransitionSystem, ParamSpec, TSFormula, TSTerm
+from ts import (
+    BaseTransitionSystem,
+    ParamSpec,
+    TSFormula,
+    TSTerm,
+    BoundTypedFormula,
+    unbind,
+    ts_formula,
+    BoundTypedTerm,
+    ts_term,
+    ErasedBoundTypedFormula,
+)
 from typed_z3 import Expr, Rel, Sort
 
 type _RawTSRel[T: Expr] = Callable[[BaseTransitionSystem], Rel[T, T]]
@@ -59,8 +70,12 @@ class FiniteSCBySort(SoundnessCondition):
 
 @dataclass(frozen=True)
 class FiniteLemma:
-    alpha: TSFormula
+    alpha_src: ErasedBoundTypedFormula
     m: int = 1  # number of elements added initially and in each transition
+
+    @cached_property
+    def alpha(self) -> TSFormula:
+        return ts_formula(unbind(self.alpha_src))
 
 
 @dataclass(frozen=True)
@@ -228,7 +243,11 @@ class Rank(ClosedRank, ABC):
 
 @dataclass(frozen=True)
 class BinRank(Rank):
-    alpha: TSFormula
+    alpha_src: ErasedBoundTypedFormula
+
+    @cached_property
+    def alpha(self) -> TSFormula:
+        return ts_formula(unbind(self.alpha_src))
 
     @property
     def spec(self) -> ParamSpec:
@@ -275,7 +294,11 @@ class BinRank(Rank):
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
     order: TSRel[T]
-    term: TSTerm[T]
+    term_src: BoundTypedTerm[Any, T]
+
+    @cached_property
+    def term(self) -> TSTerm[T]:
+        return ts_term(unbind(self.term_src))
 
     @property
     def spec(self) -> ParamSpec:
@@ -450,7 +473,11 @@ class PointwiseRank(Rank):
 @dataclass(frozen=True)
 class CondRank(Rank):
     rank: Rank
-    alpha: TSFormula
+    alpha_src: ErasedBoundTypedFormula
+
+    @cached_property
+    def alpha(self) -> TSFormula:
+        return ts_formula(unbind(self.alpha_src))
 
     def __post_init__(self) -> None:
         assert (
@@ -690,14 +717,16 @@ def ts_rel[T: BaseTransitionSystem, R: Expr](rel: Callable[[T], Rel[R, R]]) -> T
     return TSRel[R](cast(_RawTSRel[R], rel))
 
 
-def timer_rank(
-    finite_lemma: FiniteLemma | None, term: TSTerm[Time], alpha: TSFormula | None = None
+def timer_rank[*Ts](
+    finite_lemma: FiniteLemma | None,
+    term: BoundTypedTerm[*Ts, Time],
+    alpha: BoundTypedFormula[*Ts] | None = None,
 ) -> Rank:  # todo: get phi instead of term
     if alpha is None:
         return DomainPointwiseRank.close(
             PosInOrderRank(ts_rel(lambda ts: timer_order()), term), finite_lemma
         )
-    assert term.spec == alpha.spec, f"Mismatch in params"
+    # assert term.spec == alpha.spec, f"Mismatch in params"
     return DomainPointwiseRank.close(
         CondRank(PosInOrderRank(ts_rel(lambda ts: timer_order()), term), alpha),
         finite_lemma,

@@ -27,8 +27,6 @@ from ts import (
     axiom,
     init,
     transition,
-    ts_term,
-    ts_formula,
 )
 from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool
 
@@ -65,8 +63,6 @@ __all__ = [
     "axiom",
     "init",
     "transition",
-    "ts_term",
-    "ts_formula",
     "Expr",
     "Rel",
     "Fun",

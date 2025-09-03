@@ -256,14 +256,12 @@ class TicketProof(Proof[TicketSystem]):
             ),
         )
 
-    @ts_term
     def t_locked(self) -> Time:
         return self.t("t_<And(pc2(skolem_thread), G(Not(pc3(skolem_thread))))>")()
 
     def rk1(self) -> Rank:
         return timer_rank(None, self.t_locked)
 
-    @ts_formula
     def rk2_body(self, k: Ticket) -> BoolRef:
         X = Ticket("X")
         return And(
@@ -271,45 +269,40 @@ class TicketProof(Proof[TicketSystem]):
             Exists(X, And(self.sys.m(self.sys.skolem_thread, X), self.sys.le(k, X))),
         )
 
-    @FiniteLemma
-    @ts_formula
     def rk2_finite_lemma(self, k: Ticket) -> BoolRef:
         return self.sys.le(k, self.sys.next_ticket)
 
     def rk2(self) -> Rank:
         return DomainPointwiseRank.close(
             BinRank(self.rk2_body),
-            self.rk2_finite_lemma,
+            FiniteLemma(self.rk2_finite_lemma),
         )
 
-    @BinRank
-    @ts_formula
-    def rk3(self) -> BoolRef:
+    def rk3_body(self) -> BoolRef:
         T = Thread("T")
         return Not(Exists(T, self.sys.pc3(T)))
 
-    @ts_term
+    def rk3(self) -> Rank:
+        return BinRank(self.rk3_body)
+
     def scheduled(self, x: Thread) -> Time:
         return self.t("t_<scheduled(T)>")(x)
 
-    @ts_formula
     def non_pc1_serviced(self, x: Thread) -> BoolRef:
         return And(self.sys.m(x, self.sys.service), Not(self.sys.pc1(x)))
 
-    @FiniteLemma
-    @ts_formula
     def rk4_finite_lemma(self, x: Thread) -> BoolRef:
         return Not(self.sys.pc1(x))
 
     def rk4(self) -> Rank:
         return timer_rank(
-            self.rk4_finite_lemma,
+            FiniteLemma(self.rk4_finite_lemma),
             self.scheduled,
             self.non_pc1_serviced,
         )
 
     def rank(self) -> Rank:
-        return LexRank(self.rk1(), self.rk2(), self.rk3, self.rk4())
+        return LexRank(self.rk1(), self.rk2(), self.rk3(), self.rk4())
 
 
 TicketProof().check()

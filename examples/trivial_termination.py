@@ -40,14 +40,12 @@ class TicketProof(Proof[TrivialTerminationSystem]):
             timer_zero(self.t("t_<G(Exists(T, on(T)))>")()),
         )
 
-    @ts_formula
     def on(self, t: Thread) -> BoolRef:
         return self.sys.on(t)
 
     def system_rank(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.on), None)
 
-    @ts_term
     def scheduled(self, t: Thread) -> Time:
         return self.t("t_<scheduled(T)>")(t)
 

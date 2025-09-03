@@ -3,6 +3,7 @@ from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from inspect import signature
+from types import MethodType
 from typing import (
     Annotated,
     Self,
@@ -11,6 +12,7 @@ from typing import (
     get_args,
     Any,
     TypeAliasType,
+    cast,
 )
 
 import z3
@@ -111,7 +113,10 @@ class BaseTransitionSystem(ABC):
 
 
 type TypedTerm[T: BaseTransitionSystem, *Ts, R: z3.ExprRef] = Callable[[T, *Ts], R]
+type BoundTypedTerm[*Ts, R: z3.ExprRef] = Callable[[*Ts], R]
 type TypedFormula[T: BaseTransitionSystem, *Ts] = TypedTerm[T, *Ts, z3.BoolRef]
+type BoundTypedFormula[*Ts] = BoundTypedTerm[*Ts, z3.BoolRef]
+type ErasedBoundTypedFormula = Callable[..., z3.BoolRef]
 type Params = dict[str, Expr]
 type RawTSTerm[T] = Callable[[BaseTransitionSystem, Params], T]
 type Immutable[T] = Annotated[T, "immutable"]
@@ -279,6 +284,13 @@ def ts_term[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     spec = _get_spec(term, z3.ExprRef)
     raw_term = _compile_with_spec(term, spec)
     return TSTerm(spec, raw_term, term.__name__)
+
+
+def unbind[T: BaseTransitionSystem, *Ts, R](
+    fun: Callable[[*Ts], R],
+) -> Callable[[T, *Ts], R]:
+    assert isinstance(fun, MethodType), f"{fun} is not a bound method"
+    return cast(Callable[[T, *Ts], R], fun.__func__)
 
 
 def init[T: BaseTransitionSystem, *Ts](
