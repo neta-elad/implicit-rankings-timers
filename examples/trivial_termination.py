@@ -54,7 +54,7 @@ class TicketProof(Proof[TrivialTerminationSystem]):
     def timer_rank(self) -> Rank:
         return timer_rank(None, self.scheduled, self.on)
 
-    def rank(self) -> ClosedRank:
+    def rank(self) -> Rank:
         return LexRank(self.system_rank(), self.timer_rank())
 
 

@@ -308,7 +308,7 @@ class TicketProof(Proof[TicketSystem]):
             self.non_pc1_serviced,
         )
 
-    def rank(self) -> ClosedRank:
+    def rank(self) -> Rank:
         return LexRank(self.rk1(), self.rk2(), self.rk3, self.rk4())
 
 

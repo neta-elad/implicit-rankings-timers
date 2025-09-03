@@ -502,7 +502,7 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def negated_prop(self) -> BoolRef:
         return self.sys.sender_bit
 
-    def rank(self) -> ClosedRank:
+    def rank(self) -> Rank:
         return LexRank()
 
 

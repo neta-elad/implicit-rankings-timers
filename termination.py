@@ -5,7 +5,7 @@ from typing import ClassVar, cast, Any
 
 import z3
 
-from ranks import ClosedRank
+from ranks import Rank
 from timers import TimerTransitionSystem, create_timers, TimeFun
 from ts import BaseTransitionSystem, IntersectionTransitionSystem, ts_formula, TSFormula
 
@@ -38,7 +38,7 @@ class Proof[T: BaseTransitionSystem](
     def negated_prop(self) -> z3.BoolRef: ...
 
     @abstractmethod
-    def rank(self) -> ClosedRank: ...
+    def rank(self) -> Rank: ...
 
     @cached_property
     def sys(self) -> T:
@@ -67,6 +67,10 @@ class Proof[T: BaseTransitionSystem](
             print("fail: inv")
             return False
 
+        if not self._check_conserved():
+            print("fail: decrease")
+            return False
+
         if not self._check_decrease():
             print("fail: decrease")
             return False
@@ -75,10 +79,25 @@ class Proof[T: BaseTransitionSystem](
             print(f"fail: soundness")
             return False
 
+        print(f"All passed!")
         return True
 
     def _check_inv(self) -> bool:
         return self.check_inductiveness(lambda this: this.invariant, "inv")
+
+    def _check_conserved(self) -> bool:
+        results = []
+        for name, trans in self.transitions.items():
+            results.append(
+                self.check_and_print(
+                    f"conserved in {name}",
+                    self.invariant,
+                    trans,
+                    z3.Not(self.rank().conserved(self)),
+                    with_next=True,
+                )
+            )
+        return all(results)
 
     def _check_decrease(self) -> bool:
         results = []
