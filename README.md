@@ -34,3 +34,6 @@ For a simple example, check out the `ticket.py` file.
             check if there exists a trace that satisfies phi_0 
             in state 0, phi_1 in state 1, etc.
 - [ ] (?) Sanity: show the system has infinite traces
+- [ ] Add DomPermPW constructor
+- [ ] (?) Integration with invariant inference algorithm
+- [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
