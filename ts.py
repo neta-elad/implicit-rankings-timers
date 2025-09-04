@@ -16,7 +16,7 @@ from typing import (
 )
 
 import z3
-from helpers import quantify, sat_check, print_model_in_order
+from helpers import quantify, unsat_check, print_model_in_order
 
 from typed_z3 import Fun, Expr, Sort, Bool
 
@@ -94,8 +94,8 @@ class BaseTransitionSystem(ABC):
         args += (self.axiom,)
         if with_next:
             args += (self.next.axiom,)
-        result = sat_check(args, minimize_sorts=self.sorts)
-        if result[0] == z3.unsat:
+        result = unsat_check(args, minimize_sorts=self.sorts)
+        if result.unsat:
             print(f"Checking {name}: passed")
             return True
         else:

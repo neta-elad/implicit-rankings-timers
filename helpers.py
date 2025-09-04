@@ -1,16 +1,27 @@
 import io
 from collections.abc import Iterable
+from dataclasses import dataclass
+from functools import cached_property
 from pathlib import Path
-from typing import cast
+from typing import cast, Literal
 
 import z3
 
 from typed_z3 import Rel, Expr
 
-type ResultPair = tuple[z3.CheckSatResult, z3.ModelRef | None]
+
+@dataclass(frozen=True)
+class SatResult:
+    result: z3.CheckSatResult
+    model: z3.ModelRef | None = None
+    size: int | None = None
+
+    @cached_property
+    def unsat(self) -> bool:
+        return self.result == z3.unsat
 
 
-def sat_check(
+def unsat_check(
     constraints: Iterable[z3.BoolRef],
     *,
     find_model: bool = True,
@@ -19,7 +30,7 @@ def sat_check(
     print_calls: bool = False,
     print_smtlib: bool = False,
     minimize_sorts: Iterable[z3.SortRef] = (),
-) -> ResultPair:
+) -> SatResult:
     z3.set_param("timeout", 5 * 60 * 1000)  # 5 minute timeout
     solver = z3.Solver()
     solver.set(mbqi=True)
@@ -45,8 +56,11 @@ def sat_check(
         if unsat_core:
             core = solver.unsat_core()
             print("Unsat core:", core)
+        return SatResult(z3.unsat)
+
     if result == z3.sat:
         model = None
+        model_size = None
         if find_model:
             try:
                 full_model = solver.model()
@@ -61,7 +75,7 @@ def sat_check(
                         solver.add(size_constraint(sort, size))
                     new_result = solver.check()
                     if new_result == z3.sat:
-                        print(f"small model of size: {size}")
+                        model_size = size
                         model = solver.model()
                         break
                     else:
@@ -73,47 +87,50 @@ def sat_check(
             else:
                 model = full_model
 
-        return z3.sat, model
+        return SatResult(z3.sat, model, model_size)
     else:
-        return result, None
+        return SatResult(z3.unknown)
 
 
 _model_counter = 0
 
 
 def print_model_in_order(
-    model: ResultPair | z3.ModelRef | None,
+    result: SatResult,
     symbols: Iterable[z3.FuncDeclRef],
     print_model_to_file: str | bool = True,
 ) -> None:
-    if isinstance(model, tuple):
-        model = model[1]
-    if model is None:
+    if result.model is None:
         return
+
+    model = result.model
     sorts = model.sorts()
     buffer = io.StringIO()
 
+    if result.size is not None:
+        print(f"Small model of size {result.size}", file=buffer)
+
     for s in sorts:
         print(model.get_universe(s), file=buffer)
-    try:
-        for symbol in symbols:
-            if symbol in model:  # type: ignore
-                print(symbol, ":", model[symbol], file=buffer)
-            else:
-                print(f"Missing {symbol} in model", file=buffer)
-    except Exception as e:
-        print("A KeyError occurred:", e, file=buffer)
-        print(model, file=buffer)
 
-    print(buffer.getvalue())
+    for symbol in symbols:
+        if symbol in model:  # type: ignore
+            print(symbol, ":", model[symbol], file=buffer)
+        else:
+            print(f"Missing {symbol} in model", file=buffer)
+
     if isinstance(print_model_to_file, str) or print_model_to_file is True:
         if not isinstance(print_model_to_file, str):
             print_model_to_file = ""
+        else:
+            print_model_to_file = print_model_to_file.replace(" ", "-")
         global _model_counter
         _model_counter += 1
-        Path(f"model-{_model_counter}-{print_model_to_file}.txt").write_text(
-            buffer.getvalue()
-        )
+        path = Path(f"model-{_model_counter}-{print_model_to_file}.txt")
+        print(f"Model written to {path.absolute()}")
+        path.write_text(buffer.getvalue())
+    else:
+        print(buffer.getvalue())
 
 
 def size_constraint(sort: z3.SortRef, size: int) -> z3.BoolRef:

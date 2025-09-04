@@ -66,6 +66,10 @@ class Proof[T: TransitionSystem](
         return z3.And(*self.invariants.values())
 
     def check(self) -> bool:
+        if not self._check_sanity():
+            print("fail: sanity")
+            return False
+
         if not self._check_inv():
             print("fail: inv")
             return False
@@ -83,6 +87,9 @@ class Proof[T: TransitionSystem](
             return False
 
         print(f"All passed!")
+        return True
+
+    def _check_sanity(self) -> bool:
         return True
 
     def _check_inv(self) -> bool:

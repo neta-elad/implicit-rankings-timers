@@ -34,7 +34,7 @@ For a simple example, check out the `examples/ticket.py` file.
 - [ ] Add DomPermPW and PW constructors
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] (?) Add modified argument and check to see everything is modified
-- [ ] (?) Printing model to file + link to model 
+- [x] (?) Printing model to file + link to model 
 - [ ] (?) Integration with invariant inference algorithm
 - [ ] (?) Bounded model-checking: given an array of formulas phi_i,
             check if there exists a trace that satisfies phi_0 
