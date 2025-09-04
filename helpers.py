@@ -3,7 +3,7 @@ from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from pathlib import Path
-from typing import cast, Literal
+from typing import cast
 
 import z3
 
@@ -11,7 +11,7 @@ from typed_z3 import Rel, Expr
 
 
 @dataclass(frozen=True)
-class SatResult:
+class UnsatResult:
     result: z3.CheckSatResult
     model: z3.ModelRef | None = None
     size: int | None = None
@@ -25,78 +25,98 @@ def unsat_check(
     constraints: Iterable[z3.BoolRef],
     *,
     find_model: bool = True,
-    minimize_model: bool = True,
-    unsat_core: bool = False,
     print_calls: bool = False,
-    print_smtlib: bool = False,
     minimize_sorts: Iterable[z3.SortRef] = (),
+) -> UnsatResult:
+    solver = default_solver()
+    for c in constraints:
+        if print_calls:
+            print(c)
+        solver.add(c)
+
+    result = solver.check()
+    if result == z3.unsat:
+        return UnsatResult(z3.unsat)
+
+    if result == z3.unknown:
+        return UnsatResult(z3.unknown)
+
+    model = None
+    model_size = None
+    if not find_model:
+        return UnsatResult(z3.sat)
+    try:
+        model = solver.model()
+    except z3.Z3Exception as e:
+        print(f"sat but no model: {e}")
+
+    if minimize_sorts:
+        for size in range(1, 8):
+            solver.push()
+            for sort in minimize_sorts:
+                if sort.kind() != z3.Z3_UNINTERPRETED_SORT:
+                    continue
+                solver.add(size_constraint(sort, size))
+            if solver.check() == z3.sat:
+                model_size = size
+                model = solver.model()
+                break
+            else:
+                solver.pop()
+
+    return UnsatResult(z3.sat, model, model_size)
+
+
+@dataclass(frozen=True)
+class SatResult:
+    result: z3.CheckSatResult
+    core: list[z3.BoolRef]
+
+    @cached_property
+    def sat(self) -> bool:
+        return self.result == z3.sat
+
+
+def sat_check(
+    constraints: Iterable[z3.BoolRef],
+    *,
+    unsat_core: bool = True,
+    print_calls: bool = True,
 ) -> SatResult:
-    z3.set_param("timeout", 5 * 60 * 1000)  # 5 minute timeout
-    solver = z3.Solver()
-    solver.set(mbqi=True)
+    solver = default_solver()
+    named_constraints = {str(i): c for i, c in enumerate(constraints)}
     # Enable unsat core tracking
     if unsat_core:
         solver.set(unsat_core=True)
-        for i, c in enumerate(constraints):
-            if print_calls:
-                print("constraint number", i)
-                print(c)
-            solver.assert_and_track(c, str(i))
+        for name, c in named_constraints.items():
+            solver.assert_and_track(c, name)
     else:
         for c in constraints:
             if print_calls:
                 print(c)
             solver.add(c)
 
-    if print_smtlib:
-        print(solver.sexpr())
-
     result = solver.check()
-    if result == z3.unsat:
-        if unsat_core:
-            core = solver.unsat_core()
-            print("Unsat core:", core)
-        return SatResult(z3.unsat)
+    core: list[z3.BoolRef] = []
+    if result == z3.unsat and unsat_core:
+        core = list()
+        for clause in solver.unsat_core():
+            core.append(named_constraints[str(clause)])
+    return SatResult(result, core)
 
-    if result == z3.sat:
-        model = None
-        model_size = None
-        if find_model:
-            try:
-                full_model = solver.model()
-            except z3.Z3Exception as e:
-                print(f"sat but no model: {e}")
-            if minimize_model and minimize_sorts:
-                for size in range(1, 8):
-                    solver.push()
-                    for sort in minimize_sorts:
-                        if sort.eq(z3.IntSort()):
-                            continue
-                        solver.add(size_constraint(sort, size))
-                    new_result = solver.check()
-                    if new_result == z3.sat:
-                        model_size = size
-                        model = solver.model()
-                        break
-                    else:
-                        solver.pop()
 
-                if model is None:
-                    print("small model failed")
-                    model = full_model
-            else:
-                model = full_model
-
-        return SatResult(z3.sat, model, model_size)
-    else:
-        return SatResult(z3.unknown)
+def default_solver() -> z3.Solver:
+    z3.set_param("timeout", 5 * 60 * 1000)  # 5 minute timeout
+    solver = z3.Solver()
+    solver.set(mbqi=True)
+    return solver
 
 
 _model_counter = 0
 
 
 def print_model_in_order(
-    result: SatResult,
+    result: UnsatResult,
     symbols: Iterable[z3.FuncDeclRef],
     print_model_to_file: str | bool = True,
 ) -> None:
@@ -107,7 +127,9 @@ def print_model_in_order(
     sorts = model.sorts()
     buffer = io.StringIO()
 
-    if result.size is not None:
+    if result.size is None:
+        print("Small model failed", file=buffer)
+    else:
         print(f"Small model of size {result.size}", file=buffer)
 
     for s in sorts:
@@ -128,6 +150,35 @@ def print_model_in_order(
         _model_counter += 1
         path = Path(f"model-{_model_counter}-{print_model_to_file}.txt")
         print(f"Model written to {path.absolute()}")
+        path.write_text(buffer.getvalue())
+    else:
+        print(buffer.getvalue())
+
+
+_core_counter = 0
+
+
+def print_unsat_core(
+    result: SatResult,
+    print_core_to_file: str | bool = True,
+) -> None:
+    if not result.core:
+        return
+
+    buffer = io.StringIO()
+
+    for clause in result.core:
+        print(clause, file=buffer)
+
+    if isinstance(print_core_to_file, str) or print_core_to_file is True:
+        if not isinstance(print_core_to_file, str):
+            print_core_to_file = ""
+        else:
+            print_core_to_file = print_core_to_file.replace(" ", "-")
+        global _core_counter
+        _core_counter += 1
+        path = Path(f"core-{_core_counter}-{print_core_to_file}.txt")
+        print(f"Unsat core written to {path.absolute()}")
         path.write_text(buffer.getvalue())
     else:
         print(buffer.getvalue())

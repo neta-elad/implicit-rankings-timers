@@ -29,7 +29,8 @@
 For a simple example, check out the `examples/ticket.py` file.
 
 ## TODOs
-- [ ] Sanity: init is sat, every tr is sat, init & tr is sat
+- [x] Sanity: init is sat, every tr is sat, init & tr is sat
+  - [ ] Sanity failures for `examples/ticket.py`
 - [x] Checking conserved before checking decreases
 - [ ] Add DomPermPW and PW constructors
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.

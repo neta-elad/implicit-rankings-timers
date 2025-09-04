@@ -14,5 +14,6 @@ __pycache__/
 .DS_Store
 Thumbs.db
 
-# Counter-models
+# Counter-models and unsat cores
 model-*.txt
+core-*.txt

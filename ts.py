@@ -16,8 +16,14 @@ from typing import (
 )
 
 import z3
-from helpers import quantify, unsat_check, print_model_in_order
 
+from helpers import (
+    quantify,
+    unsat_check,
+    print_model_in_order,
+    sat_check,
+    print_unsat_core,
+)
 from typed_z3 import Fun, Expr, Sort, Bool
 
 
@@ -108,6 +114,32 @@ class BaseTransitionSystem(ABC):
                 }
             print(f"Checking {name}: failed")
             print_model_in_order(result, symbols, name)
+            return False
+
+    def sanity_check(self) -> bool:
+        if not self._check_sat("init", self.axiom, self.init):
+            return False
+
+        for name, tr in self.transitions.items():
+            if not self._check_sat(name, self.axiom, self.next.axiom, tr):
+                return False
+
+        for name, tr in self.transitions.items():
+            if not self._check_sat(
+                f"init and {name}", self.axiom, self.next.axiom, self.init, tr
+            ):
+                return False
+
+        return True
+
+    def _check_sat(self, name: str, *args: z3.BoolRef) -> bool:
+        result = sat_check(args)
+        if result.sat:
+            print(f"Checking sat {name}: passed")
+            return True
+        else:
+            print(f"Checking sat {name}: failed")
+            print_unsat_core(result, name)
             return False
 
 

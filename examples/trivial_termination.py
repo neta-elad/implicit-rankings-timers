@@ -12,7 +12,6 @@ class TrivialTerminationSystem(TransitionSystem):
     def initial(self, T: Thread) -> BoolRef:
         return And(
             self.on(T),
-            Not(self.scheduled(T)),
         )
 
     @transition
@@ -20,7 +19,7 @@ class TrivialTerminationSystem(TransitionSystem):
         T = Thread("T")
         return And(
             # updates
-            # self.on.update(lambda old, new, T: new(T) == And(old(T), T != t)),
+            self.on.update(lambda old, new, T: new(T) == And(old(T), T != t)),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
         )
