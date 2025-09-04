@@ -30,7 +30,7 @@ For a simple example, check out the `examples/ticket.py` file.
 
 ## TODOs
 - [ ] Sanity: init is sat, every tr is sat, init & tr is sat
-- [ ] Checking conserved before checking decreases
+- [x] Checking conserved before checking decreases
 - [ ] Add DomPermPW and PW constructors
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] (?) Add modified argument and check to see everything is modified

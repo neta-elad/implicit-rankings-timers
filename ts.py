@@ -90,12 +90,11 @@ class BaseTransitionSystem(ABC):
         name: str,
         *args: z3.BoolRef,
         with_next: bool = False,
-        print_smtlib: bool = False,
     ) -> bool:
         args += (self.axiom,)
         if with_next:
             args += (self.next.axiom,)
-        result = sat_check(args, minimize_sorts=self.sorts, print_smtlib=print_smtlib)
+        result = sat_check(args, minimize_sorts=self.sorts)
         if result[0] == z3.unsat:
             print(f"Checking {name}: passed")
             return True

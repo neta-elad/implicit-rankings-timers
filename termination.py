@@ -71,7 +71,7 @@ class Proof[T: TransitionSystem](
             return False
 
         if not self._check_conserved():
-            print("fail: decrease")
+            print("fail: conserved")
             return False
 
         if not self._check_decrease():
