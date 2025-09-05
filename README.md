@@ -29,6 +29,7 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
+- [ ] Add a property class, so we can prove multiple properties for the same system
 - [ ] Add DomPermPW and PW constructors
 - [ ] timer_rank should accept formula instead of term
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
