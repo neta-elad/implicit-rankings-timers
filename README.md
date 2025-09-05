@@ -26,19 +26,20 @@
     make precommit
     ```
   
-For a simple example, check out the `examples/ticket.py` file.
+For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
 - [x] Sanity: init is sat, every tr is sat, init & tr is sat
-  - [ ] Sanity failures for `examples/ticket.py`
+  - [ ] Sanity failures for `examples/ticket.py` -- sanity is too strong, init & tr for every tr instead of disjunction.
 - [x] Checking conserved before checking decreases
 - [ ] Add DomPermPW and PW constructors
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] (?) Add modified argument and check to see everything is modified
 - [x] (?) Printing model to file + link to model 
-- [ ] (?) Integration with invariant inference algorithm
+- [ ] models and unsat cores in a folder instead of main folder.
 - [ ] (?) Bounded model-checking: given an array of formulas phi_i,
             check if there exists a trace that satisfies phi_0 
             in state 0, phi_1 in state 1, etc.
+- [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces
-
+- [ ] (stretch) Automation for finding ranking
