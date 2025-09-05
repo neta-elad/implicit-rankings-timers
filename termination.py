@@ -67,8 +67,8 @@ class Proof[T: TransitionSystem](
 
     def check(self) -> bool:
         if not self.sys.sanity_check():
-            print("warn: sanity")
-            # return False  # todo: change to fail
+            print("fail: sanity")
+            return False
 
         if not self._check_inv():
             print("fail: inv")
