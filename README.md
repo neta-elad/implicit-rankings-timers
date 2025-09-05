@@ -29,14 +29,12 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
-- [x] Sanity: init is sat, every tr is sat, init & tr is sat
-  - [ ] Sanity failures for `examples/ticket.py` -- sanity is too strong, init & tr for every tr instead of disjunction.
-- [x] Checking conserved before checking decreases
 - [ ] Add DomPermPW and PW constructors
+- [ ] timer_rank should accept formula instead of term
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
+- [ ] (?) models and unsat cores in a folder instead of main folder.
+- [ ] (?) Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) Add modified argument and check to see everything is modified
-- [x] (?) Printing model to file + link to model 
-- [ ] models and unsat cores in a folder instead of main folder.
 - [ ] (?) Bounded model-checking: given an array of formulas phi_i,
             check if there exists a trace that satisfies phi_0 
             in state 0, phi_1 in state 1, etc.
