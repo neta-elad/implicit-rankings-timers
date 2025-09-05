@@ -3,7 +3,9 @@ import z3
 from prelude import *
 
 
-class Index(Expr): ...
+class Index(
+    Finite
+): ...  # Notice we assume finitely many indices - a bit different from original modeling, we can modify later.
 
 
 class Value(Expr): ...
@@ -21,7 +23,7 @@ class AlternatingBitProtocol(TransitionSystem):
     sender_index: Index
     sender_gen_index: Index
     receiver_index: Index
-    skolem_index: Index
+    skolem_index: Immutable[Index]
     bottom: Immutable[Value]
     le_data_msg: Rel[DataMsg, DataMsg]
     le_ack_msg: Rel[AckMsg, AckMsg]
@@ -488,11 +490,14 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
                 timer_finite(self.t("t_<Not(F(ack_sent))>")()),
                 timer_zero(self.t("t_<G(F(ack_received))>")()),
             ),
-            timer_finite(self.t("t_<F(bottom != sender_array(skolem_index))>")()),
+            timer_finite(self.t("t_<bottom != sender_array(skolem_index)>")()),
             timer_zero(self.t("t_<G(bottom == receiver_array(skolem_index))>")()),
         )
 
-    # main rank part - differences between the current index for generation, sender and receiver and the skolem index
+    # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
+
+    def t_write_to_skolem(self) -> Time:
+        return self.t("t_<bottom != sender_array(skolem_index)>")()
 
     def btw_gen_skolem(self, i: Index) -> BoolRef:
         return And(
@@ -502,9 +507,7 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     # sk_index - sender_gen_i
     def gen_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(
-            BinRank(self.btw_gen_skolem), FiniteLemma(self.btw_gen_skolem)
-        )
+        return DomainPointwiseRank.close(BinRank(self.btw_gen_skolem), None)
 
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
@@ -514,9 +517,7 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     # sk_index - sender_i
     def sender_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(
-            BinRank(self.btw_sender_skolem), FiniteLemma(self.btw_sender_skolem)
-        )
+        return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)
 
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
@@ -526,15 +527,18 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
 
     # sk_index - receiver_i
     def receiver_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(
-            BinRank(self.btw_receiver_skolem), FiniteLemma(self.btw_receiver_skolem)
-        )
+        return DomainPointwiseRank.close(BinRank(self.btw_receiver_skolem), None)
 
     # should be PWRank instead of LexRank
     def primary_rank(self) -> Rank:
         return LexRank(
-            self.gen_minus_sk(), self.sender_minus_sk(), self.receiver_minus_sk()
+            timer_rank(None, self.t_write_to_skolem, None),
+            self.gen_minus_sk(),
+            self.sender_minus_sk(),
+            self.receiver_minus_sk(),
         )
+
+    # helper booleans that characterise when the sender is outdated or up-to-date, characterised by the difference between sender and receiver bits.
 
     def sender_outdated(self) -> BoolRef:
         return self.sys.sender_bit != self.sys.receiver_bit
@@ -542,47 +546,21 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def sender_up_to_date(self) -> BoolRef:
         return Not(self.sender_outdated())
 
-    # sender_outdated rank
+    # helpers booleans that characterise fairness
 
-    def in_ack_queue(self, a: AckMsg) -> BoolRef:
-        return self.sys.le_ack_msg(a, a)
+    def ack_fairness_established(self) -> BoolRef:
+        return timer_zero(self.t("t_<G(F(ack_received))>")())
 
-    def bad_ack(self, a: AckMsg) -> BoolRef:
-        return self.sys.abit(a) != self.sys.sender_bit
+    def no_ack_fairness(self) -> BoolRef:
+        return timer_nonzero(self.t("t_<G(F(ack_received))>")())
 
-    def no_good_ack(self, A: AckMsg) -> BoolRef:
-        return And(self.in_ack_queue(A), self.bad_ack(A))
+    def data_fairness_established(self) -> BoolRef:
+        return timer_zero(self.t("t_<G(F(data_received))>")())
 
-    def bin_no_good_ack(self) -> Rank:
-        return BinRank(self.no_good_ack)
+    def no_data_fairness(self) -> BoolRef:
+        return timer_nonzero(self.t("t_<G(F(data_received))>")())
 
-    def bad_in_ack_queue(self, a: AckMsg) -> BoolRef:
-        return And(self.in_ack_queue(a), self.bad_ack(a))
-
-    def total_bad_ack(self) -> Rank:
-        return DomainPointwiseRank.close(
-            BinRank(self.bad_in_ack_queue),
-            FiniteLemma(self.in_ack_queue),
-        )
-
-    def until_receiver_scheduled(self) -> Rank:
-        return timer_rank(None, self.t("t_<receiver_scheduled>"), self.no_good_ack)
-
-    def until_ack_received(self) -> Rank:
-        return timer_rank(None, self.t("t_<ack_received>"), None)
-
-    def rank_sender_outdated(self) -> Rank:
-        return CondRank(
-            LexRank(
-                self.total_bad_ack(),
-                self.until_ack_received(),
-                self.bin_no_good_ack(),
-                self.until_receiver_scheduled(),
-            ),
-            self.sender_outdated,
-        )
-
-    # sender_up_to_date rank
+    # When the sender is up to date we wait for them to send new data or for the receiver to receive
 
     def in_data_queue(self, d: DataMsg) -> BoolRef:
         return self.sys.le_data_msg(d, d)
@@ -590,8 +568,9 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def bad_data(self, d: DataMsg) -> BoolRef:
         return self.sys.dbit(d) != self.sys.receiver_bit
 
-    def no_good_data(self, D: DataMsg) -> BoolRef:
-        return And(self.in_data_queue(D), self.bad_data(D))
+    def no_good_data(self) -> BoolRef:
+        D = DataMsg("D")
+        return ForAll(D, Implies(self.in_data_queue(D), self.bad_data(D)))
 
     def bin_no_good_data(self) -> Rank:
         return BinRank(self.no_good_data)
@@ -605,21 +584,27 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             FiniteLemma(self.in_data_queue),
         )
 
+    def data_to_send(self) -> z3.BoolRef:
+        return self.sys.sender_array(self.sys.sender_index) != self.sys.bottom
+
     def sender_scheduling_is_helpful(self) -> z3.BoolRef:
-        return And(
-            self.no_good_data,  # type: ignore # todo@raz: not sure what you meant here
-            self.sys.sender_array(self.sys.sender_index) != self.sys.bottom,
-        )
+        return And(self.no_good_data(), self.data_to_send())
+
+    def t_sender_scheduled(self) -> Time:
+        return self.t("t_<sender_scheduled>")()
 
     def until_sender_scheduled(self) -> Rank:
         return timer_rank(
             None,
-            self.t("t_<sender_scheduled>"),
+            self.t_sender_scheduled,
             self.sender_scheduling_is_helpful,
         )
 
+    def t_data_received(self) -> Time:
+        return self.t("t_<data_received>")()
+
     def until_data_received(self) -> Rank:
-        return timer_rank(None, self.t("t_<data_received>"), None)
+        return timer_rank(None, self.t_data_received, None)
 
     def rank_sender_uptodate(self) -> Rank:
         return CondRank(
@@ -632,92 +617,103 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             self.sender_up_to_date,
         )
 
-    # ack_fairness_established = lambda sym,param: And(
-    #     sym['t_<G(F(ack_received))>']==0,
-    #     Not(sym['t_<G(Not(ack_sent))>']>=0) #artifact of timer semantics not proper
-    # )
-    # no_ack_fairness = lambda sym,param: Not(ack_fairness_established(sym,param))
+    # this is relevant only when the data channel is fair
 
-    # data_fairness_established = lambda sym,param: And(
-    #     sym['t_<G(F(data_received))>']==0,
-    #     Not(sym['t_<G(Not(data_sent))>']>=0) #artifact of timer semantics not proper
-    # )
-    # no_data_fairness = lambda sym,param: Not(data_fairness_established(sym,param))
+    def rank_data_fairness(self) -> Rank:
+        return CondRank(self.rank_sender_uptodate(), self.data_fairness_established)
 
-    # #ranks for the non-fair cases
-    # #if no ack fairness then we are waiting for G(Not(ack_sent))
-    # #from that point no ack can be sent -> the receiver cannot be scheduled
-    # #so we wait for receiver_scheduled
+    # When the sender is outdated we are waiting for them to be scheduled or for the receiver to send a good ack
 
-    # timer_G_no_ack = PositionInOrderFreeRank(
-    #     lambda sym,param1,param2 : param1['x']<param2['x'],
-    #     param_int,
-    #     {'x':lambda sym,param:sym['t_<G(Not(ack_sent))>' ]}
-    # )
-    # timer_receiver_scheduled = PositionInOrderFreeRank(
-    #     lambda sym,param1,param2 : param1['x']<param2['x'],
-    #     param_int,
-    #     {'x':lambda sym,param:sym['t_<receiver_scheduled>']}
-    # )
-    # rank_no_ack_fairness = LexFreeRank([
-    #     timer_G_no_ack,
-    #     timer_receiver_scheduled
-    # ])
+    def in_ack_queue(self, a: AckMsg) -> BoolRef:
+        return self.sys.le_ack_msg(a, a)
 
-    # #if no data fairness then we are waiting for G(Not(data_sent))
-    # #intuitively along with GF sender scheduled this means that infinitely often
-    # #sender_array(sender_i) == bot, which means that the sender must have passed sk_index
-    # #this uses the timer for the assumption that we eventually write to sk_index
+    def bad_ack(self, a: AckMsg) -> BoolRef:
+        return self.sys.abit(a) != self.sys.sender_bit
 
-    # timer_G_no_data = PositionInOrderFreeRank(
-    #     lambda sym,param1,param2 : param1['x']<param2['x'],
-    #     param_int,
-    #     {'x':lambda sym,param:sym['t_<G(Not(data_sent))>' ]}
-    # )
-    # timer_sender_scheduled = PositionInOrderFreeRank(
-    #     lambda sym,param1,param2 : param1['x']<param2['x'],
-    #     param_int,
-    #     {'x':lambda sym,param:sym['t_<sender_scheduled>']}
-    # )
-    # data_to_send = lambda sym,param: sym['sender_array'](sym['sender_i']) != sym['bot']
-    # timer_sender_scheduled_data_to_send = LinFreeRank(
-    #     [timer_sender_scheduled,trivial_rank],
-    #     [data_to_send,lambda *args:
-    #         Not(data_to_send(*args))
-    #     ]
-    # )
-    # timer_write_to_sk_index = PositionInOrderFreeRank(
-    #     lambda sym,param1,param2 : param1['x']<param2['x'],
-    #     param_int,
-    #     {'x':lambda sym,param:sym['t_<sender_array(sk_index) != bot>' ]}
-    # )
+    def no_good_ack(self) -> BoolRef:
+        A = AckMsg("A")
+        return ForAll(A, Implies(self.in_ack_queue(A), self.bad_ack(A)))
 
-    # rank_no_data_fairness = LexFreeRank([
-    #     timer_G_no_data,
-    #     timer_sender_scheduled_data_to_send,
-    #     timer_write_to_sk_index
-    # ])
+    def bin_no_good_ack(self) -> Rank:
+        return BinRank(self.no_good_ack)
 
-    # rank_ack_fairness = LinFreeRank(
-    #     [rank_sender_outdated_composed,rank_no_ack_fairness],
-    #     [ack_fairness_established,no_ack_fairness]
-    # )
-    # rank_data_fairness = LinFreeRank(
-    #     [rank_sender_not_outdated_composed,rank_no_data_fairness],
-    #     [data_fairness_established,no_data_fairness]
-    # )
-    # rank_all_cases = PointwiseFreeRank([rank_data_fairness,rank_ack_fairness])
+    def bad_in_ack_queue(self, a: AckMsg) -> BoolRef:
+        return And(self.in_ack_queue(a), self.bad_ack(a))
 
-    # rank = LexFreeRank([primary_rank,rank_all_cases])
+    def total_bad_ack(self) -> Rank:
+        return DomainPointwiseRank.close(
+            BinRank(self.bad_in_ack_queue),
+            FiniteLemma(self.in_ack_queue),
+        )
 
-    def t_array_skolem_value(self) -> Time:
-        return self.t("t_<F(bottom != sender_array(skolem_index))>")()
+    def t_receiver_scheduled(self) -> Time:
+        return self.t("t_<receiver_scheduled>")()
 
-    def rk1(self) -> Rank:
-        return timer_rank(None, self.t_array_skolem_value)
+    def until_receiver_scheduled(self) -> Rank:
+        return timer_rank(None, self.t_receiver_scheduled, self.no_good_ack)
 
+    def t_ack_received(self) -> Time:
+        return self.t("t_<ack_received>")()
+
+    def true_condition(self) -> BoolRef:
+        return And()
+
+    def until_ack_received(self) -> Rank:
+        return timer_rank(None, self.t_ack_received, self.true_condition)
+
+    def rank_sender_outdated(self) -> Rank:
+        return CondRank(
+            LexRank(
+                self.total_bad_ack(),
+                self.until_ack_received(),
+                self.bin_no_good_ack(),
+                self.until_receiver_scheduled(),
+            ),
+            self.sender_outdated,
+        )
+
+    # this is relevant only when the ack channel is fair
+
+    def rank_ack_fairness(self) -> Rank:
+        return CondRank(self.rank_sender_outdated(), self.ack_fairness_established)
+
+    # If the data channel or ack channel are not fair, we wait for the final messages to be sent, and achieve contradiction with fair scheduling.
+
+    def t_no_future_acks(self) -> Time:
+        return self.t("t_<Not(F(ack_sent))>")()
+
+    def rank_no_ack_fairness(self) -> Rank:
+        return CondRank(
+            LexRank(
+                timer_rank(None, self.t_no_future_acks, None),
+                timer_rank(None, self.t_receiver_scheduled, None),
+            ),
+            self.no_ack_fairness,
+        )
+
+    def t_no_future_datas(self) -> Time:
+        return self.t("t_<Not(F(data_sent))>")()
+
+    def rank_no_data_fairness(self) -> Rank:
+        return CondRank(
+            LexRank(
+                timer_rank(None, self.t_no_future_datas, None),
+                timer_rank(None, self.t_sender_scheduled, self.data_to_send),
+            ),
+            self.no_data_fairness,
+        )
+
+    # we compose all these rankings lexicographically
+
+    # it shouldn't really be Lex, could be PW mostly (?) primary rank should be a different component.
     def rank(self) -> Rank:
-        return LexRank(self.rk1())
+        return LexRank(
+            self.primary_rank(),
+            self.rank_ack_fairness(),
+            self.rank_data_fairness(),
+            self.rank_no_ack_fairness(),
+            self.rank_no_data_fairness(),
+        )
 
 
 AlternatingBitProtocolProof().check()
