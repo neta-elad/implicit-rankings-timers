@@ -30,7 +30,7 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
 - [x] Sanity: init is sat, every tr is sat, init & tr is sat
-  - [ ] Sanity failures for `examples/ticket.py` -- sanity is too strong, init & tr for every tr instead of disjunction.
+  - [x] Sanity failures for `examples/ticket.py` -- sanity is too strong, init & tr for every tr instead of disjunction.
 - [x] Checking conserved before checking decreases
 - [ ] Add DomPermPW and PW constructors
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
