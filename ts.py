@@ -124,11 +124,10 @@ class BaseTransitionSystem(ABC):
             if not self._check_sat(name, self.axiom, self.next.axiom, tr):
                 return False
 
-        for name, tr in self.transitions.items():
-            if not self._check_sat(
-                f"init and {name}", self.axiom, self.next.axiom, self.init, tr
-            ):
-                return False
+        if not self._check_sat(
+            f"init and tr", self.axiom, self.next.axiom, self.init, z3.Or(*self.transitions.values())
+        ):
+            return False
 
         return True
 
