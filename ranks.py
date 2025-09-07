@@ -214,7 +214,7 @@ class FiniteSCByAlpha(SoundnessCondition):
             ):
                 return False
 
-        return True  # todo use alpha
+        return True
 
 
 class ClosedRank(ABC):

@@ -300,18 +300,49 @@ class AlternatingBitProtocol(TransitionSystem):
             self.ack_received == False,
         )
 
+
+class AlternatingBitProtocolProp(Prop[AlternatingBitProtocol]):
     def negated_prop(self) -> BoolRef:
         return And(
-            G(F(self.sender_scheduled)),
-            G(F(self.receiver_scheduled)),
-            Implies(G(F(self.data_sent)), G(F(self.data_received))),
-            Implies(G(F(self.ack_sent)), G(F(self.ack_received))),
-            F(self.sender_array(self.skolem_index) != self.bottom),
-            G(self.receiver_array(self.skolem_index) == self.bottom),
+            G(F(self.sys.sender_scheduled)),
+            G(F(self.sys.receiver_scheduled)),
+            Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
+            Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
+            F(self.sys.sender_array(self.sys.skolem_index) != self.sys.bottom),
+            G(self.sys.receiver_array(self.sys.skolem_index) == self.sys.bottom),
         )
+        # Implies(
+        #     And(
+        #         G(F(self.sender_scheduled)),
+        #         G(F(self.receiver_scheduled)),
+        #         Implies(G(F(self.data_sent)), G(F(self.data_received))),
+        #         Implies(G(F(self.ack_sent)), G(F(self.ack_received))),
+        #     ),
+        #     ForAll(
+        #         I,
+        #         Implies(
+        #             F(self.sender_array(I) != self.bottom),
+        #             F(self.receiver_array(I) != self.bottom),
+        #         ),
+        #     ),
+        # )
 
 
-class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
+class AlternatingBitProtocolProof(
+    Proof[AlternatingBitProtocol], prop=AlternatingBitProtocolProp
+):
+    skolem_index: Index
+
+    # @witness(skolem_index)
+    # def prop_witness(self, I: Index) -> BoolRef:
+    #     return Not(
+    #         Implies(
+    #             F(self.sender_array(I) != self.bottom),
+    #             F(self.receiver_array(I) != self.bottom),
+    #         )
+    #     )
+
+    # Exists(...(I)) replace with ...(skolem_index)
 
     @invariant
     def system_invariant(
@@ -493,6 +524,14 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
             timer_finite(self.t("t_<bottom != sender_array(skolem_index)>")()),
             timer_zero(self.t("t_<G(bottom == receiver_array(skolem_index))>")()),
         )
+
+    # @temporal_invariant
+    # def new_timer_invariant(self) -> BoolRef:
+    #     return And(
+    #         G(F(self.sys.sender_scheduled)),
+    #         G(F(self.sys.receiver_scheduled)),
+    #         Or(F(Not(F(self.sys.data_sent))), G(F(self.sys.data_received))),
+    #     )
 
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
 
@@ -694,11 +733,31 @@ class AlternatingBitProtocolProof(Proof[AlternatingBitProtocol]):
     def t_no_future_datas(self) -> Time:
         return self.t("t_<Not(F(data_sent))>")()
 
+    def no_future_data(self) -> BoolRef:
+        return Not(F(self.sys.data_sent))
+
     def rank_no_data_fairness(self) -> Rank:
+        d = DataMsg("d")
         return CondRank(
             LexRank(
-                timer_rank(None, self.t_no_future_datas, None),
-                timer_rank(None, self.t_sender_scheduled, self.data_to_send),
+                timer_rank(
+                    None,
+                    self.t_no_future_datas,
+                    # self.no_future_data,
+                    # lambda sys: Not(F(sys.data_sent)),
+                    # Not(F(self.sys.data_sent)),
+                    # lambda sys, d=DataMsg():
+                    None,
+                ),
+                timer_rank(
+                    None,
+                    self.t_sender_scheduled,
+                    # lambda sys: sys.sender_scheduled
+                    # self.sys.sender_scheduled,
+                    # lambda sys: sys.sender_array(sys.sender_index) != sys.bottom
+                    # self.sys.sender_array(self.sys.sender_index) != self.sys.bottom
+                    self.data_to_send,
+                ),
             ),
             self.no_data_fairness,
         )

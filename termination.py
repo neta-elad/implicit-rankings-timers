@@ -6,6 +6,7 @@ from typing import ClassVar, cast, Any
 import z3
 
 from ranks import Rank
+from temporal import Prop
 from timers import TimerTransitionSystem, create_timers, TimeFun
 from ts import (
     BaseTransitionSystem,
@@ -19,8 +20,14 @@ from ts import (
 class Proof[T: TransitionSystem](
     IntersectionTransitionSystem[T, TimerTransitionSystem], ABC
 ):
+    prop: Prop[T]
+    prop_type: type[Prop[T]]
     ts: ClassVar[type[BaseTransitionSystem]]
     _cache: ClassVar[dict[type[BaseTransitionSystem], type]] = {}
+
+    def __init_subclass__(cls, prop: type[Prop[T]], **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        cls.prop_type = prop
 
     def __init__(
         self, left: T | None = None, right: TimerTransitionSystem | None = None
@@ -29,14 +36,16 @@ class Proof[T: TransitionSystem](
             left = cast(T, self.__class__.ts())
         object.__setattr__(self, "left", left)
 
+        object.__setattr__(self, "prop", self.prop_type(left))
+
         if right is None:
-            right = create_timers(left.negated_prop(), left)
+            right = create_timers(self.prop.negated_prop(), left)
         object.__setattr__(self, "right", right)
 
     @classmethod
     def __class_getitem__(cls, item: type[BaseTransitionSystem]) -> "type[Proof[T]]":
         if item not in cls._cache:
-            cls._cache[item] = type("tmp", (cls,), {"ts": item})
+            cls._cache[item] = type(f"ProofOf{item}", (cls,), {"ts": item}, prop=None)
 
         return cls._cache[item]
 

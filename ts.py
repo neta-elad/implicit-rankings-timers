@@ -217,9 +217,6 @@ class TSFormula(TSTerm[z3.BoolRef]):
 class TransitionSystem(BaseTransitionSystem, ABC):
     suffix: str
 
-    @abstractmethod
-    def negated_prop(self) -> z3.BoolRef: ...
-
     def __init__(self, suffix: str = "") -> None:
         self.suffix = suffix
         _ = self.symbols  # init self.symbols

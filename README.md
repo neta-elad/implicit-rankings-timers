@@ -29,11 +29,15 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
-- [ ] Add a property class, so we can prove multiple properties for the same system
+- [x] Add a property class, so we can prove multiple properties for the same system
+- [ ] Give prop unnegated and do NNF whenever a timer is used
 - [ ] Add DomPermPW and PW constructors
+  - DomPermPW: take from previous paper + minimal&soundness is like DomPW
+  - PW: take from previous paper + minimal&soundness like Lex
 - [ ] timer_rank should accept formula instead of term
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
-- [ ] (?) models and unsat cores in a folder instead of main folder.
+- [ ] (?) Inheritance of proofs
+- [x] (?) models and unsat cores in a folder instead of main folder.
 - [ ] (?) Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) Add modified argument and check to see everything is modified
 - [ ] (?) Add option to track more temporal formulas in the timer system, and witnesses for temporal formulas (skolemization)

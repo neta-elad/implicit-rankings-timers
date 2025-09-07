@@ -13,8 +13,6 @@ from ranks import (
 )
 from termination import Proof, invariant
 from timers import (
-    G,
-    F,
     timer_zero,
     timer_finite,
     Time,
@@ -22,6 +20,7 @@ from timers import (
     timer_nonzero,
     timer_decreasable,
 )
+from temporal import G, F, Prop
 from ts import (
     TransitionSystem,
     Immutable,
@@ -54,6 +53,7 @@ __all__ = [
     "invariant",
     "G",
     "F",
+    "Prop",
     "timer_zero",
     "timer_finite",
     "Time",
