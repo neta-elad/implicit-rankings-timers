@@ -1,7 +1,6 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from functools import cached_property
-from types import MethodType
 from typing import ClassVar, cast, Any, Self
 
 import z3
@@ -17,12 +16,11 @@ from ts import (
     TransitionSystem,
     BoundTypedFormula,
     unbind,
-    ts_term,
-    get_spec,
     compile_with_spec,
     TSTerm,
+    ParamSpec,
 )
-from typed_z3 import Bool, Rel
+from typed_z3 import Bool
 
 
 class Proof[T: TransitionSystem](
@@ -84,14 +82,18 @@ class Proof[T: TransitionSystem](
 
     def timer_rank[*Ts](
         self,
-        phi: BoundTypedFormula[*Ts],
+        phi: BoundTypedFormula[*Ts] | Bool,
         alpha: BoundTypedFormula[*Ts] | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
-        ts_phi = ts_formula(unbind(phi))
-        timer_name = f"t_<{ts_phi(self)}>"
+        if isinstance(phi, Bool):
+            timer_name = f"t_<{phi.const_name}>"
+            spec = ParamSpec()
+        else:
+            ts_phi = ts_formula(unbind(phi))
+            timer_name = f"t_<{ts_phi(self)}>"
 
-        spec = ts_phi.spec
+            spec = ts_phi.spec
 
         def timer_term(ts: Self, *args: z3.ExprRef) -> Time:
             return ts.t(timer_name)(*args)

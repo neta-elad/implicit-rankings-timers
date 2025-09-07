@@ -626,21 +626,15 @@ class AlternatingBitProtocolProof(
     def sender_scheduling_is_helpful(self) -> BoolRef:
         return And(self.no_good_data(), self.data_to_send())
 
-    def sender_scheduled(self) -> BoolRef:
-        return self.sys.sender_scheduled
-
     def until_sender_scheduled(self) -> Rank:
         return self.timer_rank(
-            self.sender_scheduled,
+            self.sys.sender_scheduled,
             self.sender_scheduling_is_helpful,
             None,
         )
 
-    def data_received(self) -> BoolRef:
-        return self.sys.data_received
-
     def until_data_received(self) -> Rank:
-        return self.timer_rank(self.data_received, None, None)
+        return self.timer_rank(self.sys.data_received, None, None)
 
     def rank_sender_uptodate(self) -> Rank:
         return CondRank(
@@ -682,17 +676,11 @@ class AlternatingBitProtocolProof(
             FiniteLemma(self.in_ack_queue),
         )
 
-    def receiver_scheduled(self) -> BoolRef:
-        return self.sys.receiver_scheduled
-
     def until_receiver_scheduled(self) -> Rank:
-        return self.timer_rank(self.receiver_scheduled, self.no_good_ack, None)
-
-    def ack_received(self) -> BoolRef:
-        return self.sys.ack_received
+        return self.timer_rank(self.sys.receiver_scheduled, self.no_good_ack, None)
 
     def until_ack_received(self) -> Rank:
-        return self.timer_rank(self.ack_received, None, None)
+        return self.timer_rank(self.sys.ack_received, None, None)
 
     def rank_sender_outdated(self) -> Rank:
         return CondRank(
@@ -719,7 +707,7 @@ class AlternatingBitProtocolProof(
         return CondRank(
             LexRank(
                 self.timer_rank(self.no_future_acks, None, None),
-                self.timer_rank(self.receiver_scheduled, None, None),
+                self.timer_rank(self.sys.receiver_scheduled, None, None),
             ),
             self.no_ack_fairness,
         )
@@ -728,7 +716,6 @@ class AlternatingBitProtocolProof(
         return Not(F(self.sys.data_sent))
 
     def rank_no_data_fairness(self) -> Rank:
-        d = DataMsg("d")
         return CondRank(
             LexRank(
                 self.timer_rank(
@@ -741,7 +728,7 @@ class AlternatingBitProtocolProof(
                     None,
                 ),
                 self.timer_rank(
-                    self.sender_scheduled,
+                    self.sys.sender_scheduled,
                     # lambda sys: sys.sender_scheduled
                     # self.sys.sender_scheduled,
                     # lambda sys: sys.sender_array(sys.sender_index) != sys.bottom
