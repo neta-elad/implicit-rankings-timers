@@ -30,11 +30,11 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
 - [x] Add a property class, so we can prove multiple properties for the same system
-- [ ] Give prop unnegated and do NNF whenever a timer is used
 - [ ] Add DomPermPW and PW constructors
   - DomPermPW: take from previous paper + minimal&soundness is like DomPW
   - PW: take from previous paper + minimal&soundness like Lex
-- [ ] timer_rank should accept formula instead of term
+- [x] timer_rank should accept formula instead of term
+- [ ] Give prop unnegated and do NNF whenever a timer is used
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] (?) Inheritance of proofs
 - [x] (?) models and unsat cores in a folder instead of main folder.

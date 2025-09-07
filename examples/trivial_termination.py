@@ -44,20 +44,20 @@ class TrivialTerminationProof(
             timer_zero(self.t("t_<G(Exists(T, on(T)))>")()),
         )
 
-    def on(self, t: Thread) -> BoolRef:
-        return self.sys.on(t)
+    def on(self, T: Thread) -> BoolRef:
+        return self.sys.on(T)
 
     def system_rank(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.on), None)
 
-    def scheduled(self, t: Thread) -> Time:
-        return self.t("t_<scheduled(T)>")(t)
+    def scheduled(self, T: Thread) -> BoolRef:
+        return self.sys.scheduled(T)
 
-    def timer_rank(self) -> Rank:
-        return timer_rank(None, self.scheduled, self.on)
+    def scheduled_timer_rank(self) -> Rank:
+        return self.timer_rank(self.scheduled, self.on, None)
 
     def rank(self) -> Rank:
-        return LexRank(self.system_rank(), self.timer_rank())
+        return LexRank(self.system_rank(), self.scheduled_timer_rank())
 
 
 TrivialTerminationProof().check()

@@ -258,11 +258,14 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
             ),
         )
 
-    def t_locked(self) -> Time:
-        return self.t("t_<And(pc2(skolem_thread), G(Not(pc3(skolem_thread))))>")()
+    def locked(self) -> BoolRef:
+        return And(
+            self.sys.pc2(self.sys.skolem_thread),
+            G(Not(self.sys.pc3(self.sys.skolem_thread))),
+        )
 
     def rk1(self) -> Rank:
-        return timer_rank(None, self.t_locked)
+        return self.timer_rank(self.locked, None, None)
 
     def rk2_body(self, k: Ticket) -> BoolRef:
         X = Ticket("X")
@@ -287,20 +290,20 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     def rk3(self) -> Rank:
         return BinRank(self.rk3_body)
 
-    def scheduled(self, x: Thread) -> Time:
-        return self.t("t_<scheduled(T)>")(x)
+    def scheduled(self, T: Thread) -> BoolRef:
+        return self.sys.scheduled(T)
 
-    def non_pc1_serviced(self, x: Thread) -> BoolRef:
-        return And(self.sys.m(x, self.sys.service), Not(self.sys.pc1(x)))
+    def non_pc1_serviced(self, T: Thread) -> BoolRef:
+        return And(self.sys.m(T, self.sys.service), Not(self.sys.pc1(T)))
 
-    def rk4_finite_lemma(self, x: Thread) -> BoolRef:
-        return Not(self.sys.pc1(x))
+    def rk4_finite_lemma(self, T: Thread) -> BoolRef:
+        return Not(self.sys.pc1(T))
 
     def rk4(self) -> Rank:
-        return timer_rank(
-            FiniteLemma(self.rk4_finite_lemma),
+        return self.timer_rank(
             self.scheduled,
             self.non_pc1_serviced,
+            FiniteLemma(self.rk4_finite_lemma),
         )
 
     def rank(self) -> Rank:

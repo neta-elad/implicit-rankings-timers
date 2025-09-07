@@ -1,11 +1,8 @@
-import z3
-
 from prelude import *
 
 
-class Index(
-    Finite
-): ...  # Notice we assume finitely many indices - a bit different from original modeling, we can modify later.
+# Notice we assume finitely many indices - a bit different from original modeling, we can modify later.
+class Index(Finite): ...
 
 
 class Value(Expr): ...
@@ -535,8 +532,8 @@ class AlternatingBitProtocolProof(
 
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
 
-    def t_write_to_skolem(self) -> Time:
-        return self.t("t_<bottom != sender_array(skolem_index)>")()
+    def write_to_skolem(self) -> BoolRef:
+        return self.sys.bottom != self.sys.sender_array(self.sys.skolem_index)
 
     def btw_gen_skolem(self, i: Index) -> BoolRef:
         return And(
@@ -571,7 +568,7 @@ class AlternatingBitProtocolProof(
     # should be PWRank instead of LexRank
     def primary_rank(self) -> Rank:
         return LexRank(
-            timer_rank(None, self.t_write_to_skolem, None),
+            self.timer_rank(self.write_to_skolem, None, None),
             self.gen_minus_sk(),
             self.sender_minus_sk(),
             self.receiver_minus_sk(),
@@ -623,27 +620,27 @@ class AlternatingBitProtocolProof(
             FiniteLemma(self.in_data_queue),
         )
 
-    def data_to_send(self) -> z3.BoolRef:
+    def data_to_send(self) -> BoolRef:
         return self.sys.sender_array(self.sys.sender_index) != self.sys.bottom
 
-    def sender_scheduling_is_helpful(self) -> z3.BoolRef:
+    def sender_scheduling_is_helpful(self) -> BoolRef:
         return And(self.no_good_data(), self.data_to_send())
 
-    def t_sender_scheduled(self) -> Time:
-        return self.t("t_<sender_scheduled>")()
+    def sender_scheduled(self) -> BoolRef:
+        return self.sys.sender_scheduled
 
     def until_sender_scheduled(self) -> Rank:
-        return timer_rank(
-            None,
-            self.t_sender_scheduled,
+        return self.timer_rank(
+            self.sender_scheduled,
             self.sender_scheduling_is_helpful,
+            None,
         )
 
-    def t_data_received(self) -> Time:
-        return self.t("t_<data_received>")()
+    def data_received(self) -> BoolRef:
+        return self.sys.data_received
 
     def until_data_received(self) -> Rank:
-        return timer_rank(None, self.t_data_received, None)
+        return self.timer_rank(self.data_received, None, None)
 
     def rank_sender_uptodate(self) -> Rank:
         return CondRank(
@@ -685,20 +682,17 @@ class AlternatingBitProtocolProof(
             FiniteLemma(self.in_ack_queue),
         )
 
-    def t_receiver_scheduled(self) -> Time:
-        return self.t("t_<receiver_scheduled>")()
+    def receiver_scheduled(self) -> BoolRef:
+        return self.sys.receiver_scheduled
 
     def until_receiver_scheduled(self) -> Rank:
-        return timer_rank(None, self.t_receiver_scheduled, self.no_good_ack)
+        return self.timer_rank(self.receiver_scheduled, self.no_good_ack, None)
 
-    def t_ack_received(self) -> Time:
-        return self.t("t_<ack_received>")()
-
-    def true_condition(self) -> BoolRef:
-        return And()
+    def ack_received(self) -> BoolRef:
+        return self.sys.ack_received
 
     def until_ack_received(self) -> Rank:
-        return timer_rank(None, self.t_ack_received, self.true_condition)
+        return self.timer_rank(self.ack_received, None, None)
 
     def rank_sender_outdated(self) -> Rank:
         return CondRank(
@@ -718,20 +712,17 @@ class AlternatingBitProtocolProof(
 
     # If the data channel or ack channel are not fair, we wait for the final messages to be sent, and achieve contradiction with fair scheduling.
 
-    def t_no_future_acks(self) -> Time:
-        return self.t("t_<Not(F(ack_sent))>")()
+    def no_future_acks(self) -> BoolRef:
+        return Not(F(self.sys.ack_sent))
 
     def rank_no_ack_fairness(self) -> Rank:
         return CondRank(
             LexRank(
-                timer_rank(None, self.t_no_future_acks, None),
-                timer_rank(None, self.t_receiver_scheduled, None),
+                self.timer_rank(self.no_future_acks, None, None),
+                self.timer_rank(self.receiver_scheduled, None, None),
             ),
             self.no_ack_fairness,
         )
-
-    def t_no_future_datas(self) -> Time:
-        return self.t("t_<Not(F(data_sent))>")()
 
     def no_future_data(self) -> BoolRef:
         return Not(F(self.sys.data_sent))
@@ -740,23 +731,23 @@ class AlternatingBitProtocolProof(
         d = DataMsg("d")
         return CondRank(
             LexRank(
-                timer_rank(
-                    None,
-                    self.t_no_future_datas,
+                self.timer_rank(
+                    self.no_future_data,
                     # self.no_future_data,
                     # lambda sys: Not(F(sys.data_sent)),
                     # Not(F(self.sys.data_sent)),
                     # lambda sys, d=DataMsg():
                     None,
-                ),
-                timer_rank(
                     None,
-                    self.t_sender_scheduled,
+                ),
+                self.timer_rank(
+                    self.sender_scheduled,
                     # lambda sys: sys.sender_scheduled
                     # self.sys.sender_scheduled,
                     # lambda sys: sys.sender_array(sys.sender_index) != sys.bottom
                     # self.sys.sender_array(self.sys.sender_index) != self.sys.bottom
                     self.data_to_send,
+                    None,
                 ),
             ),
             self.no_data_fairness,

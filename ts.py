@@ -307,16 +307,16 @@ class IntersectionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSys
 def ts_formula[T: BaseTransitionSystem, *Ts](
     formula: TypedFormula[T, *Ts],
 ) -> TSFormula:
-    spec = _get_spec(formula, z3.BoolRef, Bool)
-    raw_term = _compile_with_spec(formula, spec)
+    spec = get_spec(formula, z3.BoolRef, Bool)
+    raw_term = compile_with_spec(formula, spec)
     return TSFormula(spec, raw_term, formula.__name__)
 
 
 def ts_term[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     term: TypedTerm[T, *Ts, R],
 ) -> TSTerm[R]:
-    spec = _get_spec(term, z3.ExprRef)
-    raw_term = _compile_with_spec(term, spec)
+    spec = get_spec(term, z3.ExprRef)
+    raw_term = compile_with_spec(term, spec)
     return TSTerm(spec, raw_term, term.__name__)
 
 
@@ -348,7 +348,7 @@ def transition[T: BaseTransitionSystem, *Ts](
     return fun
 
 
-def _get_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
+def get_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     term: TypedTerm[T, *Ts, R], *returns: type[z3.ExprRef]
 ) -> ParamSpec:
     sig = signature(term)
@@ -379,7 +379,7 @@ def _get_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     return ParamSpec(spec)
 
 
-def _compile_with_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
+def compile_with_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     formula: TypedTerm[T, *Ts, R], spec: ParamSpec
 ) -> RawTSTerm[R]:
     def compiled(ts: BaseTransitionSystem, params: Params) -> R:

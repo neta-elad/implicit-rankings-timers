@@ -1,20 +1,28 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from functools import cached_property
-from typing import ClassVar, cast, Any
+from types import MethodType
+from typing import ClassVar, cast, Any, Self
 
 import z3
 
-from ranks import Rank
+from ranks import Rank, FiniteLemma, timer_rank
 from temporal import Prop
-from timers import TimerTransitionSystem, create_timers, TimeFun
+from timers import TimerTransitionSystem, create_timers, TimeFun, Time
 from ts import (
     BaseTransitionSystem,
     IntersectionTransitionSystem,
     ts_formula,
     TSFormula,
     TransitionSystem,
+    BoundTypedFormula,
+    unbind,
+    ts_term,
+    get_spec,
+    compile_with_spec,
+    TSTerm,
 )
+from typed_z3 import Bool, Rel
 
 
 class Proof[T: TransitionSystem](
@@ -73,6 +81,26 @@ class Proof[T: TransitionSystem](
     @cached_property
     def invariant(self) -> z3.BoolRef:
         return z3.And(*self.invariants.values())
+
+    def timer_rank[*Ts](
+        self,
+        phi: BoundTypedFormula[*Ts],
+        alpha: BoundTypedFormula[*Ts] | None,
+        finite_lemma: FiniteLemma | None,
+    ) -> Rank:
+        ts_phi = ts_formula(unbind(phi))
+        timer_name = f"t_<{ts_phi(self)}>"
+
+        spec = ts_phi.spec
+
+        def timer_term(ts: Self, *args: z3.ExprRef) -> Time:
+            return ts.t(timer_name)(*args)
+
+        raw = compile_with_spec(timer_term, spec)
+
+        phi_term = TSTerm(spec, raw, timer_name)
+
+        return timer_rank(finite_lemma, phi_term, alpha)
 
     def check(self) -> bool:
         if not self.sys.sanity_check():

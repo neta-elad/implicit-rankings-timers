@@ -47,7 +47,6 @@ __all__ = [
     "CondRank",
     "DomainPointwiseRank",
     "LexRank",
-    "timer_rank",
     "FiniteLemma",
     "Proof",
     "invariant",

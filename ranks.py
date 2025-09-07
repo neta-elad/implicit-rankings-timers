@@ -294,10 +294,12 @@ class BinRank(Rank):
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
     order: TSRel[T]
-    term_src: BoundTypedTerm[Any, T]
+    term_src: BoundTypedTerm[Any, T] | TSTerm[T]
 
     @cached_property
     def term(self) -> TSTerm[T]:
+        if isinstance(self.term_src, TSTerm):
+            return self.term_src
         return ts_term(unbind(self.term_src))
 
     @property
@@ -719,9 +721,9 @@ def ts_rel[T: BaseTransitionSystem, R: Expr](rel: Callable[[T], Rel[R, R]]) -> T
 
 def timer_rank[*Ts](
     finite_lemma: FiniteLemma | None,
-    term: BoundTypedTerm[*Ts, Time],
+    term: BoundTypedTerm[*Ts, Time] | TSTerm[Time],
     alpha: BoundTypedFormula[*Ts] | None = None,
-) -> Rank:  # todo: get phi instead of term
+) -> Rank:
     if alpha is None:
         return DomainPointwiseRank.close(
             PosInOrderRank(ts_rel(lambda ts: timer_order()), term), finite_lemma
