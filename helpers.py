@@ -148,9 +148,10 @@ def print_model_in_order(
             print_model_to_file = print_model_to_file.replace(" ", "-")
         global _model_counter
         _model_counter += 1
-        path = Path(f"model-{_model_counter}-{print_model_to_file}.txt")
-        print(f"Model written to {path.absolute()}")
+        path = Path(f"models/{_model_counter}-{print_model_to_file}.txt")
+        path.parent.mkdir(exist_ok=True)
         path.write_text(buffer.getvalue())
+        print(f"Model written to {path.absolute()}")
     else:
         print(buffer.getvalue())
 
@@ -177,9 +178,10 @@ def print_unsat_core(
             print_core_to_file = print_core_to_file.replace(" ", "-")
         global _core_counter
         _core_counter += 1
-        path = Path(f"core-{_core_counter}-{print_core_to_file}.txt")
-        print(f"Unsat core written to {path.absolute()}")
+        path = Path(f"cores/{_core_counter}-{print_core_to_file}.txt")
+        path.parent.mkdir(exist_ok=True)
         path.write_text(buffer.getvalue())
+        print(f"Unsat core written to {path.absolute()}")
     else:
         print(buffer.getvalue())
 

@@ -17,3 +17,5 @@ Thumbs.db
 # Counter-models and unsat cores
 model-*.txt
 core-*.txt
+models/
+cores/
