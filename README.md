@@ -36,6 +36,7 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 - [ ] (?) models and unsat cores in a folder instead of main folder.
 - [ ] (?) Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) Add modified argument and check to see everything is modified
+- [ ] (?) Add option to track more temporal formulas in the timer system, and witnesses for temporal formulas (skolemization)
 - [ ] (?) Bounded model-checking: given an array of formulas phi_i,
             check if there exists a trace that satisfies phi_0 
             in state 0, phi_1 in state 1, etc.
