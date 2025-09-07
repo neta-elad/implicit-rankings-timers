@@ -28,6 +28,7 @@ format: $(VENV)
 	$(PYTHON) -m black . --exclude .venv
 
 .PHONY: %.py
+.PRECIOUS: %.py
 %.py: $(VENV) check
 	$(PYTHON) $@
 
