@@ -45,7 +45,7 @@ class Proof[T: TransitionSystem](
         object.__setattr__(self, "prop", self.prop_type(left))
 
         if right is None:
-            right = create_timers(self.prop.negated_prop(), left)
+            right = create_timers(left, self.prop.negated_prop())
         object.__setattr__(self, "right", right)
 
     @classmethod

@@ -239,23 +239,12 @@ class ExistsTimer(Timer):
         )
 
 
+@dataclass(frozen=True)
 class TimerTransitionSystem(BaseTransitionSystem):
     ts: BaseTransitionSystem
     timers: dict[TimerId, Timer]
     root: Timer
-    suffix: str
-
-    def __init__(
-        self,
-        ts: BaseTransitionSystem,
-        timers: dict[TimerId, Timer],
-        root: Timer,
-        suffix: str = "",
-    ) -> None:
-        self.ts = ts
-        self.timers = timers
-        self.root = root
-        self.suffix = suffix
+    suffix: str = ""
 
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
@@ -266,6 +255,10 @@ class TimerTransitionSystem(BaseTransitionSystem):
     @cached_property
     def next(self) -> Self:
         return self.__class__(self.ts.next, self.timers, self.root, self.suffix + "'")
+
+    @cached_property
+    def reset(self) -> Self:
+        return self.__class__(self.ts.next, self.timers, self.root, "")
 
     def t(self, name: str) -> TimeFun:
         assert name in self.symbols, f"No timer for formula {name}"
@@ -308,7 +301,9 @@ class TimerTransitionSystem(BaseTransitionSystem):
 
 
 def create_timers[T: BaseTransitionSystem](
-    root_formula: z3.BoolRef, ts: T
+    ts: T,
+    root_formula: z3.BoolRef,
+    *formulas: z3.BoolRef,
 ) -> TimerTransitionSystem:
     timers: dict[TimerId, Timer] = {}
 
@@ -420,6 +415,9 @@ def create_timers[T: BaseTransitionSystem](
             return add(AtomicTimer(formula, atomic_params))
 
     root_timer = create_timer(root_formula)
+
+    for formula in formulas:
+        create_timer(formula)
 
     return TimerTransitionSystem(ts, timers, root_timer)
 

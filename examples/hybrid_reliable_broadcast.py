@@ -113,7 +113,6 @@ class HybridReliableBroadcast(TransitionSystem):
             ),
         )
 
-
     @transition
     def receive_msg(self, s: Node, n: Node) -> BoolRef:
         N2 = Node("N2")
@@ -127,12 +126,16 @@ class HybridReliableBroadcast(TransitionSystem):
                 == Or(old(N1, N2), And(N1 == s, N2 == n))
             ),
             If(
-                Exists(B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))),
+                Exists(
+                    B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
+                ),
                 self.accept.update(lambda old, new, N: new(N) == Or(old(N), N == n)),
                 self.accept.unchanged(),
             ),
             If(
-                Exists(A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))),
+                Exists(
+                    A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))
+                ),
                 And(
                     self.sent_msg.update(
                         lambda old, new, N1, N2: new(N1, N2) == Or(old(N1, N2), N1 == n)
@@ -160,12 +163,16 @@ class HybridReliableBroadcast(TransitionSystem):
                 == Or(old(N1, N2), And(N1 == s, N2 == n))
             ),
             If(
-                Exists(B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))),
+                Exists(
+                    B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
+                ),
                 self.accept.update(lambda old, new, N: new(N) == Or(old(N), N == n)),
                 self.accept.unchanged(),
             ),
             If(
-                Exists(A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))),
+                Exists(
+                    A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))
+                ),
                 Or(
                     And(
                         self.sent_msg.update(
@@ -226,14 +233,18 @@ class HybridReliableBroadcast(TransitionSystem):
                 == Or(old(N1, N2), And(N1 == s, N2 == n))
             ),
             If(
-                Exists(B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))),
+                Exists(
+                    B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
+                ),
                 self.accept.update(
                     lambda old, new, N1: new(N1) == Or(old(N1), N1 == n)
                 ),
                 self.accept.unchanged(),
             ),
             If(
-                Exists(A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))),
+                Exists(
+                    A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))
+                ),
                 Or(
                     And(
                         # sent_msg(n,N) := *; assume old sent_msg(n,N) -> sent_msg(n,N);
