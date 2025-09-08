@@ -235,18 +235,21 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         X = Ticket("X")
         return Exists(X, self.sys.m(self.sys.skolem_thread, X))
 
-    @invariant
+    @temporal_invariant
     def globally_eventually_scheduled(self, T: Thread) -> BoolRef:
-        return timer_zero(self.t("t_<G(F(scheduled(T)))>")(T))
+        return G(F(self.sys.scheduled(T)))
 
-    @invariant
+    @temporal_invariant
     def timer_invariant(self, K: Ticket) -> BoolRef:
         return Or(
-            timer_finite(
-                self.t("t_<And(pc2(skolem_thread), G(Not(pc3(skolem_thread))))>")()
+            F(
+                And(
+                    self.sys.pc2(self.sys.skolem_thread),
+                    G(Not(self.sys.pc3(self.sys.skolem_thread))),
+                )
             ),
             And(
-                timer_zero(self.t("t_<G(Not(pc3(skolem_thread)))>")()),
+                G(Not(self.sys.pc3(self.sys.skolem_thread))),
                 self.sys.pc2(self.sys.skolem_thread),
                 ForAll(
                     K,
