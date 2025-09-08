@@ -10,7 +10,7 @@ from ranks import (
     LexRank,
     FiniteLemma,
 )
-from termination import Proof, invariant
+from termination import Proof, invariant, temporal_invariant
 from timers import (
     timer_zero,
     timer_finite,
@@ -49,6 +49,7 @@ __all__ = [
     "FiniteLemma",
     "Proof",
     "invariant",
+    "temporal_invariant",
     "G",
     "F",
     "Prop",

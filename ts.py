@@ -28,6 +28,11 @@ from typed_z3 import Fun, Expr, Sort, Bool
 
 
 class BaseTransitionSystem(ABC):
+    suffix: str
+
+    def __init__(self, suffix: str) -> None:
+        self.suffix = suffix
+
     @property
     @abstractmethod
     def symbols(self) -> dict[str, z3.FuncDeclRef]: ...
@@ -35,9 +40,16 @@ class BaseTransitionSystem(ABC):
     def __getitem__(self, item: str) -> z3.FuncDeclRef:
         return self.symbols[item]
 
-    @property
     @abstractmethod
-    def next(self) -> Self: ...
+    def clone(self, suffix: str) -> Self: ...
+
+    @cached_property
+    def next(self) -> Self:
+        return self.clone(self.suffix + "'")
+
+    @cached_property
+    def reset(self) -> Self:
+        return self.clone("")
 
     @property
     @abstractmethod
@@ -215,11 +227,12 @@ class TSFormula(TSTerm[z3.BoolRef]):
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
-    suffix: str
-
     def __init__(self, suffix: str = "") -> None:
-        self.suffix = suffix
+        super().__init__(suffix)
         _ = self.symbols  # init self.symbols
+
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix)
 
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
@@ -272,20 +285,26 @@ class TransitionSystem(BaseTransitionSystem, ABC):
         return transitions
 
 
-@dataclass(frozen=True)
 class IntersectionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
     BaseTransitionSystem
 ):
     left: L
     right: R
 
+    def __init__(self, suffix: str, left: L, right: R) -> None:
+        assert (
+            suffix == left.suffix and left.suffix == right.suffix
+        ), f"Malformed intersection system"
+        super().__init__(suffix)
+        self.left = left
+        self.right = right
+
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
         return self.left.symbols | self.right.symbols
 
-    @cached_property
-    def next(self) -> Self:
-        return self.__class__(self.left.next, self.right.next)
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix, self.left.clone(suffix), self.right.clone(suffix))
 
     @cached_property
     def inits(self) -> dict[str, z3.BoolRef]:

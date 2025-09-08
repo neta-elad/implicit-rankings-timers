@@ -36,13 +36,14 @@ class TrivialTerminationProp(Prop[TrivialTerminationSystem]):
 class TrivialTerminationProof(
     Proof[TrivialTerminationSystem], prop=TrivialTerminationProp
 ):
-    @invariant
+    @temporal_invariant
+    def fair_scheduling(self, T: Thread) -> BoolRef:
+        return G(F(self.sys.scheduled(T)))
+
+    @temporal_invariant
     def timer_invariant(self) -> BoolRef:
-        return And(
-            timer_zero(self.t("t_<ForAll(T, G(F(scheduled(T))))>")()),
-            # temporal invariant: ForAll(T, G(F(scheduled(T)))
-            timer_zero(self.t("t_<G(Exists(T, on(T)))>")()),
-        )
+        T = Thread("T")
+        return G(Exists(T, self.sys.on(T)))
 
     def on(self, T: Thread) -> BoolRef:
         return self.sys.on(T)

@@ -34,6 +34,7 @@ For a simple example, check out the `examples/trivial_termination.py` file.
   - DomPermPW: take from previous paper + minimal&soundness is like DomPW
   - PW: take from previous paper + minimal&soundness like Lex
 - [x] timer_rank should accept formula instead of term
+- [x] Temporal invariants
 - [ ] Give prop unnegated and do NNF whenever a timer is used
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] (?) Inheritance of proofs

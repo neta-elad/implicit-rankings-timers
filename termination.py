@@ -7,7 +7,7 @@ import z3
 
 from ranks import Rank, FiniteLemma, timer_rank
 from temporal import Prop
-from timers import TimerTransitionSystem, create_timers, TimeFun, Time
+from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
     BaseTransitionSystem,
     IntersectionTransitionSystem,
@@ -23,30 +23,36 @@ from ts import (
 from typed_z3 import Bool
 
 
-class Proof[T: TransitionSystem](
-    IntersectionTransitionSystem[T, TimerTransitionSystem], ABC
-):
-    prop: Prop[T]
+class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     prop_type: type[Prop[T]]
-    ts: ClassVar[type[BaseTransitionSystem]]
+    ts: ClassVar[type[TransitionSystem]]
     _cache: ClassVar[dict[type[BaseTransitionSystem], type]] = {}
 
     def __init_subclass__(cls, prop: type[Prop[T]], **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.prop_type = prop
 
-    def __init__(
-        self, left: T | None = None, right: TimerTransitionSystem | None = None
-    ) -> None:
-        if left is None:
-            left = cast(T, self.__class__.ts())
-        object.__setattr__(self, "left", left)
+    def __init__(self, suffix: str = "") -> None:
+        super().__init__(suffix)
 
-        object.__setattr__(self, "prop", self.prop_type(left))
+    @property
+    def symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return self.intersection.symbols
 
-        if right is None:
-            right = create_timers(left, self.prop.negated_prop())
-        object.__setattr__(self, "right", right)
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix)
+
+    @property
+    def inits(self) -> dict[str, z3.BoolRef]:
+        return self.intersection.inits
+
+    @property
+    def axioms(self) -> dict[str, z3.BoolRef]:
+        return self.intersection.axioms
+
+    @property
+    def transitions(self) -> dict[str, z3.BoolRef]:
+        return self.intersection.transitions
 
     @classmethod
     def __class_getitem__(cls, item: type[BaseTransitionSystem]) -> "type[Proof[T]]":
@@ -60,14 +66,26 @@ class Proof[T: TransitionSystem](
 
     @cached_property
     def sys(self) -> T:
-        return self.left
+        return cast(T, self.__class__.ts(self.suffix))
+
+    @cached_property
+    def prop(self) -> Prop[T]:
+        return self.prop_type(self.sys)
 
     @cached_property
     def timers(self) -> TimerTransitionSystem:
-        return self.right
+        return create_timers(
+            self.reset.sys,
+            self.reset.prop.negated_prop(),
+            *self.temporal_invariant_formulas.values(),
+        ).clone(self.suffix)
+
+    @cached_property
+    def intersection(self) -> IntersectionTransitionSystem[T, TimerTransitionSystem]:
+        return IntersectionTransitionSystem(self.suffix, self.sys, self.timers)
 
     def t(self, name: str) -> TimeFun:
-        return self.right.t(name)
+        return self.timers.t(name)
 
     @cached_property
     def invariants(self) -> dict[str, z3.BoolRef]:
@@ -77,8 +95,22 @@ class Proof[T: TransitionSystem](
         }
 
     @cached_property
+    def temporal_invariant_formulas(self) -> dict[str, z3.BoolRef]:
+        return {
+            name: method.forall(self.reset)
+            for name, method in _get_methods(self, _PROOF_TEMPORAL_INVARIANT)
+        }
+
+    @cached_property
+    def temporal_invariants(self) -> dict[str, z3.BoolRef]:
+        return {
+            name: timer_zero(self._compile_timer(f"t_<{formula}>")(self))
+            for name, formula in self.temporal_invariant_formulas.items()
+        }
+
+    @cached_property
     def invariant(self) -> z3.BoolRef:
-        return z3.And(*self.invariants.values())
+        return z3.And(*self.invariants.values(), *self.temporal_invariants.values())
 
     def timer_rank[*Ts](
         self,
@@ -92,8 +124,16 @@ class Proof[T: TransitionSystem](
         else:
             ts_phi = ts_formula(unbind(phi))
             timer_name = f"t_<{ts_phi(self)}>"
-
             spec = ts_phi.spec
+
+        phi_term = self._compile_timer(timer_name, spec)
+
+        return timer_rank(finite_lemma, phi_term, alpha)
+
+    @staticmethod
+    def _compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:
+        if spec is None:
+            spec = ParamSpec()
 
         def timer_term(ts: Self, *args: z3.ExprRef) -> Time:
             return ts.t(timer_name)(*args)
@@ -101,8 +141,7 @@ class Proof[T: TransitionSystem](
         raw = compile_with_spec(timer_term, spec)
 
         phi_term = TSTerm(spec, raw, timer_name)
-
-        return timer_rank(finite_lemma, phi_term, alpha)
+        return phi_term
 
     def check(self) -> bool:
         if not self.sys.sanity_check():
@@ -178,9 +217,22 @@ def invariant[T: Proof[Any], *Ts](
     return fun
 
 
+def temporal_invariant[T: Proof[Any], *Ts](
+    fun: TypedProofFormula[T, *Ts],
+) -> TypedProofFormula[T, *Ts]:
+    setattr(fun, _PROOF_METADATA, _PROOF_TEMPORAL_INVARIANT)
+    return fun
+
+
 _PROOF_METADATA = "__proof_metadata__"
 _PROOF_INVARIANT = object()
-_PROOF_SPECIALS = {"invariant", "invariants"}
+_PROOF_TEMPORAL_INVARIANT = object()
+_PROOF_SPECIALS = {
+    "invariant",
+    "invariants",
+    "temporal_invariants",
+    "temporal_invariant_formulas",
+}
 
 
 def _get_methods(ts: Proof[Any], marker: object) -> Iterable[tuple[str, TSFormula]]:

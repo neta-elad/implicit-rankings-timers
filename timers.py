@@ -252,13 +252,8 @@ class TimerTransitionSystem(BaseTransitionSystem):
             timer.name: timer.to_fun(self.suffix) for timer in self.timers.values()
         }
 
-    @cached_property
-    def next(self) -> Self:
-        return self.__class__(self.ts.next, self.timers, self.root, self.suffix + "'")
-
-    @cached_property
-    def reset(self) -> Self:
-        return self.__class__(self.ts.next, self.timers, self.root, "")
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(self.ts.clone(suffix), self.timers, self.root, suffix)
 
     def t(self, name: str) -> TimeFun:
         assert name in self.symbols, f"No timer for formula {name}"
