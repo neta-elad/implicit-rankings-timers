@@ -505,30 +505,22 @@ class AlternatingBitProtocolProof(
             ),
         )
 
-    @invariant
+    @temporal_invariant
     def timer_invariant(self) -> BoolRef:
         return And(
-            timer_zero(self.t("t_<G(F(sender_scheduled))>")()),
-            timer_zero(self.t("t_<G(F(receiver_scheduled))>")()),
+            G(F(self.sys.sender_scheduled)),
+            G(F(self.sys.receiver_scheduled)),
             Or(
-                timer_finite(self.t("t_<Not(F(data_sent))>")()),
-                timer_zero(self.t("t_<G(F(data_received))>")()),
+                F(Not(F(self.sys.data_sent))),
+                G(F(self.sys.data_received)),
             ),
             Or(
-                timer_finite(self.t("t_<Not(F(ack_sent))>")()),
-                timer_zero(self.t("t_<G(F(ack_received))>")()),
+                F(Not(F(self.sys.ack_sent))),
+                G(F(self.sys.ack_received)),
             ),
-            timer_finite(self.t("t_<bottom != sender_array(skolem_index)>")()),
-            timer_zero(self.t("t_<G(bottom == receiver_array(skolem_index))>")()),
+            F(self.sys.bottom != self.sys.sender_array(self.sys.skolem_index)),
+            G(self.sys.bottom == self.sys.receiver_array(self.sys.skolem_index)),
         )
-
-    # @temporal_invariant
-    # def new_timer_invariant(self) -> BoolRef:
-    #     return And(
-    #         G(F(self.sys.sender_scheduled)),
-    #         G(F(self.sys.receiver_scheduled)),
-    #         Or(F(Not(F(self.sys.data_sent))), G(F(self.sys.data_received))),
-    #     )
 
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
 
