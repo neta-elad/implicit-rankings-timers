@@ -6,6 +6,7 @@ from typing import Any, cast, Self, Protocol
 
 import z3
 
+from helpers import unpack_quantifier
 from temporal import is_G, is_F
 from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
@@ -448,25 +449,6 @@ def normalized_not(formula: z3.ExprRef) -> z3.BoolRef:
         return cast(z3.BoolRef, child)
     else:
         return z3.Not(formula)
-
-
-def clone_vars(quantifier: z3.QuantifierRef) -> list[z3.ExprRef]:
-    return [
-        z3.Const(quantifier.var_name(i), quantifier.var_sort(i))
-        for i in range(quantifier.num_vars())
-    ]
-
-
-def unpack_quantifier(
-    quantifier: z3.QuantifierRef,
-) -> tuple[list[z3.ExprRef], z3.BoolRef]:
-    bounding_vars = clone_vars(quantifier)
-
-    body = z3.substitute_vars(
-        quantifier.body(), *reversed(bounding_vars)
-    )  # Z3 uses vars in reverse order
-
-    return bounding_vars, body
 
 
 def _replace_symbols_in_formula(

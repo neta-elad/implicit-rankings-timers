@@ -8,7 +8,6 @@ from ranks import (
     CondRank,
     DomainPointwiseRank,
     LexRank,
-    timer_rank,
     FiniteLemma,
 )
 from termination import Proof, invariant
