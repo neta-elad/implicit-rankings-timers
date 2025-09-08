@@ -557,141 +557,149 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
 
 CorrectnessHRBProof().check()
 
-"""
-Second Property - Relay
-In words: 
-under the same assumptions
-if some correct node accepts
-then eventually all correct nodes accept
-"""
 
-# relay = And(
-#     ForAll([N, M], Implies(And(correct(N), rcv_init(N)), F(sent_msg(N, M)))),
-#     ForAll([N, M], G(Implies(And(sent_msg(N, M), correct(M)), F(rcv_msg(N, M))))),
-#     F(Exists(N, And(obedient(N), accept(N)))),
-#     G(Exists(N, And(correct(N), Not(accept(N))))),
-# )
+## Waiting for ability to have witnesses for temporal formulas
+class RelayHRB(Prop[HybridReliableBroadcast]):
+    # Second Property - Relay
+    # Under the same assumptions as correctness, if some correct node accepts,
+    # then eventually all correct nodes accept.
+    def negated_prop(self) -> BoolRef:
+        N = Node("N")
+        M = Node("M")
+        return And(
+            ForAll(
+                [N, M],
+                Implies(
+                    And(self.sys.correct(N), self.sys.rcv_init(N)),
+                    F(self.sys.sent_msg(N, M)),
+                ),
+            ),
+            ForAll(
+                [N, M],
+                G(
+                    Implies(
+                        And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                        F(self.sys.rcv_msg(N, M)),
+                    )
+                ),
+            ),
+            F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
+            G(Exists(N, And(self.sys.correct(N), Not(self.sys.accept(N))))),
+        )
 
-# class RelayHRBProof():
 
-# """start of second proof"""
+class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
 
-# # intuition:
-# # first we wait for some obedient node n0 to accept
-# # let B0 be the quorum that has all the correct nodes
-# # and let A0 be the quorum that has only symmetric nodes from B0
-# # we want to show that eventually all correct nodes accept through B0
-# # didn't compeletely get this but this is related to the non-EPR invariants above.
+    pass
+    # intuition:
+    # first we wait for some obedient node n0 to accept
+    # let B0 be the quorum that has all the correct nodes
+    # and let A0 be the quorum that has only symmetric nodes from B0
+    # we want to show that eventually all correct nodes accept through B0
+    # didn't compeletely get this but this is related to the non-EPR invariants above.
 
-# timer_system = timer_transition_system(relay, {})
-# intersection = IntersectionTS(ts, timer_system)
-# # print(intersection.constant_sym)
+    # def timer_invariant_relay(sym):
+    #     return And(
+    #         sym["t_<G(Exists(N, And(correct(N), Not(accept(N)))))>"] == 0,
+    #         ForAll(
+    #             [N, M],
+    #             Implies(
+    #                 And(
+    #                     self.correct(N),
+    #                     self.sys.rcv_init(N),
+    #                     Not(self.sent_msg(N, M)),
+    #                 ),
+    #                 sym["t_<sent_msg(N, M)>"](N, M) > 0,
+    #             ),
+    #         ),
+    #         ForAll(
+    #             [N, M],
+    #             sym[
+    #                 "t_<G(Or(Or(Not(sent_msg(N, M)), Not(correct(M))), F(rcv_msg(N, M))))>"
+    #             ](N, M)
+    #             == 0,
+    #         ),
+    #         ForAll(
+    #             [N, M],
+    #             Implies(
+    #                 And(
+    #                     self.correct(M),
+    #                     self.sent_msg(N, M),
+    #                     Not(self.rcv_msg(N, M)),
+    #                 ),
+    #                 sym["t_<rcv_msg(N, M)>"](N, M) > 0,
+    #             ),
+    #         ),
+    #         Or(
+    #             Exists(N, And(self.sys.obedient(N), self.accept(N))),
+    #             sym["t_<Exists(N, And(obedient(N), accept(N)))>"] > 0,
+    #         ),
+    #     )
 
-# def timer_invariant_relay(sym):
-#     return And(
-#         sym["t_<G(Exists(N, And(correct(N), Not(accept(N)))))>"] == 0,
-#         ForAll(
-#             [N, M],
-#             Implies(
-#                 And(
-#                     self.correct(N),
-#                     self.sys.rcv_init(N),
-#                     Not(self.sent_msg(N, M)),
-#                 ),
-#                 sym["t_<sent_msg(N, M)>"](N, M) > 0,
-#             ),
-#         ),
-#         ForAll(
-#             [N, M],
-#             sym[
-#                 "t_<G(Or(Or(Not(sent_msg(N, M)), Not(correct(M))), F(rcv_msg(N, M))))>"
-#             ](N, M)
-#             == 0,
-#         ),
-#         ForAll(
-#             [N, M],
-#             Implies(
-#                 And(
-#                     self.correct(M),
-#                     self.sent_msg(N, M),
-#                     Not(self.rcv_msg(N, M)),
-#                 ),
-#                 sym["t_<rcv_msg(N, M)>"](N, M) > 0,
-#             ),
-#         ),
-#         Or(
-#             Exists(N, And(self.sys.obedient(N), self.accept(N))),
-#             sym["t_<Exists(N, And(obedient(N), accept(N)))>"] > 0,
-#         ),
-#     )
+    # def invariant_relay(sym):
+    #     return And(system_invariant(sym), timer_invariant_relay(sym))
 
-# def invariant_relay(sym):
-#     return And(system_invariant(sym), timer_invariant_relay(sym))
+    # # more ranks
 
-# # more ranks
+    # not_accept_correct = lambda sym, param: And(
+    #     self.correct(param["N"]), Not(self.accept(param["N"]))
+    # )
+    # bin_not_accept = BinaryFreeRank(not_accept_correct, {"N": Node})
+    # pw_not_accept = ParPointwiseFreeRank(bin_not_accept, {"N": Node})
 
-# not_accept_correct = lambda sym, param: And(
-#     self.correct(param["N"]), Not(self.accept(param["N"]))
-# )
-# bin_not_accept = BinaryFreeRank(not_accept_correct, {"N": Node})
-# pw_not_accept = ParPointwiseFreeRank(bin_not_accept, {"N": Node})
+    # # should be packaged somehow
+    # timer_exists_accept = PositionInOrderFreeRank(
+    #     lambda sym, param1, param2: param1["x"] < param2["x"],
+    #     param_int,
+    #     {"x": lambda sym, param: sym["t_<Exists(N, And(obedient(N), accept(N)))>"]},
+    #     {},
+    # )
+    # exists_accept = lambda sym, param: Exists(
+    #     N, And(self.sys.obedient(N), self.accept(N))
+    # )
+    # not_exists_accept = lambda sym, param: Not(exists_accept(sym, param))
+    # timer_exists_accept_lin = LinFreeRank(
+    #     [timer_exists_accept, trivial_rank], [not_exists_accept, exists_accept]
+    # )
 
-# # should be packaged somehow
-# timer_exists_accept = PositionInOrderFreeRank(
-#     lambda sym, param1, param2: param1["x"] < param2["x"],
-#     param_int,
-#     {"x": lambda sym, param: sym["t_<Exists(N, And(obedient(N), accept(N)))>"]},
-#     {},
-# )
-# exists_accept = lambda sym, param: Exists(
-#     N, And(self.sys.obedient(N), self.accept(N))
-# )
-# not_exists_accept = lambda sym, param: Not(exists_accept(sym, param))
-# timer_exists_accept_lin = LinFreeRank(
-#     [timer_exists_accept, trivial_rank], [not_exists_accept, exists_accept]
-# )
+    # # not necessarily important or needed at all
+    # correct_rcv_init_and_unsent = lambda sym, param: And(
+    #     self.correct(param["N"]),
+    #     self.sys.rcv_init(param["N"]),
+    #     Not(self.sent_msg(param["N"], param["M"])),
+    # )
+    # ow3 = lambda sym, param: Not(correct_rcv_init_and_unsent(sym, param))
+    # sent_timer_for_good = LinFreeRank(
+    #     [sent_timer, trivial_rank], [correct_rcv_init_and_unsent, ow3]
+    # )
+    # all_sent_timers_refined = ParPointwiseFreeRank(sent_timer_for_good, param_NM)
 
-# # not necessarily important or needed at all
-# correct_rcv_init_and_unsent = lambda sym, param: And(
-#     self.correct(param["N"]),
-#     self.sys.rcv_init(param["N"]),
-#     Not(self.sent_msg(param["N"], param["M"])),
-# )
-# ow3 = lambda sym, param: Not(correct_rcv_init_and_unsent(sym, param))
-# sent_timer_for_good = LinFreeRank(
-#     [sent_timer, trivial_rank], [correct_rcv_init_and_unsent, ow3]
-# )
-# all_sent_timers_refined = ParPointwiseFreeRank(sent_timer_for_good, param_NM)
+    # not_sent = lambda sym, param: Not(self.sent_msg(param["N"], param["M"]))
+    # correct_sent_not_recv_accept = lambda sym, param: And(
+    #     self.correct(param["M"]),
+    #     self.correct(param["N"]),
+    #     self.sent_msg(param["N"], param["M"]),
+    #     Not(self.rcv_msg(param["N"], param["M"])),
+    #     Not(self.accept(param["M"])),
+    # )
+    # ow4 = lambda sym, param: And(
+    #     Not(correct_sent_not_recv_accept(sym, param)), Not(not_sent(sym, param))
+    # )
+    # sent_timer_for_good = LinFreeRank(
+    #     [trivial_rank, rcv_timer, trivial_rank],
+    #     [not_sent, correct_sent_not_recv_accept, ow4],
+    # )
+    # all_rcv_timers_refined = ParPointwiseFreeRank(sent_timer_for_good, param_NM)
 
-# not_sent = lambda sym, param: Not(self.sent_msg(param["N"], param["M"]))
-# correct_sent_not_recv_accept = lambda sym, param: And(
-#     self.correct(param["M"]),
-#     self.correct(param["N"]),
-#     self.sent_msg(param["N"], param["M"]),
-#     Not(self.rcv_msg(param["N"], param["M"])),
-#     Not(self.accept(param["M"])),
-# )
-# ow4 = lambda sym, param: And(
-#     Not(correct_sent_not_recv_accept(sym, param)), Not(not_sent(sym, param))
-# )
-# sent_timer_for_good = LinFreeRank(
-#     [trivial_rank, rcv_timer, trivial_rank],
-#     [not_sent, correct_sent_not_recv_accept, ow4],
-# )
-# all_rcv_timers_refined = ParPointwiseFreeRank(sent_timer_for_good, param_NM)
+    # # the rank below might be good enough but there is either a problem with the timer ranks or the invariant is not good enough.
 
-# # the rank below might be good enough but there is either a problem with the timer ranks or the invariant is not good enough.
-
-# rank_relay = PointwiseFreeRank(
-#     [
-#         pw_not_sent,
-#         pw_not_recv,
-#         pw_not_accept,
-#         timer_exists_accept_lin,
-#         all_rcv_timers_refined,
-#         all_sent_timers_refined,
-#     ]
-# )
-
-# proof_relay = TerminationProof(rank_relay, invariant_relay)
-# proof_relay.check_proof(intersection)
+    # rank_relay = PointwiseFreeRank(
+    #     [
+    #         pw_not_sent,
+    #         pw_not_recv,
+    #         pw_not_accept,
+    #         timer_exists_accept_lin,
+    #         all_rcv_timers_refined,
+    #         all_sent_timers_refined,
+    #     ]
+    # )
