@@ -1,4 +1,4 @@
-from z3 import BoolRef, ExprRef, And, Implies, Or, Not, ForAll, If, Exists
+from z3 import BoolRef, ExprRef, And, Implies, Or, Not, ForAll, If, Exists, EnumSort
 
 from ranks import (
     ClosedRank,
@@ -39,6 +39,7 @@ __all__ = [
     "ForAll",
     "If",
     "Exists",
+    "EnumSort",
     "ClosedRank",
     "Rank",
     "BinRank",
