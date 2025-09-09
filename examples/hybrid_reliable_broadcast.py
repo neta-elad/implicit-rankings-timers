@@ -480,15 +480,24 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
     @invariant
     def timer_invariant_correctness(self, N: Node, M: Node) -> BoolRef:
         return And(
-            timer_zero(self.t("t_<G(ForAll(N, Not(And(correct(N), accept(N)))))>")()),
+            timer_zero(
+                self.t(
+                    G(ForAll(N, Not(And(self.sys.correct(N), self.sys.accept(N)))))
+                )()
+            ),
             Implies(self.sys.obedient(N), self.sys.rcv_init(N)),
             Implies(
                 And(self.sys.correct(N), self.sys.rcv_init(N)),
-                timer_finite(self.t("t_<sent_msg(N, M)>")(N, M)),
+                timer_finite(self.t(self.sys.sent_msg(N, M))(N, M)),
             ),
             timer_zero(
                 self.t(
-                    "t_<G(Implies(And(sent_msg(N, M), correct(M)), F(rcv_msg(N, M))))>"
+                    G(
+                        Implies(
+                            And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                            F(self.sys.rcv_msg(N, M)),
+                        )
+                    )
                 )(N, M)
             ),
             Implies(
@@ -497,7 +506,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                     self.sys.sent_msg(N, M),
                     Not(self.sys.rcv_msg(N, M)),
                 ),
-                timer_finite(self.t("t_<rcv_msg(N, M)>")(N, M)),
+                timer_finite(self.t(self.sys.rcv_msg(N, M))(N, M)),
             ),
         )
 

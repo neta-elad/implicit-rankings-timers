@@ -84,8 +84,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def intersection(self) -> IntersectionTransitionSystem[T, TimerTransitionSystem]:
         return IntersectionTransitionSystem(self.suffix, self.sys, self.timers)
 
-    def t(self, name: str) -> TimeFun:
-        return self.timers.t(name)
+    def t(self, name: z3.BoolRef) -> TimeFun:
+        return self.timers.t(f"t_<{str(name).replace("'", "")}>")
 
     @cached_property
     def invariants(self) -> dict[str, z3.BoolRef]:
@@ -136,7 +136,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             spec = ParamSpec()
 
         def timer_term(ts: Self, *args: z3.ExprRef) -> Time:
-            return ts.t(timer_name)(*args)
+            return ts.timers.t(timer_name)(*args)
 
         raw = compile_with_spec(timer_term, spec)
 

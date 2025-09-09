@@ -577,16 +577,16 @@ class AlternatingBitProtocolProof(
     # helpers booleans that characterise fairness
 
     def ack_fairness_established(self) -> BoolRef:
-        return timer_zero(self.t("t_<G(F(ack_received))>")())
+        return timer_zero(self.t(G(F(self.sys.ack_received)))())
 
     def no_ack_fairness(self) -> BoolRef:
-        return timer_nonzero(self.t("t_<G(F(ack_received))>")())
+        return timer_nonzero(self.t(G(F(self.sys.ack_received)))())
 
     def data_fairness_established(self) -> BoolRef:
-        return timer_zero(self.t("t_<G(F(data_received))>")())
+        return timer_zero(self.t(G(F(self.sys.data_received)))())
 
     def no_data_fairness(self) -> BoolRef:
-        return timer_nonzero(self.t("t_<G(F(data_received))>")())
+        return timer_nonzero(self.t(G(F(self.sys.data_received)))())
 
     # When the sender is up to date we wait for them to send new data or for the receiver to receive
 
