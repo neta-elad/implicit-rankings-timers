@@ -137,7 +137,6 @@ class Enum(Expr, ABC):
         names = []
         for field, hint in get_type_hints(cls, localns={cls.__name__: cls}).items():
             if hint is cls:
-                print(f"{field=} {hint=}")
                 names.append(field)
 
         sort, values = z3.EnumSort(cls.__name__, names)
