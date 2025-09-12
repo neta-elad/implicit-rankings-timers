@@ -124,6 +124,10 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
     @invariant
     def unique_token(self, X: Node, Y: Node) -> BoolRef:
         return Implies(And(self.sys.token(X), self.sys.token(Y)), X == Y)
+    
+    @invariant
+    def critical_implies_token(self, X:Node) -> BoolRef:
+        return Implies(self.sys.node_loc(X) == Loc.critical, self.sys.token(X))
 
     @invariant
     def exists_token(self) -> BoolRef:
@@ -134,43 +138,71 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
     def globally_eventually_scheduled(self, N: Node) -> BoolRef:
         return G(F(self.sys.scheduled(N)))
 
-    def scheduled(self, N: Node) -> BoolRef:
-        return self.sys.scheduled(N)
+    @temporal_invariant
+    def skolem_never_critical(self) -> BoolRef:
+        return F(
+            And(
+                self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
+                G(Not(self.sys.node_loc(self.sys.skolem_node) == Loc.critical)),
+            )
+        )
 
     def holds_token(self, N: Node) -> BoolRef:
         return self.sys.token(N)
 
-    ## add system ranks
+    def waiting_and_token(self) -> BoolRef:
+        N = Node("N")
+        return Exists(N, And(self.holds_token(N), self.sys.node_loc(N) == Loc.waiting))
+
+    def critical(self) -> BoolRef:
+        N = Node("N")
+        return Exists(N, self.sys.node_loc(N) == Loc.critical)
+
+    def local_rank(self) -> Rank:
+        return LexRank(
+            BinRank(self.waiting_and_token),
+            BinRank(self.critical)
+        )
+    
+
+    def btw_sk_token(self, N: Node) -> BoolRef:
+        M = Node("M")
+        return Exists(
+            M,
+            And(
+                self.holds_token(M),
+                Or(
+                    self.sys.btw(M, N, self.sys.skolem_node),
+                    And(M != N, N == self.sys.skolem_node),
+                ),
+            ),
+        )
+
+    def ring_distance(self) -> Rank:
+        return DomainPointwiseRank.close(BinRank(self.btw_sk_token), None)
+
+    def locked(self) -> BoolRef:
+        return And(
+            self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
+            G(Not(self.sys.node_loc(self.sys.skolem_node) == Loc.critical)),
+        )
+
+    def locked_rank(self) -> Rank:
+        return self.timer_rank(self.locked, None, None)
+
+    def scheduled(self, N: Node) -> BoolRef:
+        return self.sys.scheduled(N)
 
     def scheduling_rank(self) -> Rank:
         return self.timer_rank(self.scheduled, self.holds_token, None)
 
     def rank(self) -> Rank:
-        return LexRank(self.scheduling_rank())
+        return LexRank(
+            self.locked_rank(),
+            self.ring_distance(),
+            self.local_rank(),
+            self.scheduling_rank(),
+        )
 
 
 MutexRingProof().check()
-
-# rank in prev paper.
-# n_node = {'n':Node}
-# pred_waiting_token = lambda sym,param: And(sym['node_loc'](n)==waiting,sym['token'](n))
-# delta0_free = BinaryFreeRank(pred_waiting_token,n_node)
-# pred_critical_token = lambda sym,param: And(sym['node_loc'](n)==critical,sym['token'](n))
-# delta1_free = BinaryFreeRank(pred_critical_token,n_node)
-# pred_neutral_token = lambda sym,param: And(sym['node_loc'](n)==neutral,sym['token'](n))
-# delta2_free = BinaryFreeRank(pred_neutral_token,n_node)
-# delta_free = LexFreeRank([delta0_free,delta1_free,delta2_free],n_node)
-
-# less_btw_her_last = lambda sym,param1,param2: Or(self.btw(sym['node_her1'],param1['n'],param2['n']),And(param2['n']==sym['node_her1'],param1['n']!=sym['node_her1']))
-
-# rank_lex = ParLexFreeRank(delta_free,n_node,less_btw_her_last,{})
-
-# rank_lex.print_reduced(ts)
-
-# rho = lambda sym: And(Exists(X,sym['token'](X)),
-#                             inv(sym) #safety invariant - needed for proof with rank_lin
-#                             )
-# phi = lambda sym: And(rho(sym),
-#                         p(sym),
-#                         Not(q(sym)))
-# psi = lambda sym,param: sym['token'](n)
