@@ -1,50 +1,11 @@
 from abc import ABC
 from collections.abc import Callable
 from functools import cached_property
-from typing import TYPE_CHECKING, Self, ClassVar, cast, Annotated
+from typing import TYPE_CHECKING, Self, ClassVar, cast, get_type_hints, Any
 
 import z3
 
-if TYPE_CHECKING:
-
-    class Expr(z3.Const, ABC):
-        const_name: str
-
-        def __init__(self, name: str) -> None: ...
-
-        @classmethod
-        def ref(cls) -> z3.SortRef: ...
-
-        @classmethod
-        def const(cls, name: str) -> Self: ...
-
-        @classmethod
-        def consts(cls, names: str) -> list[Self]: ...
-
-        @classmethod
-        def declare(cls, name: str) -> "Sort": ...
-
-        @classmethod
-        def finite(cls) -> bool: ...
-
-        @property
-        def next(self) -> Self: ...
-
-        @property
-        def fun(self) -> "Fun[Self]": ...
-
-        @property
-        def fun_ref(self) -> z3.FuncDeclRef: ...
-
-        def unchanged(self) -> z3.BoolRef: ...
-
-    class Bool(z3.Bool, Expr): ...
-
-    class Int(z3.Int, Expr):
-        @classmethod
-        def lt(cls) -> "Rel[Int, Int]": ...
-
-else:
+if not TYPE_CHECKING:
 
     class Expr(z3.ExprRef, ABC):
         const_name: str
@@ -52,8 +13,11 @@ else:
 
         _cache: ClassVar[dict[str, type["Expr"]]] = {}
 
-        def __init__(self, name: str, mutable: bool = True) -> None:
-            const = z3.Const(name, self.__class__.ref())
+        def __init__(
+            self, name: str, mutable: bool = True, *, const: "z3.Const | None" = None
+        ) -> None:
+            if const is None:
+                const = z3.Const(name, self.__class__.ref())
             super(Expr, self).__init__(const.ast, const.ctx)
             self.const_name = name
             self.mutable = mutable
@@ -113,10 +77,103 @@ else:
             return WFRel[Int]("<", False, (z3.IntVal(0) < 0).decl())
 
 
+if TYPE_CHECKING:
+
+    class Expr(z3.Const, ABC):
+        const_name: str
+
+        def __init__(self, name: str) -> None: ...
+
+        @classmethod
+        def ref(cls) -> z3.SortRef: ...
+
+        @classmethod
+        def const(cls, name: str) -> Self: ...
+
+        @classmethod
+        def consts(cls, names: str) -> list[Self]: ...
+
+        @classmethod
+        def declare(cls, name: str) -> "Sort": ...
+
+        @classmethod
+        def finite(cls) -> bool: ...
+
+        @property
+        def next(self) -> Self: ...
+
+        @property
+        def fun(self) -> "Fun[Self]": ...
+
+        @property
+        def fun_ref(self) -> z3.FuncDeclRef: ...
+
+        def unchanged(self) -> z3.BoolRef: ...
+
+    class Bool(z3.Bool, Expr): ...
+
+    class Int(z3.Int, Expr):
+        @classmethod
+        def lt(cls) -> "Rel[Int, Int]": ...
+
+
 class Finite(Expr, ABC):
     @classmethod
     def finite(cls) -> bool:
         return True
+
+
+class Enum(Expr, ABC):
+    enum_sort: ClassVar[z3.SortRef]
+    enum_values: tuple[Self, ...]
+
+    @classmethod
+    def finite(cls) -> bool:
+        return True
+
+    @classmethod
+    def __init_subclass__(cls, **kwargs: Any) -> None:
+        super().__init_subclass__(**kwargs)
+        names = []
+        for field, hint in get_type_hints(cls, localns={cls.__name__: cls}).items():
+            if hint is cls:
+                print(f"{field=} {hint=}")
+                names.append(field)
+
+        sort, values = z3.EnumSort(cls.__name__, names)
+        cls.enum_sort = sort
+
+        enum_values: list[Self] = []
+        for name, value in zip(names, values):
+            enum_value: Self = cls(name, False, const=value)  # type: ignore
+            setattr(cls, name, enum_value)
+            enum_values.append(enum_value)
+
+        cls.enum_values = tuple(enum_values)
+
+    # origin = get_origin(hint) or hint
+    # mutable = True
+    # if origin is Immutable:
+    #     mutable = False
+    #     origin = get_args(hint)[0]
+    #
+    # name = field
+    # if mutable:
+    #     name += self.suffix
+    #
+    # if issubclass(origin, Expr):
+    #     symbol = origin(name, mutable)
+    #     symbols[field] = symbol.fun_ref
+    # elif issubclass(origin, Fun):
+    #     symbol = origin(name, mutable)
+    #     symbols[field] = symbol.fun
+    # else:
+    #     continue
+    # object.__setattr__(self, field, symbol)
+
+    @classmethod
+    def ref(cls) -> z3.SortRef:
+        return cls.enum_sort
 
 
 type Sort = type[Expr]
