@@ -124,9 +124,9 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
     @invariant
     def unique_token(self, X: Node, Y: Node) -> BoolRef:
         return Implies(And(self.sys.token(X), self.sys.token(Y)), X == Y)
-    
+
     @invariant
-    def critical_implies_token(self, X:Node) -> BoolRef:
+    def critical_implies_token(self, X: Node) -> BoolRef:
         return Implies(self.sys.node_loc(X) == Loc.critical, self.sys.token(X))
 
     @invariant
@@ -159,11 +159,7 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
         return Exists(N, self.sys.node_loc(N) == Loc.critical)
 
     def local_rank(self) -> Rank:
-        return LexRank(
-            BinRank(self.waiting_and_token),
-            BinRank(self.critical)
-        )
-    
+        return LexRank(BinRank(self.waiting_and_token), BinRank(self.critical))
 
     def btw_sk_token(self, N: Node) -> BoolRef:
         M = Node("M")
