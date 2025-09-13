@@ -36,6 +36,7 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] In readme, write list of all features
 - [ ] Improve formatter
+- [ ] differentiate timeouts and violations in printing
 - [ ] (?) Remove .update() function - it's confusing, or make better update function for updating just one relation/function value
 - [ ] (?) Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) Add modified argument and check to see everything is modified
