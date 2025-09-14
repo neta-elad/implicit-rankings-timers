@@ -341,6 +341,40 @@ class IntersectionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSys
         }
 
 
+class UnionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
+    BaseTransitionSystem
+):
+    left: L
+    right: R
+
+    def __init__(self, suffix: str, left: L, right: R) -> None:
+        assert (
+            suffix == left.suffix and left.suffix == right.suffix
+        ), f"Malformed union system"
+        super().__init__(suffix)
+        self.left = left
+        self.right = right
+
+    @cached_property
+    def symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return self.left.symbols | self.right.symbols
+
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix, self.left.clone(suffix), self.right.clone(suffix))
+
+    @cached_property
+    def inits(self) -> dict[str, z3.BoolRef]:
+        return self.left.inits | self.right.inits
+
+    @cached_property
+    def axioms(self) -> dict[str, z3.BoolRef]:
+        return self.left.axioms | self.right.axioms
+
+    @cached_property
+    def transitions(self) -> dict[str, z3.BoolRef]:
+        return self.left.transitions | self.right.transitions
+
+
 def ts_formula[T: BaseTransitionSystem, *Ts](
     formula: TypedFormula[T, *Ts],
 ) -> TSFormula:

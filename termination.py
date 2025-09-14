@@ -20,8 +20,43 @@ from ts import (
     compile_with_spec,
     TSTerm,
     ParamSpec,
+    UnionTransitionSystem,
 )
 from typed_z3 import Bool, Expr
+
+
+class WitnessSystem(BaseTransitionSystem):
+    witness_generator: Callable[[str], dict[str, z3.FuncDeclRef]]
+    axiom_generator: Callable[[str], dict[str, z3.BoolRef]]
+
+    def __init__(
+        self,
+        suffix: str,
+        witness_generator: Callable[[str], dict[str, z3.FuncDeclRef]],
+        axiom_generator: Callable[[str], dict[str, z3.BoolRef]],
+    ) -> None:
+        super().__init__(suffix)
+        self.witness_generator = witness_generator
+        self.axiom_generator = axiom_generator
+
+    @cached_property
+    def symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return self.witness_generator(self.suffix)
+
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix, self.witness_generator, self.axiom_generator)
+
+    @property
+    def inits(self) -> dict[str, z3.BoolRef]:
+        return {}
+
+    @property
+    def axioms(self) -> dict[str, z3.BoolRef]:
+        return self.axiom_generator(self.suffix)
+
+    @property
+    def transitions(self) -> dict[str, z3.BoolRef]:
+        return {}
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -35,7 +70,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     def __init__(self, suffix: str = "") -> None:
         super().__init__(suffix)
-        _ = self.witnesses  # initial witness
+        _ = self.witnesses  # initialize witnesses
+        _ = self.temporal_witnesses  # initialize temporal witnesses
 
     @property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
@@ -50,9 +86,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @property
     def axioms(self) -> dict[str, z3.BoolRef]:
-        return self.intersection.axioms | {
-            name: axiom for name, (_witness, axiom) in self.witnesses.items()
-        }
+        return self.intersection.axioms
 
     @property
     def transitions(self) -> dict[str, z3.BoolRef]:
@@ -73,20 +107,42 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return cast(T, self.__class__.ts(self.suffix))
 
     @cached_property
+    def witness_system(self) -> WitnessSystem:
+        return WitnessSystem(
+            self.suffix,
+            lambda suffix: self.clone(suffix).witness_symbols
+            | self.clone(suffix).temporal_witness_symbols,
+            lambda suffix: self.clone(suffix).witness_axioms,
+        )
+
+    @cached_property
+    def sys_with_witnesses(self) -> UnionTransitionSystem[T, WitnessSystem]:
+        return UnionTransitionSystem(self.suffix, self.sys, self.witness_system)
+
+    @cached_property
     def prop(self) -> Prop[T]:
         return self.prop_type(self.sys)
 
     @cached_property
     def timers(self) -> TimerTransitionSystem:
         return create_timers(
-            self.reset.sys,
-            self.reset.prop.negated_prop(),
-            *self.temporal_invariant_formulas.values(),
+            self.reset.sys_with_witnesses,
+            z3.And(
+                self.reset.prop.negated_prop(),
+                *self.reset.temporal_witness_props.values(),
+            ),
+            *self.reset.temporal_invariant_formulas.values(),
         ).clone(self.suffix)
 
     @cached_property
-    def intersection(self) -> IntersectionTransitionSystem[T, TimerTransitionSystem]:
-        return IntersectionTransitionSystem(self.suffix, self.sys, self.timers)
+    def intersection(
+        self,
+    ) -> IntersectionTransitionSystem[
+        UnionTransitionSystem[T, WitnessSystem], TimerTransitionSystem
+    ]:
+        return IntersectionTransitionSystem(
+            self.suffix, self.sys_with_witnesses, self.timers
+        )
 
     def t(self, name: z3.BoolRef) -> TimeFun:
         return self.timers.t(f"t_<{str(name).replace("'", "")}>")
@@ -118,7 +174,6 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @cached_property
     def witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
-        hints = get_type_hints(self.__class__)
         witnesses = {}
         for method_name, method in _get_methods(self, _PROOF_WITNESS):
             witness_name = method_name
@@ -131,6 +186,42 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             witnesses[witness_name] = (symbol, axiom)
             setattr(self, witness_name, symbol)
         return witnesses
+
+    @cached_property
+    def witness_symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return {
+            name: symbol.fun_ref for name, (symbol, _axiom) in self.witnesses.items()
+        }
+
+    @cached_property
+    def witness_axioms(self) -> dict[str, z3.BoolRef]:
+        return {name: axiom for name, (_symbol, axiom) in self.witnesses.items()}
+
+    @cached_property
+    def temporal_witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
+        witnesses = {}
+        for method_name, method in _get_methods(self, _PROOF_TEMPORAL_WITNESS):
+            witness_name = method_name
+            assert (
+                len(method.spec) == 1
+            ), f"Witness method {method_name} must except exactly one argument"
+            ((param, sort),) = method.spec.items()
+            symbol = sort(witness_name, False)  # type: ignore
+            prop = z3.Implies(method.exists(self), method(self, {param: symbol}))
+            witnesses[witness_name] = (symbol, prop)
+            setattr(self, witness_name, symbol)
+        return witnesses
+
+    @cached_property
+    def temporal_witness_props(self) -> dict[str, z3.BoolRef]:
+        return {name: prop for name, (_symbol, prop) in self.temporal_witnesses.items()}
+
+    @cached_property
+    def temporal_witness_symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return {
+            name: symbol.fun_ref
+            for name, (symbol, _axiom) in self.temporal_witnesses.items()
+        }
 
     def timer_rank[*Ts](
         self,
@@ -244,21 +335,21 @@ def temporal_invariant[T: Proof[Any], *Ts](
     return fun
 
 
-# def witness[T: Proof[Any], W: Expr](
-#     name: str
-# ) -> Callable[[TypedProofFormula[T, W]], TypedProofFormula[T, W]]:
 def witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
     setattr(fun, _PROOF_METADATA, _PROOF_WITNESS)
-    # setattr(fun, _PROOF_WITNESS_METADATA, name)
     return fun  # type: ignore
 
-    # return decorator
+
+def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
+    setattr(fun, _PROOF_METADATA, _PROOF_TEMPORAL_WITNESS)
+    return fun  # type: ignore
 
 
 _PROOF_METADATA = "__proof_metadata__"
 _PROOF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
 _PROOF_WITNESS = object()
+_PROOF_TEMPORAL_WITNESS = object()
 _PROOF_WITNESS_METADATA = "__proof_witness_metadata__"
 
 _PROOF_SPECIALS = {
@@ -267,6 +358,7 @@ _PROOF_SPECIALS = {
     "temporal_invariants",
     "temporal_invariant_formulas",
     "witnesses",
+    "temporal_witnesses",
 }
 
 
