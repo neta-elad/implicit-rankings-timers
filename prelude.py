@@ -10,6 +10,8 @@ from ranks import (
     CondRank,
     DomainPointwiseRank,
     LexRank,
+    PointwiseRank,
+    DomainPermutedRank,
     FiniteLemma,
 )
 from termination import Proof, invariant, temporal_invariant
@@ -50,6 +52,8 @@ __all__ = [
     "CondRank",
     "DomainPointwiseRank",
     "LexRank",
+    "PointwiseRank",
+    "DomainPermutedRank",
     "FiniteLemma",
     "Proof",
     "invariant",
