@@ -116,22 +116,17 @@ class FiniteSCByAlpha(SoundnessCondition):
             for i in range(self.lemma.m)
         ]
 
-        params = self.spec.params()
+        params = self.spec.consts()
 
         return z3.Exists(
             [y for y_tuple in ys for y in y_tuple],
             z3.ForAll(
-                list(params.values()),
+                params,
                 z3.Implies(
                     self.alpha(ts),
                     z3.Or(
                         *(
-                            z3.And(
-                                *(
-                                    param == y
-                                    for param, y in zip(params.values(), y_tuple)
-                                )
-                            )
+                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
                             for y_tuple in ys
                         )
                     ),
@@ -145,23 +140,18 @@ class FiniteSCByAlpha(SoundnessCondition):
             for i in range(self.lemma.m)
         ]
 
-        params = self.spec.params()
+        params = self.spec.consts()
 
         return z3.Exists(
             [y for y_tuple in ys for y in y_tuple],
             z3.ForAll(
-                list(params.values()),
+                params,
                 z3.Implies(
                     self.alpha(ts.next),
                     z3.Or(
                         self.alpha(ts),
                         *(
-                            z3.And(
-                                *(
-                                    param == y
-                                    for param, y in zip(params.values(), y_tuple)
-                                )
-                            )
+                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
                             for y_tuple in ys
                         ),
                     ),
@@ -191,7 +181,7 @@ class FiniteSCByAlpha(SoundnessCondition):
             z3.Not(
                 quantify(
                     True,
-                    z.params().values(),  # todo: maybe flip to exists ys forall z
+                    z.consts(),  # todo: maybe flip to exists ys forall z
                     self.at_most_m_alpha_at_init(ts),
                 )
             ),
@@ -206,7 +196,7 @@ class FiniteSCByAlpha(SoundnessCondition):
                 z3.Not(
                     quantify(
                         True,
-                        z.params().values(),  # todo: maybe flip to exists ys forall z
+                        z.consts(),  # todo: maybe flip to exists ys forall z
                         self.at_most_m_alpha_added(ts),
                     ),
                 ),
@@ -566,7 +556,7 @@ class DomainPointwiseRank(Rank):
         return TSFormula(
             self.spec.doubled(),
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.conserved(
                     ts,
                     params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -580,7 +570,7 @@ class DomainPointwiseRank(Rank):
         return TSFormula(
             self.spec,
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.minimal(ts, params | self.quant_spec.params()),
             ),
             f"{self}_<minimal>",
@@ -604,7 +594,7 @@ class DomainPointwiseRank(Rank):
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
                 z3.Exists(
-                    list(self.quant_spec.params().values()),
+                    self.quant_spec.consts(),
                     self.rank.decreased(
                         ts,
                         params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -677,7 +667,7 @@ class DomainLexRank(Rank):
         return TSFormula(
             self.spec,
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.minimal(ts, params | self.quant_spec.params()),
             ),
             f"{self}_<minimal>",
@@ -701,7 +691,7 @@ class DomainLexRank(Rank):
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
                 z3.Exists(
-                    list(self.quant_spec.params().values()),
+                    self.quant_spec.consts(),
                     self.rank.decreased(
                         ts,
                         params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -713,6 +703,9 @@ class DomainLexRank(Rank):
 
     def __str__(self) -> str:
         return f"DomLex({self.rank}, {self.param[0]})"
+
+
+class DomainPermutedRank(Rank): ...
 
 
 def ts_rel[T: BaseTransitionSystem, R: Expr](rel: Callable[[T], Rel[R, R]]) -> TSRel[R]:

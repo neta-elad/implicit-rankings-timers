@@ -290,7 +290,9 @@ class TimerTransitionSystem(BaseTransitionSystem):
 
     @property
     def inits(self) -> dict[str, z3.BoolRef]:
-        params = {param: sort.const(param) for param, sort in self.root.params.items()}
+        params: Params = {
+            param: sort.const(param) for param, sort in self.root.params.items()
+        }
         assert not params, "root timer should have no free variables"
         return {"timers": timer_zero(self.root.term(self, params))}
 

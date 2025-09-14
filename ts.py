@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from inspect import signature
@@ -13,6 +13,7 @@ from typing import (
     Any,
     TypeAliasType,
     cast,
+    Protocol,
 )
 
 import z3
@@ -163,9 +164,18 @@ type BoundTypedTerm[*Ts, R: z3.ExprRef] = Callable[[*Ts], R]
 type TypedFormula[T: BaseTransitionSystem, *Ts] = TypedTerm[T, *Ts, z3.BoolRef]
 type BoundTypedFormula[*Ts] = BoundTypedTerm[*Ts, z3.BoolRef]
 type ErasedBoundTypedFormula = Callable[..., z3.BoolRef]
-type Params = dict[str, Expr]
 type RawTSTerm[T] = Callable[[BaseTransitionSystem, Params], T]
 type Immutable[T] = Annotated[T, "immutable"]
+
+
+class Params(Protocol):
+    def items(self) -> Iterable[tuple[str, z3.ExprRef]]: ...
+
+    def __getitem__(self, item: str) -> z3.ExprRef: ...
+
+    def __contains__(self, item: str) -> bool: ...
+
+    def __or__(self, other: Self) -> Self: ...
 
 
 class ParamSpec(dict[str, Sort]):
@@ -176,19 +186,22 @@ class ParamSpec(dict[str, Sort]):
         return self.__class__(self | self.primed())
 
     def prime(self, params: Params) -> Params:
-        primed = dict(params)
+        primed = dict(params.items())
         for param in self:
             primed[param + "'"] = primed[param]
         return primed
 
     def unprime(self, params: Params) -> Params:
-        unprimed = dict(params)
+        unprimed = dict(params.items())
         for param in self:
             unprimed[param] = unprimed[param + "'"]
         return unprimed
 
     def params(self, suffix: str = "") -> Params:
         return {f"{param}{suffix}": sort(param) for param, sort in self.items()}
+
+    def consts(self) -> list[Expr]:
+        return [sort(param) for param, sort in self.items()]
 
 
 @dataclass(frozen=True)
@@ -220,10 +233,10 @@ class TSTerm[T: z3.ExprRef = z3.ExprRef]:
 @dataclass(frozen=True)
 class TSFormula(TSTerm[z3.BoolRef]):
     def forall(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(True, self.params.values(), self(ts), qid=self.name)
+        return quantify(True, self.spec.consts(), self(ts), qid=self.name)
 
     def exists(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(False, self.params.values(), self(ts), qid=self.name)
+        return quantify(False, self.spec.consts(), self(ts), qid=self.name)
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
