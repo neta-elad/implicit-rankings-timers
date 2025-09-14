@@ -299,42 +299,23 @@ class AlternatingBitProtocol(TransitionSystem):
 
 
 class AlternatingBitProtocolProp(Prop[AlternatingBitProtocol]):
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         I = Index("I")
-        return And(
-            G(F(self.sys.sender_scheduled)),
-            G(F(self.sys.receiver_scheduled)),
-            Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
-            Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
-            Exists(
+        return Implies(
+            And(
+                G(F(self.sys.sender_scheduled)),
+                G(F(self.sys.receiver_scheduled)),
+                Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
+                Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
+            ),
+            ForAll(
                 I,
-                And(
+                Implies(
                     F(self.sys.sender_array(I) != self.sys.bottom),
-                    G(self.sys.receiver_array(I) == self.sys.bottom),
+                    F(self.sys.receiver_array(I) != self.sys.bottom),
                 ),
-                # todo: nnf Not(
-                #     Implies(
-                #         F(self.sys.sender_array(I) != self.sys.bottom),
-                #         F(self.sys.receiver_array(I) != self.sys.bottom),
-                #     )
-                # )
             ),
         )
-        # todo: nnf Implies(
-        #     And(
-        #         G(F(self.sender_scheduled)),
-        #         G(F(self.receiver_scheduled)),
-        #         Implies(G(F(self.data_sent)), G(F(self.data_received))),
-        #         Implies(G(F(self.ack_sent)), G(F(self.ack_received))),
-        #     ),
-        #     ForAll(
-        #         I,
-        #         Implies(
-        #             F(self.sender_array(I) != self.bottom),
-        #             F(self.receiver_array(I) != self.bottom),
-        #         ),
-        #     ),
-        # )
 
 
 class AlternatingBitProtocolProof(
@@ -342,16 +323,12 @@ class AlternatingBitProtocolProof(
 ):
     @temporal_witness
     def skolem_index(self, I: Index) -> BoolRef:
-        return And(
-            F(self.sys.sender_array(I) != self.sys.bottom),
-            G(self.sys.receiver_array(I) == self.sys.bottom),
+        return Not(
+            Implies(
+                F(self.sys.sender_array(I) != self.sys.bottom),
+                F(self.sys.receiver_array(I) != self.sys.bottom),
+            )
         )
-        # todo nnf: return Not(
-        #     Implies(
-        #         F(self.sys.sender_array(I) != self.sys.bottom),
-        #         F(self.sys.receiver_array(I) != self.sys.bottom),
-        #     )
-        # )
 
     @invariant
     def system_invariant(

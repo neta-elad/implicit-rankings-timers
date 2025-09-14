@@ -106,14 +106,14 @@ class MutexRing(TransitionSystem):
 
 
 class MutexRingProp(Prop[MutexRing]):
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         N = Node("N")
-        return And(
+        return Implies(
             ForAll(N, G(F(self.sys.scheduled(N)))),
-            F(
-                And(
+            G(
+                Implies(
                     self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
-                    G(Not(self.sys.node_loc(self.sys.skolem_node) == Loc.critical)),
+                    F(self.sys.node_loc(self.sys.skolem_node) == Loc.critical),
                 )
             ),
         )

@@ -7,7 +7,7 @@ from typing import ClassVar, cast, Any, Self, get_type_hints, get_origin
 import z3
 
 from ranks import Rank, FiniteLemma, timer_rank
-from temporal import Prop
+from temporal import Prop, nnf
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
     BaseTransitionSystem,
@@ -128,7 +128,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return create_timers(
             self.reset.sys_with_witnesses,
             z3.And(
-                self.reset.prop.negated_prop(),
+                z3.Not(self.reset.prop.prop()),
                 *self.reset.temporal_witness_props.values(),
             ),
             *self.reset.temporal_invariant_formulas.values(),
@@ -145,6 +145,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         )
 
     def t(self, name: z3.BoolRef) -> TimeFun:
+        name = nnf(name)
         return self.timers.t(f"t_<{str(name).replace("'", "")}>")
 
     @cached_property
@@ -164,7 +165,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     @cached_property
     def temporal_invariants(self) -> dict[str, z3.BoolRef]:
         return {
-            name: timer_zero(self._compile_timer(f"t_<{formula}>")(self))
+            name: timer_zero(self._compile_timer(f"t_<{nnf(formula)}>")(self))
             for name, formula in self.temporal_invariant_formulas.items()
         }
 
@@ -234,7 +235,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             spec = ParamSpec()
         else:
             ts_phi = ts_formula(unbind(phi))
-            timer_name = f"t_<{ts_phi(self)}>"
+            timer_name = f"t_<{nnf(ts_phi(self))}>"
             spec = ts_phi.spec
 
         phi_term = self._compile_timer(timer_name, spec)

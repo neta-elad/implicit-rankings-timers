@@ -336,28 +336,30 @@ class CorrectnessHRB(Prop[HybridReliableBroadcast]):
     # First Property - Correctness
     # If all obedient nodes initially hold the message and all correct nodes eventually send and receive
     # then eventually some node accepts
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         N = Node("N")
         M = Node("M")
-        return And(
-            ForAll(
-                [N, M],
-                Implies(
-                    And(self.sys.correct(N), self.sys.rcv_init(N)),
-                    F(self.sys.sent_msg(N, M)),
-                ),
-            ),
-            ForAll(
-                [N, M],
-                G(
+        return Not(
+            And(  # todo: simplify
+                ForAll(
+                    [N, M],
                     Implies(
-                        And(self.sys.sent_msg(N, M), self.sys.correct(M)),
-                        F(self.sys.rcv_msg(N, M)),
-                    )
+                        And(self.sys.correct(N), self.sys.rcv_init(N)),
+                        F(self.sys.sent_msg(N, M)),
+                    ),
                 ),
-            ),
-            ForAll(N, Implies(self.sys.obedient(N), self.sys.rcv_init(N))),
-            G(ForAll(N, Not(And(self.sys.correct(N), self.sys.accept(N))))),
+                ForAll(
+                    [N, M],
+                    G(
+                        Implies(
+                            And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                            F(self.sys.rcv_msg(N, M)),
+                        )
+                    ),
+                ),
+                ForAll(N, Implies(self.sys.obedient(N), self.sys.rcv_init(N))),
+                G(ForAll(N, Not(And(self.sys.correct(N), self.sys.accept(N))))),
+            )
         )
 
 
@@ -572,28 +574,30 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
     # Second Property - Relay
     # Under the same assumptions as correctness, if some correct node accepts,
     # then eventually all correct nodes accept.
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         N = Node("N")
         M = Node("M")
-        return And(
-            ForAll(
-                [N, M],
-                Implies(
-                    And(self.sys.correct(N), self.sys.rcv_init(N)),
-                    F(self.sys.sent_msg(N, M)),
-                ),
-            ),
-            ForAll(
-                [N, M],
-                G(
+        return Not(
+            And(  # todo: simplify
+                ForAll(
+                    [N, M],
                     Implies(
-                        And(self.sys.sent_msg(N, M), self.sys.correct(M)),
-                        F(self.sys.rcv_msg(N, M)),
-                    )
+                        And(self.sys.correct(N), self.sys.rcv_init(N)),
+                        F(self.sys.sent_msg(N, M)),
+                    ),
                 ),
-            ),
-            F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
-            G(Exists(N, And(self.sys.correct(N), Not(self.sys.accept(N))))),
+                ForAll(
+                    [N, M],
+                    G(
+                        Implies(
+                            And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                            F(self.sys.rcv_msg(N, M)),
+                        )
+                    ),
+                ),
+                F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
+                G(Exists(N, And(self.sys.correct(N), Not(self.sys.accept(N))))),
+            )
         )
 
 

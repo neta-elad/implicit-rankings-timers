@@ -126,20 +126,42 @@ class TicketSystem(TransitionSystem):
 
 
 class TicketProp(Prop[TicketSystem]):
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         T = Thread("T")
-        return And(
+        return Implies(
             ForAll(T, G(F(self.sys.scheduled(T)))),
-            F(
-                And(
+            G(
+                Implies(
                     self.sys.pc2(self.sys.skolem_thread),
-                    G(Not(self.sys.pc3(self.sys.skolem_thread))),
+                    F(self.sys.pc3(self.sys.skolem_thread)),
                 )
             ),
+        )
+        return Not(
+            And(  # todo: simplify
+                ForAll(T, G(F(self.sys.scheduled(T)))),
+                F(
+                    And(
+                        self.sys.pc2(self.sys.sys.skolem_thread),
+                        G(Not(self.sys.pc3(self.sys.sys.skolem_thread))),
+                    )
+                ),
+            )
         )
 
 
 class TicketProof(Proof[TicketSystem], prop=TicketProp):
+    # @temporal_witness
+    # def skolem_thread(self, T: Thread) -> BoolRef:
+    #     return Not(
+    #         G(
+    #             Implies(
+    #                 self.sys.pc2(T),
+    #                 F(self.sys.pc3(T)),
+    #             )
+    #         )
+    #     )
+
     @invariant
     def pc_at_least_one(self, T: Thread) -> BoolRef:
         return Or(self.sys.pc1(T), self.sys.pc2(T), self.sys.pc3(T))

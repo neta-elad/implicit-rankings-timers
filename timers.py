@@ -7,7 +7,7 @@ from typing import Any, cast, Self, Protocol
 import z3
 
 from helpers import unpack_quantifier
-from temporal import is_G, is_F
+from temporal import is_G, is_F, nnf
 from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
@@ -303,6 +303,10 @@ def create_timers[T: BaseTransitionSystem](
     *formulas: z3.BoolRef,
 ) -> TimerTransitionSystem:
     timers: dict[TimerId, Timer] = {}
+
+    # normalization
+    root_formula = nnf(root_formula)
+    formulas = tuple(nnf(formula) for formula in formulas)
 
     def add(timer: Timer) -> Timer:
         timers[timer.id] = timer
