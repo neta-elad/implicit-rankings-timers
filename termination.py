@@ -1,7 +1,8 @@
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
+from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, cast, Any, Self
+from typing import ClassVar, cast, Any, Self, get_type_hints, get_origin
 
 import z3
 
@@ -20,7 +21,7 @@ from ts import (
     TSTerm,
     ParamSpec,
 )
-from typed_z3 import Bool
+from typed_z3 import Bool, Expr
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -34,6 +35,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     def __init__(self, suffix: str = "") -> None:
         super().__init__(suffix)
+        _ = self.witnesses  # initial witness
 
     @property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
@@ -48,7 +50,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @property
     def axioms(self) -> dict[str, z3.BoolRef]:
-        return self.intersection.axioms
+        return self.intersection.axioms | {
+            name: axiom for name, (_witness, axiom) in self.witnesses.items()
+        }
 
     @property
     def transitions(self) -> dict[str, z3.BoolRef]:
@@ -111,6 +115,22 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     @cached_property
     def invariant(self) -> z3.BoolRef:
         return z3.And(*self.invariants.values(), *self.temporal_invariants.values())
+
+    @cached_property
+    def witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
+        hints = get_type_hints(self.__class__)
+        witnesses = {}
+        for method_name, method in _get_methods(self, _PROOF_WITNESS):
+            witness_name = method_name
+            assert (
+                len(method.spec) == 1
+            ), f"Witness method {method_name} must except exactly one argument"
+            ((param, sort),) = method.spec.items()
+            symbol = sort(witness_name + self.suffix, True)  # type: ignore
+            axiom = z3.Implies(method.exists(self), method(self, {param: symbol}))
+            witnesses[witness_name] = (symbol, axiom)
+            setattr(self, witness_name, symbol)
+        return witnesses
 
     def timer_rank[*Ts](
         self,
@@ -224,14 +244,29 @@ def temporal_invariant[T: Proof[Any], *Ts](
     return fun
 
 
+# def witness[T: Proof[Any], W: Expr](
+#     name: str
+# ) -> Callable[[TypedProofFormula[T, W]], TypedProofFormula[T, W]]:
+def witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
+    setattr(fun, _PROOF_METADATA, _PROOF_WITNESS)
+    # setattr(fun, _PROOF_WITNESS_METADATA, name)
+    return fun  # type: ignore
+
+    # return decorator
+
+
 _PROOF_METADATA = "__proof_metadata__"
 _PROOF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
+_PROOF_WITNESS = object()
+_PROOF_WITNESS_METADATA = "__proof_witness_metadata__"
+
 _PROOF_SPECIALS = {
     "invariant",
     "invariants",
     "temporal_invariants",
     "temporal_invariant_formulas",
+    "witnesses",
 }
 
 
