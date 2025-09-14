@@ -197,11 +197,16 @@ class ParamSpec(dict[str, Sort]):
             unprimed[param] = unprimed[param + "'"]
         return unprimed
 
-    def params(self, suffix: str = "") -> Params:
-        return {f"{param}{suffix}": sort(param) for param, sort in self.items()}
+    def params(
+        self, name_suffix: str = "", variable_suffix: str = ""
+    ) -> dict[str, Expr]:
+        return {
+            f"{param}{name_suffix}": sort(param + variable_suffix)
+            for param, sort in self.items()
+        }
 
-    def consts(self) -> list[Expr]:
-        return [sort(param) for param, sort in self.items()]
+    def consts(self, suffix: str = "") -> list[Expr]:
+        return [sort(param + suffix) for param, sort in self.items()]
 
 
 @dataclass(frozen=True)

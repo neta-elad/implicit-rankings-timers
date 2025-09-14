@@ -30,8 +30,8 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
 - [ ] Add DomPermPW and PW constructors
-  - DomPermPW: take from previous paper + minimal&soundness is like DomPW
-  - PW: take from previous paper + minimal&soundness like Lex
+  - [x] DomPermPW: take from previous paper + minimal&soundness is like DomPW
+  - [ ] PW: take from previous paper + minimal&soundness like Lex
 - [ ] Give prop unnegated and do NNF whenever a timer is used
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
 - [ ] In readme, write list of all features
