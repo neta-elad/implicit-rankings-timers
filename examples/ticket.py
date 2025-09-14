@@ -11,7 +11,6 @@ class TicketSystem(TransitionSystem):
     zero: Immutable[Ticket]
     service: Ticket
     next_ticket: Ticket
-    skolem_thread: Immutable[Thread]
 
     le: Immutable[Rel[Ticket, Ticket]]
     pc1: Rel[Thread]
@@ -130,11 +129,14 @@ class TicketProp(Prop[TicketSystem]):
         T = Thread("T")
         return Implies(
             ForAll(T, G(F(self.sys.scheduled(T)))),
-            G(
-                Implies(
-                    self.sys.pc2(self.sys.skolem_thread),
-                    F(self.sys.pc3(self.sys.skolem_thread)),
-                )
+            ForAll(
+                T,
+                G(
+                    Implies(
+                        self.sys.pc2(T),
+                        F(self.sys.pc3(T)),
+                    )
+                ),
             ),
         )
         return Not(
@@ -142,8 +144,8 @@ class TicketProp(Prop[TicketSystem]):
                 ForAll(T, G(F(self.sys.scheduled(T)))),
                 F(
                     And(
-                        self.sys.pc2(self.sys.sys.skolem_thread),
-                        G(Not(self.sys.pc3(self.sys.sys.skolem_thread))),
+                        self.sys.pc2(self.sys.skolem_thread),
+                        G(Not(self.sys.pc3(self.sys.skolem_thread))),
                     )
                 ),
             )
@@ -151,16 +153,16 @@ class TicketProp(Prop[TicketSystem]):
 
 
 class TicketProof(Proof[TicketSystem], prop=TicketProp):
-    # @temporal_witness
-    # def skolem_thread(self, T: Thread) -> BoolRef:
-    #     return Not(
-    #         G(
-    #             Implies(
-    #                 self.sys.pc2(T),
-    #                 F(self.sys.pc3(T)),
-    #             )
-    #         )
-    #     )
+    @temporal_witness
+    def skolem_thread(self, T: Thread) -> BoolRef:
+        return Not(
+            G(
+                Implies(
+                    self.sys.pc2(T),
+                    F(self.sys.pc3(T)),
+                )
+            )
+        )
 
     @invariant
     def pc_at_least_one(self, T: Thread) -> BoolRef:
@@ -255,7 +257,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     @invariant
     def skolem_has_ticket(self) -> BoolRef:
         X = Ticket("X")
-        return Exists(X, self.sys.m(self.sys.skolem_thread, X))
+        return Exists(X, self.sys.m(self.skolem_thread, X))
 
     @temporal_invariant
     def globally_eventually_scheduled(self, T: Thread) -> BoolRef:
@@ -266,17 +268,17 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         return Or(
             F(
                 And(
-                    self.sys.pc2(self.sys.skolem_thread),
-                    G(Not(self.sys.pc3(self.sys.skolem_thread))),
+                    self.sys.pc2(self.skolem_thread),
+                    G(Not(self.sys.pc3(self.skolem_thread))),
                 )
             ),
             And(
-                G(Not(self.sys.pc3(self.sys.skolem_thread))),
-                self.sys.pc2(self.sys.skolem_thread),
+                G(Not(self.sys.pc3(self.skolem_thread))),
+                self.sys.pc2(self.skolem_thread),
                 ForAll(
                     K,
                     Implies(
-                        self.sys.m(self.sys.skolem_thread, K),
+                        self.sys.m(self.skolem_thread, K),
                         self.sys.le(self.sys.service, K),
                     ),
                 ),
@@ -285,8 +287,8 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
 
     def locked(self) -> BoolRef:
         return And(
-            self.sys.pc2(self.sys.skolem_thread),
-            G(Not(self.sys.pc3(self.sys.skolem_thread))),
+            self.sys.pc2(self.skolem_thread),
+            G(Not(self.sys.pc3(self.skolem_thread))),
         )
 
     def rk1(self) -> Rank:
@@ -296,7 +298,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         X = Ticket("X")
         return And(
             self.sys.le(self.sys.service, k),
-            Exists(X, And(self.sys.m(self.sys.skolem_thread, X), self.sys.le(k, X))),
+            Exists(X, And(self.sys.m(self.skolem_thread, X), self.sys.le(k, X))),
         )
 
     def rk2_finite_lemma(self, k: Ticket) -> BoolRef:
