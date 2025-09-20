@@ -9,6 +9,7 @@ from ranks import (
     PosInOrderRank,
     CondRank,
     DomainPointwiseRank,
+    DomainLexRank,
     LexRank,
     FiniteLemma,
 )
@@ -49,6 +50,7 @@ __all__ = [
     "PosInOrderRank",
     "CondRank",
     "DomainPointwiseRank",
+    "DomainLexRank",
     "LexRank",
     "FiniteLemma",
     "Proof",
