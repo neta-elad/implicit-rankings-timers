@@ -101,7 +101,7 @@ class Prop[T: TransitionSystem](ABC):
     sys: T
 
     @abstractmethod
-    def negated_prop(self) -> z3.BoolRef: ...
+    def prop(self) -> z3.BoolRef: ...
 
     def __init__(self, sys: T) -> None:
         self.sys = sys

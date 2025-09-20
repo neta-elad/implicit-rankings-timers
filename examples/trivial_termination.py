@@ -27,10 +27,11 @@ class TrivialTerminationSystem(TransitionSystem):
 
 class TrivialTerminationProp(Prop[TrivialTerminationSystem]):
     # The property we want to prove -- under fair scheduling, eventually all threads are off, together.
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         T = Thread("T")
-        return And(ForAll(T, G(F(self.sys.scheduled(T)))), G(Exists(T, self.sys.on(T))))
-        # unnegated prop: Implies(ForAll(T, G(F(self.scheduled(T)))), F(ForAll(T), Not(self.on(T))) non-negated prop
+        return Implies(
+            ForAll(T, G(F(self.sys.scheduled(T)))), F(ForAll(T, Not(self.sys.on(T))))
+        )
 
 
 class TrivialTerminationProof(

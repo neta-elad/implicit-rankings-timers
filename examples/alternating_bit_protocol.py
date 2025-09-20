@@ -20,7 +20,7 @@ class AlternatingBitProtocol(TransitionSystem):
     sender_index: Index
     sender_gen_index: Index
     receiver_index: Index
-    skolem_index: Immutable[Index]
+    # skolem_index: Immutable[Index]
     bottom: Immutable[Value]
     le_data_msg: Rel[DataMsg, DataMsg]
     le_ack_msg: Rel[AckMsg, AckMsg]
@@ -299,47 +299,36 @@ class AlternatingBitProtocol(TransitionSystem):
 
 
 class AlternatingBitProtocolProp(Prop[AlternatingBitProtocol]):
-    def negated_prop(self) -> BoolRef:
-        return And(
-            G(F(self.sys.sender_scheduled)),
-            G(F(self.sys.receiver_scheduled)),
-            Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
-            Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
-            F(self.sys.sender_array(self.sys.skolem_index) != self.sys.bottom),
-            G(self.sys.receiver_array(self.sys.skolem_index) == self.sys.bottom),
+    def prop(self) -> BoolRef:
+        I = Index("I")
+        return Implies(
+            And(
+                G(F(self.sys.sender_scheduled)),
+                G(F(self.sys.receiver_scheduled)),
+                Implies(G(F(self.sys.data_sent)), G(F(self.sys.data_received))),
+                Implies(G(F(self.sys.ack_sent)), G(F(self.sys.ack_received))),
+            ),
+            ForAll(
+                I,
+                Implies(
+                    F(self.sys.sender_array(I) != self.sys.bottom),
+                    F(self.sys.receiver_array(I) != self.sys.bottom),
+                ),
+            ),
         )
-        # Implies(
-        #     And(
-        #         G(F(self.sender_scheduled)),
-        #         G(F(self.receiver_scheduled)),
-        #         Implies(G(F(self.data_sent)), G(F(self.data_received))),
-        #         Implies(G(F(self.ack_sent)), G(F(self.ack_received))),
-        #     ),
-        #     ForAll(
-        #         I,
-        #         Implies(
-        #             F(self.sender_array(I) != self.bottom),
-        #             F(self.receiver_array(I) != self.bottom),
-        #         ),
-        #     ),
-        # )
 
 
 class AlternatingBitProtocolProof(
     Proof[AlternatingBitProtocol], prop=AlternatingBitProtocolProp
 ):
-    skolem_index: Index
-
-    # @witness(skolem_index)
-    # def prop_witness(self, I: Index) -> BoolRef:
-    #     return Not(
-    #         Implies(
-    #             F(self.sender_array(I) != self.bottom),
-    #             F(self.receiver_array(I) != self.bottom),
-    #         )
-    #     )
-
-    # Exists(...(I)) replace with ...(skolem_index)
+    @temporal_witness
+    def skolem_index(self, I: Index) -> BoolRef:
+        return Not(
+            Implies(
+                F(self.sys.sender_array(I) != self.sys.bottom),
+                F(self.sys.receiver_array(I) != self.sys.bottom),
+            )
+        )
 
     @invariant
     def system_invariant(
@@ -518,18 +507,18 @@ class AlternatingBitProtocolProof(
                 F(Not(F(self.sys.ack_sent))),
                 G(F(self.sys.ack_received)),
             ),
-            F(self.sys.bottom != self.sys.sender_array(self.sys.skolem_index)),
-            G(self.sys.bottom == self.sys.receiver_array(self.sys.skolem_index)),
+            F(self.sys.bottom != self.sys.sender_array(self.skolem_index)),
+            G(self.sys.bottom == self.sys.receiver_array(self.skolem_index)),
         )
 
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
 
     def write_to_skolem(self) -> BoolRef:
-        return self.sys.bottom != self.sys.sender_array(self.sys.skolem_index)
+        return self.sys.bottom != self.sys.sender_array(self.skolem_index)
 
     def btw_gen_skolem(self, i: Index) -> BoolRef:
         return And(
-            self.sys.le(i, self.sys.skolem_index),
+            self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.sender_gen_index, i),
         )
 
@@ -539,7 +528,7 @@ class AlternatingBitProtocolProof(
 
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
-            self.sys.le(i, self.sys.skolem_index),
+            self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.sender_index, i),
         )
 
@@ -549,7 +538,7 @@ class AlternatingBitProtocolProof(
 
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
-            self.sys.le(i, self.sys.skolem_index),
+            self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.receiver_index, i),
         )
 

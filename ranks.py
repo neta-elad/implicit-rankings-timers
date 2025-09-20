@@ -19,6 +19,8 @@ from ts import (
     BoundTypedTerm,
     ts_term,
     ErasedBoundTypedFormula,
+    Params,
+    RawTSTerm,
 )
 from typed_z3 import Expr, Rel, Sort
 
@@ -116,22 +118,17 @@ class FiniteSCByAlpha(SoundnessCondition):
             for i in range(self.lemma.m)
         ]
 
-        params = self.spec.params()
+        params = self.spec.consts()
 
         return z3.Exists(
             [y for y_tuple in ys for y in y_tuple],
             z3.ForAll(
-                list(params.values()),
+                params,
                 z3.Implies(
                     self.alpha(ts),
                     z3.Or(
                         *(
-                            z3.And(
-                                *(
-                                    param == y
-                                    for param, y in zip(params.values(), y_tuple)
-                                )
-                            )
+                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
                             for y_tuple in ys
                         )
                     ),
@@ -145,23 +142,18 @@ class FiniteSCByAlpha(SoundnessCondition):
             for i in range(self.lemma.m)
         ]
 
-        params = self.spec.params()
+        params = self.spec.consts()
 
         return z3.Exists(
             [y for y_tuple in ys for y in y_tuple],
             z3.ForAll(
-                list(params.values()),
+                params,
                 z3.Implies(
                     self.alpha(ts.next),
                     z3.Or(
                         self.alpha(ts),
                         *(
-                            z3.And(
-                                *(
-                                    param == y
-                                    for param, y in zip(params.values(), y_tuple)
-                                )
-                            )
+                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
                             for y_tuple in ys
                         ),
                     ),
@@ -191,7 +183,7 @@ class FiniteSCByAlpha(SoundnessCondition):
             z3.Not(
                 quantify(
                     True,
-                    z.params().values(),  # todo: maybe flip to exists ys forall z
+                    z.consts(),  # todo: maybe flip to exists ys forall z
                     self.at_most_m_alpha_at_init(ts),
                 )
             ),
@@ -206,7 +198,7 @@ class FiniteSCByAlpha(SoundnessCondition):
                 z3.Not(
                     quantify(
                         True,
-                        z.params().values(),  # todo: maybe flip to exists ys forall z
+                        z.consts(),  # todo: maybe flip to exists ys forall z
                         self.at_most_m_alpha_added(ts),
                     ),
                 ),
@@ -566,7 +558,7 @@ class DomainPointwiseRank(Rank):
         return TSFormula(
             self.spec.doubled(),
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.conserved(
                     ts,
                     params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -580,7 +572,7 @@ class DomainPointwiseRank(Rank):
         return TSFormula(
             self.spec,
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.minimal(ts, params | self.quant_spec.params()),
             ),
             f"{self}_<minimal>",
@@ -604,7 +596,7 @@ class DomainPointwiseRank(Rank):
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
                 z3.Exists(
-                    list(self.quant_spec.params().values()),
+                    self.quant_spec.consts(),
                     self.rank.decreased(
                         ts,
                         params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -677,7 +669,7 @@ class DomainLexRank(Rank):
         return TSFormula(
             self.spec,
             lambda ts, params: z3.ForAll(
-                list(self.quant_spec.params().values()),
+                self.quant_spec.consts(),
                 self.rank.minimal(ts, params | self.quant_spec.params()),
             ),
             f"{self}_<minimal>",
@@ -701,7 +693,7 @@ class DomainLexRank(Rank):
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
                 z3.Exists(
-                    list(self.quant_spec.params().values()),
+                    self.quant_spec.consts(),
                     self.rank.decreased(
                         ts,
                         params | self.quant_spec.params() | self.quant_spec.params("'"),
@@ -713,6 +705,130 @@ class DomainLexRank(Rank):
 
     def __str__(self) -> str:
         return f"DomLex({self.rank}, {self.param[0]})"
+
+
+@dataclass(frozen=True)
+class DomainPermutedRank(Rank):
+    rank: Rank
+    ys: ParamSpec
+    k: int = 1
+    finite_lemma: FiniteLemma | None = None
+
+    @cached_property
+    def ys_left_right(self) -> list[tuple[dict[str, Expr], dict[str, Expr]]]:
+        return [
+            (self.ys.params("", f"-left-{i}"), self.ys.params("", f"-right-{i}"))
+            for i in range(1, self.k + 1)
+        ]
+
+    @cached_property
+    def ys_sigma(self) -> Params:
+        ys_left_right = self.ys_left_right
+        ys = self.ys.params()
+        ys_sigma = self.ys.params()
+        for left, right in ys_left_right:
+            ys_sigma = {
+                name: z3.If(ys[name] == right[name], left[name], param)
+                for name, param in ys_sigma.items()
+            }
+        return ys_sigma
+
+    @property
+    def spec(self) -> ParamSpec:
+        return ParamSpec(
+            {
+                param: sort
+                for param, sort in self.rank.spec.items()
+                if param not in self.ys
+            }
+        )
+
+    def exists_permutation(self, alpha: RawTSTerm[z3.BoolRef]) -> RawTSTerm[z3.BoolRef]:
+        all_ys_left_right = [
+            var
+            for (left, right) in self.ys_left_right
+            for name in left
+            for var in (left[name], right[name])
+        ]
+        return lambda ts, params: z3.Exists(
+            all_ys_left_right,
+            z3.And(
+                *(
+                    z3.And(
+                        *(right_i[name] != right_j[name] for name in right_i),
+                        *(left_i[name] != left_j[name] for name in left_i),
+                        *(right_i[name] != left_j[name] for name in right_i),
+                    )
+                    for i, (left_i, right_i) in enumerate(self.ys_left_right)
+                    for j, (left_j, right_j) in enumerate(self.ys_left_right)
+                    if i < j
+                ),
+                alpha(ts, params),
+            ),
+        )
+
+    @property
+    def conserved(self) -> TSFormula:
+        return TSFormula(
+            self.spec,
+            self.exists_permutation(
+                lambda ts, params: z3.ForAll(
+                    self.ys.consts(),
+                    self.rank.conserved(
+                        ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                    ),
+                )
+            ),
+            f"{self}_<conserved>",
+        )
+
+    @property
+    def minimal(self) -> TSFormula:
+        return TSFormula(
+            self.spec,
+            lambda ts, params: z3.ForAll(
+                self.ys.consts(),
+                self.rank.minimal(ts, params | self.ys.params()),
+            ),
+            f"{self}_<minimal>",
+        )
+
+    @property
+    def condition(self) -> SoundnessCondition:
+        return ConjunctionSC((self.rank.condition, self.finite_condition))
+
+    @property
+    def finite_condition(self) -> SoundnessCondition:
+        if self.finite_lemma is None:
+            return FiniteSCBySort(self.ys)
+        else:
+            return FiniteSCByAlpha(self.ys, self.rank, self.finite_lemma)
+
+    @property
+    def decreased(self) -> TSFormula:
+        return TSFormula(
+            self.spec,
+            self.exists_permutation(
+                lambda ts, params: z3.And(
+                    z3.ForAll(
+                        self.ys.consts(),
+                        self.rank.conserved(
+                            ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                        ),
+                    ),
+                    z3.Exists(
+                        self.ys.consts(),
+                        self.rank.decreased(
+                            ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                        ),
+                    ),
+                )
+            ),
+            f"{self}_<decreased>",
+        )
+
+    def __str__(self) -> str:
+        return f"DomPerm({self.rank}, {self.ys}, {self.k})"
 
 
 def ts_rel[T: BaseTransitionSystem, R: Expr](rel: Callable[[T], Rel[R, R]]) -> TSRel[R]:

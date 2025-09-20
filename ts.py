@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable
+from collections.abc import Callable, Iterable, Mapping
 from dataclasses import dataclass
 from functools import cached_property
 from inspect import signature
@@ -13,6 +13,7 @@ from typing import (
     Any,
     TypeAliasType,
     cast,
+    Protocol,
 )
 
 import z3
@@ -163,9 +164,18 @@ type BoundTypedTerm[*Ts, R: z3.ExprRef] = Callable[[*Ts], R]
 type TypedFormula[T: BaseTransitionSystem, *Ts] = TypedTerm[T, *Ts, z3.BoolRef]
 type BoundTypedFormula[*Ts] = BoundTypedTerm[*Ts, z3.BoolRef]
 type ErasedBoundTypedFormula = Callable[..., z3.BoolRef]
-type Params = dict[str, Expr]
 type RawTSTerm[T] = Callable[[BaseTransitionSystem, Params], T]
 type Immutable[T] = Annotated[T, "immutable"]
+
+
+class Params(Protocol):
+    def items(self) -> Iterable[tuple[str, z3.ExprRef]]: ...
+
+    def __getitem__(self, item: str) -> z3.ExprRef: ...
+
+    def __contains__(self, item: str) -> bool: ...
+
+    def __or__(self, other: Self) -> Self: ...
 
 
 class ParamSpec(dict[str, Sort]):
@@ -176,19 +186,27 @@ class ParamSpec(dict[str, Sort]):
         return self.__class__(self | self.primed())
 
     def prime(self, params: Params) -> Params:
-        primed = dict(params)
+        primed = dict(params.items())
         for param in self:
             primed[param + "'"] = primed[param]
         return primed
 
     def unprime(self, params: Params) -> Params:
-        unprimed = dict(params)
+        unprimed = dict(params.items())
         for param in self:
             unprimed[param] = unprimed[param + "'"]
         return unprimed
 
-    def params(self, suffix: str = "") -> Params:
-        return {f"{param}{suffix}": sort(param) for param, sort in self.items()}
+    def params(
+        self, name_suffix: str = "", variable_suffix: str = ""
+    ) -> dict[str, Expr]:
+        return {
+            f"{param}{name_suffix}": sort(param + variable_suffix)
+            for param, sort in self.items()
+        }
+
+    def consts(self, suffix: str = "") -> list[Expr]:
+        return [sort(param + suffix) for param, sort in self.items()]
 
 
 @dataclass(frozen=True)
@@ -220,10 +238,10 @@ class TSTerm[T: z3.ExprRef = z3.ExprRef]:
 @dataclass(frozen=True)
 class TSFormula(TSTerm[z3.BoolRef]):
     def forall(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(True, self.params.values(), self(ts), qid=self.name)
+        return quantify(True, self.spec.consts(), self(ts), qid=self.name)
 
     def exists(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(False, self.params.values(), self(ts), qid=self.name)
+        return quantify(False, self.spec.consts(), self(ts), qid=self.name)
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
@@ -321,6 +339,40 @@ class IntersectionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSys
             for left_name, left in self.left.transitions.items()
             for right_name, right in self.right.transitions.items()
         }
+
+
+class UnionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
+    BaseTransitionSystem
+):
+    left: L
+    right: R
+
+    def __init__(self, suffix: str, left: L, right: R) -> None:
+        assert (
+            suffix == left.suffix and left.suffix == right.suffix
+        ), f"Malformed union system"
+        super().__init__(suffix)
+        self.left = left
+        self.right = right
+
+    @cached_property
+    def symbols(self) -> dict[str, z3.FuncDeclRef]:
+        return self.left.symbols | self.right.symbols
+
+    def clone(self, suffix: str) -> Self:
+        return self.__class__(suffix, self.left.clone(suffix), self.right.clone(suffix))
+
+    @cached_property
+    def inits(self) -> dict[str, z3.BoolRef]:
+        return self.left.inits | self.right.inits
+
+    @cached_property
+    def axioms(self) -> dict[str, z3.BoolRef]:
+        return self.left.axioms | self.right.axioms
+
+    @cached_property
+    def transitions(self) -> dict[str, z3.BoolRef]:
+        return self.left.transitions | self.right.transitions
 
 
 def ts_formula[T: BaseTransitionSystem, *Ts](

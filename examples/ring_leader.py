@@ -140,11 +140,13 @@ class RingLeader(TransitionSystem):
 
 
 class RingLeaderProp(Prop[RingLeader]):
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         N = Node("N")
-        return And(
-            ForAll(N, G(F(self.sys.scheduled(N)))),
-            G(ForAll(N, Not(self.sys.leader(N)))),
+        return Not(
+            And(  # todo: simplify
+                ForAll(N, G(F(self.sys.scheduled(N)))),
+                G(ForAll(N, Not(self.sys.leader(N)))),
+            )
         )
 
 
