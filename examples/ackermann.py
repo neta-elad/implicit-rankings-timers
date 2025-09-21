@@ -98,8 +98,10 @@ class AckermannSystem(TransitionSystem):
 
 
 class AckermannProp(Prop[AckermannSystem]):
-    def negated_prop(self) -> BoolRef:
-        return G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
+    def prop(self) -> BoolRef:
+        return Not(
+            G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
+        )
 
 
 class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):

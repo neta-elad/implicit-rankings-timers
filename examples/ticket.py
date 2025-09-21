@@ -139,17 +139,6 @@ class TicketProp(Prop[TicketSystem]):
                 ),
             ),
         )
-        return Not(
-            And(  # todo: simplify
-                ForAll(T, G(F(self.sys.scheduled(T)))),
-                F(
-                    And(
-                        self.sys.pc2(self.sys.skolem_thread),
-                        G(Not(self.sys.pc3(self.sys.skolem_thread))),
-                    )
-                ),
-            )
-        )
 
 
 class TicketProof(Proof[TicketSystem], prop=TicketProp):

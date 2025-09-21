@@ -7,7 +7,7 @@ from typing import ClassVar, cast, Any, Self, get_type_hints, get_origin
 import z3
 
 from ranks import Rank, FiniteLemma, timer_rank
-from temporal import Prop, nnf
+from temporal import Prop, nnf, is_F, F, is_G, G
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
     BaseTransitionSystem,
@@ -22,7 +22,7 @@ from ts import (
     ParamSpec,
     UnionTransitionSystem,
 )
-from typed_z3 import Bool, Expr
+from typed_z3 import Bool, Expr, Sort
 
 
 class WitnessSystem(BaseTransitionSystem):
@@ -57,6 +57,35 @@ class WitnessSystem(BaseTransitionSystem):
     @property
     def transitions(self) -> dict[str, z3.BoolRef]:
         return {}
+
+
+@dataclass(frozen=True)
+class TemporalWitness:
+    formula: TSFormula
+
+    @cached_property
+    def name(self) -> str:
+        return self.formula.name
+
+    @cached_property
+    def sort(self) -> Sort:
+        ((_param, sort),) = self.formula.spec.items()
+        return sort
+
+    @cached_property
+    def param(self) -> str:
+        ((param, _sort),) = self.formula.spec.items()
+        return param
+
+    @cached_property
+    def symbol(self) -> Expr:
+        return self.sort(self.name, False)  # type: ignore
+
+    def source(self, sys: BaseTransitionSystem) -> z3.BoolRef:
+        return self.formula.exists(sys)
+
+    def instantiated(self, sys: BaseTransitionSystem) -> z3.BoolRef:
+        return self.formula(sys, {self.param: self.symbol})
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -127,12 +156,47 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def timers(self) -> TimerTransitionSystem:
         return create_timers(
             self.reset.sys_with_witnesses,
-            z3.And(
-                z3.Not(self.reset.prop.prop()),
-                *self.reset.temporal_witness_props.values(),
-            ),
+            self.reset.instantiated_prop,
             *self.reset.temporal_invariant_formulas.values(),
         ).clone(self.suffix)
+
+    @cached_property
+    def instantiated_prop(self) -> z3.BoolRef:
+        negated_prop = nnf(z3.Not(self.prop.prop()))
+
+        pending = {
+            name: (nnf(w.source(self)), nnf(w.instantiated(self)))
+            for name, w in self.temporal_witnesses.items()
+        }
+
+        def instantiate(formula: z3.BoolRef) -> z3.BoolRef:
+            for name, (source, replacement) in pending.items():
+                if formula.eq(source):
+                    del pending[name]
+                    return replacement
+
+            if is_F(formula):
+                (child,) = formula.children()
+                return F(instantiate(cast(z3.BoolRef, child)))
+            elif is_G(formula):
+                (child,) = formula.children()
+                return G(instantiate(cast(z3.BoolRef, child)))
+            elif z3.is_and(formula) or z3.is_or(formula):
+                children = [
+                    instantiate(cast(z3.BoolRef, child)) for child in formula.children()
+                ]
+                if z3.is_or(formula):
+                    return z3.Or(*children)
+                else:
+                    return z3.And(*children)
+            else:
+                return formula
+
+        instantiated_negated_prop = instantiate(negated_prop)
+        assert (
+            not pending
+        ), f"Some temporal witnesses could not be instantiated: {", ".join(pending.keys())}"
+        return instantiated_negated_prop
 
     @cached_property
     def intersection(
@@ -199,30 +263,21 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return {name: axiom for name, (_symbol, axiom) in self.witnesses.items()}
 
     @cached_property
-    def temporal_witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
+    def temporal_witnesses(self) -> dict[str, TemporalWitness]:
         witnesses = {}
         for method_name, method in _get_methods(self, _PROOF_TEMPORAL_WITNESS):
             witness_name = method_name
             assert (
                 len(method.spec) == 1
             ), f"Witness method {method_name} must except exactly one argument"
-            ((param, sort),) = method.spec.items()
-            symbol = sort(witness_name, False)  # type: ignore
-            prop = z3.Implies(method.exists(self), method(self, {param: symbol}))
-            witnesses[witness_name] = (symbol, prop)
-            setattr(self, witness_name, symbol)
+            w = TemporalWitness(method)
+            witnesses[witness_name] = w
+            setattr(self, witness_name, w.symbol)
         return witnesses
 
     @cached_property
-    def temporal_witness_props(self) -> dict[str, z3.BoolRef]:
-        return {name: prop for name, (_symbol, prop) in self.temporal_witnesses.items()}
-
-    @cached_property
     def temporal_witness_symbols(self) -> dict[str, z3.FuncDeclRef]:
-        return {
-            name: symbol.fun_ref
-            for name, (symbol, _axiom) in self.temporal_witnesses.items()
-        }
+        return {name: w.symbol.fun_ref for name, w in self.temporal_witnesses.items()}
 
     def timer_rank[*Ts](
         self,
