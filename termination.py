@@ -6,6 +6,7 @@ from typing import ClassVar, cast, Any, Self, get_type_hints, get_origin
 
 import z3
 
+from helpers import unpack_quantifier
 from ranks import Rank, FiniteLemma, timer_rank
 from temporal import Prop, nnf, is_F, F, is_G, G
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
@@ -181,6 +182,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             elif is_G(formula):
                 (child,) = formula.children()
                 return G(instantiate(cast(z3.BoolRef, child)))
+            elif z3.is_quantifier(formula) and formula.is_exists():
+                variables, body = unpack_quantifier(formula)
+                return z3.Exists(variables, instantiate(body))
             elif z3.is_and(formula) or z3.is_or(formula):
                 children = [
                     instantiate(cast(z3.BoolRef, child)) for child in formula.children()
