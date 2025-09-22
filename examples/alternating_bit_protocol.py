@@ -20,7 +20,6 @@ class AlternatingBitProtocol(TransitionSystem):
     sender_index: Index
     sender_gen_index: Index
     receiver_index: Index
-    # skolem_index: Immutable[Index]
     bottom: Immutable[Value]
     le_data_msg: Rel[DataMsg, DataMsg]
     le_ack_msg: Rel[AckMsg, AckMsg]

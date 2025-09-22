@@ -19,7 +19,6 @@ class MutexRing(TransitionSystem):
     # immutables
     leader: Immutable[Node]
     btw: Immutable[Rel[Node, Node, Node]]
-    skolem_node: Immutable[Node]
 
     # mutables
     token: Rel[Node]
@@ -110,16 +109,30 @@ class MutexRingProp(Prop[MutexRing]):
         N = Node("N")
         return Implies(
             ForAll(N, G(F(self.sys.scheduled(N)))),
-            G(
-                Implies(
-                    self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
-                    F(self.sys.node_loc(self.sys.skolem_node) == Loc.critical),
-                )
+            ForAll(
+                N,
+                G(
+                    Implies(
+                        self.sys.node_loc(N) == Loc.waiting,
+                        F(self.sys.node_loc(N) == Loc.critical),
+                    )
+                ),
             ),
         )
 
 
 class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
+    @temporal_witness
+    def skolem_node(self, N: Node) -> BoolRef:
+        return Not(
+            G(
+                Implies(
+                    self.sys.node_loc(N) == Loc.waiting,
+                    F(self.sys.node_loc(N) == Loc.critical),
+                )
+            )
+        )
+
     # needed?
     @invariant
     def unique_token(self, X: Node, Y: Node) -> BoolRef:
@@ -142,8 +155,8 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
     def skolem_never_critical(self) -> BoolRef:
         return F(
             And(
-                self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
-                G(Not(self.sys.node_loc(self.sys.skolem_node) == Loc.critical)),
+                self.sys.node_loc(self.skolem_node) == Loc.waiting,
+                G(Not(self.sys.node_loc(self.skolem_node) == Loc.critical)),
             )
         )
 
@@ -168,8 +181,8 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
             And(
                 self.holds_token(M),
                 Or(
-                    self.sys.btw(M, N, self.sys.skolem_node),
-                    And(M != N, N == self.sys.skolem_node),
+                    self.sys.btw(M, N, self.skolem_node),
+                    And(M != N, N == self.skolem_node),
                 ),
             ),
         )
@@ -179,8 +192,8 @@ class MutexRingProof(Proof[MutexRing], prop=MutexRingProp):
 
     def locked(self) -> BoolRef:
         return And(
-            self.sys.node_loc(self.sys.skolem_node) == Loc.waiting,
-            G(Not(self.sys.node_loc(self.sys.skolem_node) == Loc.critical)),
+            self.sys.node_loc(self.skolem_node) == Loc.waiting,
+            G(Not(self.sys.node_loc(self.skolem_node) == Loc.critical)),
         )
 
     def locked_rank(self) -> Rank:
