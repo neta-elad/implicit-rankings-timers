@@ -159,6 +159,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             self.reset.sys_with_witnesses,
             self.reset.instantiated_prop,
             *self.reset.temporal_invariant_formulas.values(),
+            *self.reset.tracked_temporal_formulas.values(),
         ).clone(self.suffix)
 
     @cached_property
@@ -201,6 +202,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             not pending
         ), f"Some temporal witnesses could not be instantiated: {", ".join(pending.keys())}"
         return instantiated_negated_prop
+
+    @cached_property
+    def tracked_temporal_formulas(self) -> dict[str, z3.BoolRef]:
+        tracked = {}
+        for name, method in _get_methods(self, _PROOF_TRACK_TEMPORAL):
+            tracked[name] = method(self)
+
+        return tracked
 
     @cached_property
     def intersection(
@@ -395,6 +404,13 @@ def temporal_invariant[T: Proof[Any], *Ts](
     return fun
 
 
+def track[T: Proof[Any], *Ts](
+    fun: TypedProofFormula[T, *Ts],
+) -> TypedProofFormula[T, *Ts]:
+    setattr(fun, _PROOF_METADATA, _PROOF_TRACK_TEMPORAL)
+    return fun
+
+
 def witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
     setattr(fun, _PROOF_METADATA, _PROOF_WITNESS)
     return fun  # type: ignore
@@ -410,6 +426,7 @@ _PROOF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
 _PROOF_WITNESS = object()
 _PROOF_TEMPORAL_WITNESS = object()
+_PROOF_TRACK_TEMPORAL = object()
 _PROOF_WITNESS_METADATA = "__proof_witness_metadata__"
 
 _PROOF_SPECIALS = {
@@ -419,6 +436,7 @@ _PROOF_SPECIALS = {
     "temporal_invariant_formulas",
     "witnesses",
     "temporal_witnesses",
+    "tracked_temporal_formulas",
 }
 
 

@@ -15,7 +15,14 @@ from ranks import (
     DomainPermutedRank,
     FiniteLemma,
 )
-from termination import Proof, invariant, temporal_invariant, witness, temporal_witness
+from termination import (
+    Proof,
+    invariant,
+    temporal_invariant,
+    witness,
+    temporal_witness,
+    track,
+)
 from timers import (
     timer_zero,
     timer_finite,
@@ -62,6 +69,7 @@ __all__ = [
     "temporal_invariant",
     "witness",
     "temporal_witness",
+    "track",
     "G",
     "F",
     "Prop",
