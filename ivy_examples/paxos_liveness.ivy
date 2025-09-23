@@ -1,0 +1,435 @@
+#lang ivy1.6
+
+################################################################################
+#
+# Module for axiomatizing a total order
+#
+################################################################################
+
+module total_order(r) = {
+    axiom r(X,X)                        # Reflexivity
+    axiom r(X, Y) & r(Y, Z) -> r(X, Z)  # Transitivity
+    axiom r(X, Y) & r(Y, X) -> X = Y    # Anti-symmetry
+    axiom r(X, Y) | r(Y, X)             # Totality
+}
+
+
+################################################################################
+#
+# Types, relations and functions describing state of the network
+#
+################################################################################
+
+object paxos = {
+
+    ################################################################################
+    #
+    # The protocol itself, together with encoding the fairness
+    # constraints and the negation of the liveness property
+    #
+    # * property:     exists V:value, Q:quorum. F. forall N:node. member(N,Q) -> vote(N,r0,V)
+    #   "A quorum of nodes eventually votes for the same value in round r0"
+    # * fairness 1:   F. one_a(r0)
+    #   "Eventually a phase 1a message is sent in round r0 (i.e. the owner of r0 starts round r0)"
+    # * fairness 2:   forall N:node. member(N,q0) -> 
+    #                   G. one_a(r0) -> F. one_a_received(N,r0)
+    #                   forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
+    #                   forall. V. G proposal(r0,V) ->  F. proposal_received(N,r0,V)
+    #   "Any message sent in round r0 to a node of quorum q0 is eventually received,
+    #     and any messages sent by a node of quorum q0 to the owner of round r0 is eventually received"
+    # * "fairness":   G. forall R:round. R > r0 -> ~one_a(R)
+    #   "No round higher than r0 is ever started"  
+    # * fairness 3:   F. proposed(r0)
+    #   "A proposal is eventually made in round r0"
+    # * ~property:    forall V:value, Q:quorum. G. exists N:node. member(N,Q) & ~vote(N,r0,V)
+    #
+    # * conversion of fairness to Buchi acceptance conditions:
+    # fairness 1: phi_1 = G. F. one_a(r0)
+    # fairness 2: phi_2(N) =
+    #               G. F. member(N,q0) & one_a(r0) -> one_a_received(N,r0)
+    #               G. F. member(N,q0) & one_b_max_vote(N,r0,R,V) -> one_b_received(r0,N)
+    #               G. F. member(N,q0) & proposal(r0,V) -> proposal_received(N,r0,V)
+    # fairness 3: phi_1 = G. F. proposed(r0)
+    ################################################################################
+
+    type node
+    type value
+    type quorum
+    type round
+
+    individual none: round
+    relation le(X:round, Y:round)
+    instantiate total_order(le)
+
+    relation member(N:node, Q:quorum)
+    axiom forall Q1:quorum, Q2:quorum. exists N:node. member(N, Q1) & member(N, Q2)
+
+    # original paxos relations
+    relation one_a(R:round) # 1a messages
+    relation one_b_max_vote(N:node, R1:round, R2:round, V:value) # 1b messages
+    relation proposal(R:round, V:value) # 2a messages
+    relation vote(N:node, R:round, V:value) # 2b messages
+
+    # relation for tracking which messages have been received
+    relation one_a_received(N:node, R:round)
+    relation one_b_max_vote_received(R1:round, N:node, R2:round, V:value)
+    relation proposal_received(N:node, R:round, V:value)
+
+    # projections that increase the precision of the abstraction by eliminating components which may not be in the finite footprint at the freeze point.
+    relation proposed(R:round) # invariant: proposed(R) <-> exists V . proposal(R,V)
+    relation one_b_received(R:round, N:node) # invariant: one_b_received(R,N) <-> exists R2,V. one_b_max_vote_received(R,N,R2,V)
+
+    init ~one_a(R)
+    init ~one_b_max_vote(N,R1,R2,V)
+    init ~proposal(R,V)
+    init ~vote(N,R,V)
+    init ~one_a_received(N,R)
+    init ~one_b_max_vote_received(R1,N,R2,V)
+    init ~proposal_received(N,R,V)
+    init ~proposed(R)
+    init ~one_b_received(R,N)
+
+    # the ballot after which no ballot must be started.
+    individual r0:round
+    axiom r0 ~= none
+    # the quorum that must be responsive
+    individual q0:quorum
+
+    action send_1a(r:round) = {
+        # a proposer selects a round and sends a message asking nodes to join the round
+        assume r ~= none;
+        assume ~one_a(r);
+        assume le(r,r0); # assumption for liveness (the "fairness" assumption)
+        one_a(r) := true
+    }
+
+    action join_round(n:node, r:round, maxr:round, v:value) = {
+        # receive 1a and answer with 1b
+        assume r ~= none;
+        assume one_a(r);
+        one_a_received(n, r) := true;
+        if forall R1,R2,V . one_b_max_vote(n,R1,R2,V) -> le(R1,r) {
+            # find the maximal vote in a round less than r
+            assume (
+              (maxr = none & forall MAXR:round,V:value. ~(~le(r,MAXR) & vote(n,MAXR,V))) |
+              (maxr ~= none & ~le(r,maxr) & vote(n,maxr,v) &
+                (forall MAXR:round,V:value. (~le(r,MAXR) & vote(n,MAXR,V)) -> le(MAXR,maxr)))
+            );
+            # send the 1b message
+            one_b_max_vote(n,r,maxr,v) := true
+        }
+    }
+
+    action receive_one_b(r:round, n:node, maxr:round, v:value) = {
+        assume r ~= none;
+        assume one_b_max_vote(n, r, maxr, v);
+        one_b_max_vote_received(r, n, maxr, v) := true;
+        one_b_received(r, n) := true;
+    }
+
+    action propose(r:round, v:value, q:quorum, maxr:round) = {
+      assume r ~= none;
+      assume (forall N:node. member(N, Q) -> exists MAXR, V . one_b_max_vote_received(r,N,MAXR,V))
+        -> (forall N:node. member(N, q) -> exists MAXR, V . one_b_max_vote_received(r,N,MAXR,V));
+      if (forall V:value. ~proposal(r,V)) & (forall N:node. member(N, q) -> exists MAXR, V . one_b_max_vote_received(r,N,MAXR,V)) {
+      # find the maximal max_vote in the quorum
+        assume (
+         (maxr = none & forall N:node,MAXR:round,V:value. ~(member(N, q) & MAXR ~= none & one_b_max_vote_received(r,N,MAXR,V))) |
+         (maxr ~= none &
+           (exists N:node. member(N, q) & ~le(r,maxr) & one_b_max_vote_received(r,N,maxr,v)) &
+           (forall N:node,MAXR:round,V:value. (member(N, q) & ~le(r,MAXR) & one_b_max_vote_received(r,N,MAXR,V) & MAXR~=none) -> le(MAXR,maxr)) )
+        );
+        # propose value v
+        proposal(r, v) := true;
+        proposed(r) := true
+      }
+    }
+
+    action cast_vote(n:node, v:value, r:round) = {
+        # receive a 2a and send 2b
+        assume r ~= none;
+        assume proposal(r, v);
+        proposal_received(n, r, v) := true;
+        # proposed_rcvd(n, r) := true;
+        if (forall R1,R2,V . ~le(R1,r) -> ~one_b_max_vote(n,R1,R2,V)) {
+            vote(n, r, v) := true;
+            # from negation of the liveness property:
+            if exists Q . forall N . member(N,Q) -> vote(N,r0,v) {
+                assume false
+            }
+        }
+    }
+
+    export send_1a
+    export join_round
+    export receive_one_b
+    export cast_vote
+    export propose
+
+    ################################################################################
+    #
+    # The liveness to safety construction
+    #
+    ################################################################################
+
+    object l2s = {
+
+        # the states of the monitor
+        relation waiting
+        relation frozen
+        relation saved
+        init waiting & ~frozen & ~saved
+        conjecture waiting | frozen | saved
+        conjecture ~waiting | ~frozen
+        conjecture ~waiting | ~saved
+        conjecture ~frozen  | ~saved
+
+        # d - the finite footprint
+        relation d_node(N:node)
+        relation d_quorum(Q:quorum)
+        relation d_round(R:round)
+        relation d_value(V:value)
+
+        # initially d contains elements whose existence is implied by init
+        init d_quorum(Q) <-> Q = q0
+        init d_round(R) <-> R = r0
+        init d_node(N) # there are finitely many nodes.
+        init ~d_value(V)
+
+        # W - waiting for fairness constraints
+        # this comes from the fainess constraints expressed as Buchi acceptance conditions.
+        relation w_send_one_a_r0
+        relation w_rcv_one_a(N:node,R:round)
+        relation w_rcv_one_b_max_vote(N:node, R1:round, R2:round, V:value)
+        relation w_rcv_proposal(N:node, R:round, V:value)
+        relation w_r0_proposal
+        # initially W contains elements whose existence is implied by init
+        # this is the fairness selection function applied to the initial state.
+        init w_send_one_a_r0
+        init w_rcv_one_a(N,R) <-> (member(N,q0) & d_node(N) & d_round(R))
+        init w_rcv_one_b_max_vote(N,R1,R2,V) <-> (member(N,q0) & d_node(N) & d_round(R1) & d_round(R2) & d_value(V))
+        init w_rcv_proposal(N,R,V) <-> (member(N,q0) & d_node(N) & d_round(R) & d_value(V))
+        init w_r0_proposal
+
+        # a - the frozen copy of d
+        relation a_node(N:node)
+        relation a_quorum(Q:quorum)
+        relation a_round(R:round)
+        relation a_value(V:value)
+
+        # copies of all the state relations and constants
+        # this is used to remember the abstract state at the save point.
+        relation s_one_a(R:round)
+        relation s_one_b_max_vote(N:node, R1:round, R2:round, V:value)
+        relation s_proposal(R:round, V:value)
+        relation s_vote(N:node, R:round, V:value)
+        relation s_one_a_received(N:node, R:round)
+        relation s_one_b_max_vote_received(R1:round, N:node, R2:round, V:value)
+        relation s_proposal_received(N:node, R:round, V:value)
+        relation s_proposed(R:round)
+        relation s_one_b_received(R:round, N:node)
+
+        # monitor actions combined with every protocol action
+        # below we use IVy's before and after statements to combine the monitor actions with the normal protocol actions.
+
+        # the prelude action executes before the normal protocol actions.
+        # it updates the control-flow variables of the monitor, copies the finite footprint to "a" upon the "waiting->frozen" monitor transition, and copies the current state to "s" and sets "W" (the set of fairness conditions to wait for) upon the "frozen->saved" monitor transition.
+        action prelude = {
+            if (waiting &
+                ~w_send_one_a_r0 &
+                (forall N,R. ~w_rcv_one_a(N,R)) &
+                (forall N,R1,R2,V. ~w_rcv_one_b_max_vote(N,R1,R2,V)) &
+                (forall N,R,V. ~w_rcv_proposal(N,R,V)) &
+                ~w_r0_proposal
+                ) {
+                frozen := *;
+                if frozen {
+                    waiting := false;
+                    a_node(N) := d_node(N);
+                    a_round(R) := d_round(R);
+                    a_value(V) := d_value(V);
+                    a_quorum(Q) := d_quorum(Q)
+                }
+            } else {
+                if frozen {
+                    saved := *;
+                    if saved {
+                        frozen := false;
+                        # copy relations
+                        s_one_a(R) := one_a(R);
+                        s_one_b_max_vote(N,R1,R2,V) := one_b_max_vote(N,R1,R2,V);
+                        s_proposal(R,V) := proposal(R,V);
+                        s_vote(N,R,V) := vote(N,R,V);
+                        s_one_a_received(N, R) := one_a_received(N,R);
+                        s_one_b_max_vote_received(R1,N,R2,V) := one_b_max_vote_received(R1,N,R2,V);
+                        s_proposal_received(N,R,V) := proposal_received(N,R,V);
+                        s_proposed(R) := proposed(R);
+                        s_one_b_received(R,N) := one_b_received(R,N);
+                        # sets W; we use the finite footprint to select fairness constraints.
+                        w_send_one_a_r0 := true;
+                        w_rcv_one_a(N,R) := R=r0 & member(N,q0) & d_node(N) & d_round(R);
+                        w_rcv_one_b_max_vote(N,R1,R2,V) := R1=r0 & member(N,q0) & d_node(N) & d_round(R1) & d_round(R2) & d_value(V);
+                        w_rcv_proposal(N,R,V) := R=r0 & member(N,q0) & d_node(N) & d_round(R) & d_value(V);
+                        w_r0_proposal := true
+                    }
+                }
+            }
+        }
+
+        # before every protocol action, we call the prelude action.
+        before send_1a { call prelude }
+        before join_round { call prelude }
+        before receive_one_b { call prelude }
+        before cast_vote { call prelude }
+        before propose { call prelude }
+
+        # the postlude action removes satisfied faireness constraints from W and, when the monitor is in "saved" state and W is empty, asserts that the current-state finite abstraction is not equal to the saved-state finite abstraction.
+        action postlude = {
+            # remove satisfied fairness constraints from W
+            w_send_one_a_r0 := w_send_one_a_r0 & ~one_a(r0);
+            w_rcv_one_a(N,R) := w_rcv_one_a(N,R) & ~(~one_a(R) | one_a_received(N, R));
+            w_rcv_one_b_max_vote(N,R1,R2,V) := (
+                w_rcv_one_b_max_vote(N,R1,R2,V) &
+                ~(~one_b_max_vote(N,R1,R2,V) | one_b_max_vote_received(R1,N,R2,V))
+            );
+            w_rcv_proposal(N,R,V) := w_rcv_proposal(N,R,V) & ~(~proposal(R,V) | proposal_received(N,R,V));
+            # w_r0_proposal set in after of propose
+
+            # assert no cycle detected
+            assert ~(
+                saved &
+                # W = emptyset
+                ~w_send_one_a_r0 &
+                (forall N,R. ~w_rcv_one_a(N,R)) &
+                (forall N,R1,R2,V. ~w_rcv_one_b_max_vote(N,R1,R2,V)) &
+                (forall N,R,V. ~w_rcv_proposal(N,R,V)) &
+                ~w_r0_proposal &
+                # A(t) = A(s)
+                # checking the following relations is sufficient (adding more relations can only help make the assert pass):
+                (forall R,N. a_node(N) & a_round(R) -> (s_one_a_received(N,R) <-> one_a_received(N,R))) &
+                (forall R. a_round(R) -> (s_proposed(R) <-> proposed(R))) &
+                (forall R,N. a_round(R) & a_node(N) -> (s_one_b_received(R,N) <-> one_b_received(R,N)))
+            )
+        }
+
+        # after every protocol action, we update the finite footprint and call the postlude action.
+        after send_1a {
+            d_round(r) := true;
+            call postlude
+        }
+
+        after join_round {
+            d_node(n) := true;
+            d_round(r) := true;
+            d_round(maxr) := true;
+            d_value(v) := true;
+            call postlude
+        }
+
+        after receive_one_b {
+            d_round(r) := true;
+            d_node(n) := true;
+            d_round(maxr) := true;
+            d_value(v) := true;
+            call postlude
+        }
+
+        after propose {
+          d_round(r) := true;
+          d_round(maxr) := true;
+          d_quorum(q) := true;
+          d_value(v) := true;
+          w_r0_proposal := w_r0_proposal & (r ~= r0);
+          call postlude
+        }
+
+        after cast_vote {
+            d_node(n) := true;
+            d_round(r) := true;
+            d_value(v) := true;
+            call postlude
+        }
+    }
+
+    ################################################################################
+    #
+    # The safety proof (implies the liveness property by the liveness-to-safety reduction).
+    #
+    ################################################################################
+
+    # proposals are unique per round
+    conjecture proposal(R,V1) & proposal(R,V2) -> V1 = V2
+
+    # nodes only vote for proposed values
+    conjecture vote(N,R,V) -> proposal(R,V)
+
+    # nothing happens after r0:
+    conjecture one_a(R) -> le(R,r0)
+    conjecture one_b_max_vote(N,R1,R2,V) -> le(R1,r0)
+    conjecture one_b_max_vote_received(R,N,MAXR,V) -> le(R,r0)
+    conjecture proposal(R,V) -> le(R,r0)
+    conjecture vote(N,R,V) -> le(R,r0)
+
+    # d and a are large enough at the freeze point
+    conjecture l2s.d_node(N)
+    conjecture l2s.d_round(r0)
+    conjecture ~l2s.waiting -> l2s.a_node(N)
+    conjecture ~l2s.waiting -> l2s.a_round(r0)
+
+    # all relations are monotone
+    conjecture l2s.saved -> (l2s.s_one_a(R) -> one_a(R))
+    conjecture l2s.saved -> (l2s.s_one_b_max_vote(N,R1,R2,V) -> one_b_max_vote(N,R1,R2,V))
+    conjecture l2s.saved -> (l2s.s_proposal(R,V) -> proposal(R,V))
+    conjecture l2s.saved -> (l2s.s_vote(N,R,V) -> vote(N,R,V))
+    conjecture l2s.saved -> (l2s.s_one_a_received(N,R) -> one_a_received(N,R))
+    conjecture l2s.saved -> (l2s.s_one_b_max_vote_received(R1,N,R2,V) -> one_b_max_vote_received(R1,N,R2,V))
+    conjecture l2s.saved -> (l2s.s_proposal_received(N,R,V) -> proposal_received(N,R,V))
+    conjecture l2s.saved -> (l2s.s_one_b_received(R,N) -> one_b_received(R,N))
+
+    # d is large enough before the save point (facilitates the next set of conjectures)
+    conjecture one_a(R) -> l2s.d_round(R)
+    conjecture one_b_max_vote(N,R1,R2,V) -> l2s.d_node(N) & l2s.d_round(R1) & l2s.d_round(R2) & l2s.d_value(V)
+    conjecture proposal(R,V) -> l2s.d_round(R) & l2s.d_value(V)
+
+    # saved and sent before saving and not waiting means received (for messages sent in r0 and for members of q0):
+    conjecture R=r0 & l2s.saved & l2s.s_one_a(R) & member(N,q0) & ~l2s.w_rcv_one_a(N,R) -> one_a_received(N,R)
+    conjecture R1=r0 & l2s.saved & l2s.s_one_b_max_vote(N,R1,R2,V) & member(N,q0) & ~l2s.w_rcv_one_b_max_vote(N,R1,R2,V) -> one_b_max_vote_received(R1,N,R2,V)
+    conjecture R=r0 & l2s.saved & l2s.s_proposal(R,V) & member(N,q0) & ~l2s.w_rcv_proposal(N,R,V) -> proposal_received(N,R,V)
+
+    # projection properties
+    conjecture (exists V. proposal(R,V)) <-> proposed(R)
+    conjecture l2s.saved -> ((exists V. l2s.s_proposal(R,V)) <-> l2s.s_proposed(R))
+    conjecture proposal_received(N,R,V) -> proposed(R)
+    conjecture l2s.saved -> l2s.s_proposal_received(N,R,V) -> l2s.s_proposed(R)
+    conjecture one_b_received(R,N) <-> (exists R2,V . one_b_max_vote_received(R,N,R2,V))
+    conjecture l2s.saved -> (l2s.s_one_b_received(R1,N) <-> (exists R2,V . l2s.s_one_b_max_vote_received(R1,N,R2,V)))
+
+    # w_send_one_a_r0 conjectures
+    conjecture ~l2s.w_send_one_a_r0 -> one_a(r0)
+    conjecture ~l2s.waiting -> one_a(r0)
+    conjecture l2s.saved -> l2s.s_one_a(r0)
+
+    # progress conjectures for r0 - if msg a is received, msg b is sent
+    conjecture one_a_received(N,r0) <-> (exists R,V. one_b_max_vote(N,r0,R,V))
+    conjecture l2s.saved -> (l2s.s_one_a_received(N,r0) <-> (exists R,V. l2s.s_one_b_max_vote(N,r0,R,V)))
+    conjecture proposal_received(N,r0,V) <-> vote(N,r0,V)
+    conjecture l2s.saved -> (l2s.s_proposal_received(N,r0,V) <-> l2s.s_vote(N,r0,V))
+
+    # progress conjectures for r0 - progress of proposal at r0 
+    conjecture l2s.saved & ~l2s.s_proposed(r0) & (forall N . member(N,Q) -> l2s.s_one_b_received(r0,N)) & ~l2s.w_r0_proposal -> proposed(r0)
+
+    # once a proposal is sent, we will always wait for at least one node.
+    conjecture exists N. forall V. member(N,q0) & ~vote(N,r0,V)
+
+# Domain size restrictions; uncomment for finding counter-example models with particular cardinality.
+#axiom exists V1:value,V2. forall V:value. V=V1 | V=V2
+#axiom exists N1:node,N2. forall N:node. N=N1 | N=N2
+#axiom exists R1:round,R2:round,R3:round. forall R:round. R=R1 | R=R2 | R=R3
+
+# A trick to make IVy display boolean variables in the GUI:
+#type typ
+#function w_r0_proposal(T:typ) = l2s.w_r0_proposal
+#function w_send_one_a_r0(T:typ) = l2s.w_send_one_a_r0
+#function saved(T:typ) = l2s.saved
+
+}

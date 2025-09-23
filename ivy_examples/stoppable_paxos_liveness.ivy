@@ -1,0 +1,521 @@
+#lang ivy1.6
+
+################################################################################
+#
+# Modules that should probably come from a standard library
+#
+################################################################################
+
+################################################################################
+#
+# Module for axiomatizing a total order
+#
+################################################################################
+
+module total_order(r) = {
+    axiom r(X,X)                        # Reflexivity
+    axiom r(X, Y) & r(Y, Z) -> r(X, Z)  # Transitivity
+    axiom r(X, Y) & r(Y, X) -> X = Y    # Anti-symmetry
+    axiom r(X, Y) | r(Y, X)             # Totality
+}
+
+
+################################################################################
+#
+# Types, relations and functions describing state of the network
+#
+################################################################################
+
+object stoppable_paxos  = {
+
+    ################################################################################
+    #
+    # The protocol itself, together with encoding the fairness
+    # constraints and the negation of the liveness property
+    #
+    # * property:     forall I . exists I2:inst, V:value, Q:quorum. F. 
+    #                     ( (forall N:node. member(N,Q) -> vote(N,I,r0,V)) | (~le(I,I2) & forall N:node. member(N,Q) -> vote(N,I,r0,stop)) )
+    #   "For every instance, eventually, either a quorum of nodes votes for the same value, or a quorum of nodes votes for a stop command in a lower instance"
+    # * fairness 1:   F. one_a(r0)
+    #   "Eventually a phase 1a message is sent in round r0 (i.e. the owner of r0 starts round r0)"
+    # * fairness 2:   forall N:node. member(N,q0) -> 
+    #                   G. one_a(r0) -> F. one_a_received(N,r0)
+    #                   forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
+    #                   forall. V. G proposal(I,r0,V) ->  F. proposal_received(N,I,r0,V)
+    #   "Any message sent in round r0 to a node of quorum q0 is eventually received,
+    #     and any messages sent by a node of quorum q0 to the owner of round r0 is eventually received"
+    # * "fairness":   G. forall R:round. R > r0 -> ~one_a(R)
+    #   "No round higher than r0 is ever started"  
+    # * fairness 3:   G. F. propose(r0,I)
+    #   "The proposal action in round r0 is executed infinitely often"
+    # * fairness 4:   G. F. process_join_acks(r0) 
+    #   "The process_join_acks action in round r0 is executed infinitely often"
+    # * ~property     forall V:value, Q:quorum. G. exists N:node. member(N,Q) & ~vote(N,i0,r0,V)
+    #
+    # * conversion of fairness to Buchi acceptance conditions:
+    # fairness 1: phi_1 = G. F. one_a(r0)
+    # fairness 2: phi_2(N) =
+    #               G. F. member(N,q0) & one_a(r0) -> one_a_received(N,r0)
+    #               G. F. member(N,q0) & one_b_max_vote(N,r0,R,V) -> one_b_received(r0,N)
+    #               G. F. member(N,q0) & proposal(I,r0,V) -> proposal_received(N,I,r0,V)
+    # fairness 3: phi_1 = G. F. proposed(r0,I)
+    # fairness 4: phi_1 = G. F. process_join_acks(r0,I)
+    ################################################################################
+
+type node
+type value
+type quorum
+type round
+type inst
+type votemap
+
+individual stop:value
+
+relation inst_le(X:inst,Y:inst)
+instantiate total_order(inst_le)
+
+individual none: round
+relation le(X:round, Y:round)
+instantiate total_order(le)
+axiom le(none,R)
+
+relation member(N:node, Q:quorum)
+axiom forall Q1:quorum, Q2:quorum. exists N:node. member(N, Q1) & member(N, Q2)
+
+relation one_a(R:round)
+relation one_b_msg(N:node, R1:round, M:votemap)
+relation proposal(I:inst, R:round, V:value) # 2a
+relation vote(N:node, I:inst, R:round, V:value) # 2b
+relation active(R:round) # round R has received a quorum of 1b and can now propose new values
+individual maxr(M:votemap,I:inst) : round
+individual maxv(M:votemap,I:inst) : value
+
+init ~one_a(R)
+init ~one_b_msg(N,R1,M)
+init ~proposal(I,R,V)
+init ~vote(N,I,R,V)
+init ~active(R)
+
+# tracking fairness of message arrival
+relation one_b_votemap_received(R:round, N:node, M:votemap)
+relation one_a_received(N:node, R:round)
+relation proposal_received(N:node, I:inst, R:round, V:value)
+init ~one_b_votemap_received(R,N,M)
+init ~one_a_received(N, R)
+init ~proposal_received(N,I,R,V)
+
+# projections for liveness proof
+relation proposed(I:inst,R:round)
+relation one_b_received(R:round, N:node)
+init ~proposed(I,R)
+init ~one_b_received(R,N)
+
+# the ballot after which no ballot must be started (fairness assumption).
+individual r0:round
+axiom r0 ~= none
+# the quorum that must be responsive
+individual q0:quorum
+# the instance in which nothing is chosen (from negation of liveness property)
+individual i0:inst
+
+action send_1a(r:round) = {
+    # a proposer selects a round and sends a message asking nodes to join the round
+        assume r ~= none;
+        assume ~one_a(r);
+        assume le(r,r0); # assumption for liveness (the "fairness" assumption)
+        one_a(r) := true
+}
+
+action join_round(n:node, r:round, m:votemap) = {
+        assume r ~= none;
+        assume one_a(r);
+        one_a_received(n, r) := true;
+        if one_b_msg(n,R,M) -> le(R,r) {
+        # find the maximal vote in a round less than r, for all instances
+        assume forall I:inst. (
+            ( maxr(m,I) = none & forall R,V. ~(vote(n,I,R,V) & ~le(r,R)) ) |
+            ( vote(n,I,maxr(m,I),maxv(m,I)) & ~le(r,maxr(m,I)) &
+              forall R,V. vote(n,I,R,V) & ~le(r,R) -> le(R,maxr(m,I)) )
+        );
+        # send the 1b message
+        one_b_msg(n,r,m) := true
+        }
+}
+
+action receive_one_b(r:round, n:node, m:votemap) = {
+      assume r ~= none;
+      assume one_b_msg(n, r, m);
+      one_b_votemap_received(r, n, m) := true;
+      one_b_received(r, n) := true
+}
+
+action process_join_acks(r:round, q:quorum, m:votemap, im:inst) = {
+        assume r ~= none;
+        assume ~active(r); # this happens only once
+        assume forall N:node. member(N, q) -> exists M:votemap. one_b_msg(N,r,M);
+
+        # find the maximal vote in the quorum for each instance
+        assume forall I:inst. (
+            ( maxr(m,I) = none &
+              forall N,M. ~(member(N, q) & one_b_votemap_received(r,N,M) & maxr(M,I) ~= none) ) |
+            ( (exists N,M.   member(N, q) & one_b_votemap_received(r,N,M) & maxr(M,I) ~= none & maxr(M,I) = maxr(m,I) & maxv(M,I) = maxv(m,I)) &
+              (forall N,M.   member(N, q) & one_b_votemap_received(r,N,M) & maxr(M,I) ~= none -> le(maxr(M,I),maxr(m,I))) )
+        );
+
+    # activate round
+    active(r) := true;
+
+    # propose according to the overapproximating rule
+    # check if there are stops
+    if (forall I . ~(maxr(m,I) ~= none & maxv(m,I) = stop)) {
+        # if there are no stops, propose according to m
+        proposal(I, r, V) := proposal(I, r, V) | (maxr(m,I) ~= none & V = maxv(m,I))
+    } else {
+        # if there are stops, find the stop with the maximal round
+        assume (
+            maxr(m,im) ~= none & maxv(m,im) = stop &
+            forall I . (maxr(m,I) ~= none & maxv(m,I) = stop) -> le(maxr(m,I),maxr(m,im))
+        );
+        # check if the stop at im is voided
+        if (exists I . ~inst_le(I,im) & maxr(m,I) ~= none & ~le(maxr(m,I), maxr(m,im))) {
+            # the stop at im is voided. void all stops, and also all
+            # proposals at instances greater than im and lower
+            # rounds. this is needed to be an overapproximation of
+            # Lamport's version.
+            proposal(I, r, V) := proposal(I, r, V) | (maxr(m,I) ~= none & V = maxv(m,I) &
+                ~(maxv(m,I) = stop | (~inst_le(I,im) & ~le(maxr(m,im),maxr(m,I))))
+            )
+        } else {
+            # the stop at im is not voided. void all other stops and
+            # all proposals at instances larger than im
+            proposal(I, r, V) := proposal(I, r, V) | (maxr(m,I) ~= none & V = maxv(m,I) &
+                ~((I ~= im & maxv(m,I) = stop) | ~inst_le(I,im))
+            )
+        }
+    };
+    # update proposed according to the new proposals.
+    proposed(I,r) := proposed(I,r) | exists V . proposal(I,r,V)
+}
+
+action propose(r:round, i:inst, v:value) = {
+    # propose a new arbitrary value for an available instance
+        assume r ~= none;
+        assume ~inst_le(I,i) & proposal(I,r,V) -> v ~= stop;
+        if active(r) & (forall V . ~proposal(i, r, V)) & (forall I . ~(~inst_le(i,I) & proposal(I, r, stop))) {
+          proposal(i, r, v) := true;
+          proposed(i,r) := true
+        }
+}
+
+action cast_vote(n:node, v:value, r:round, i:inst) = {
+    # receive a 2a and send 2b
+        assume r ~= none;
+        assume proposal(i, r, v);
+        proposal_received(n,i,r,v) := true;
+        if (forall R,M . one_b_msg(n,R,M) -> le(R,r)) & ~vote(n, i, r, V) {
+          vote(n, i, r, v) := true;
+          # from negation of the liveness property:
+          if (exists Q. forall N . member(N,Q) -> vote(N,i0,r0,v))
+            | (inst_le(i,i0) & exists Q . forall N . member(N,Q) -> vote(N,i,r0,stop)) {
+              assume false
+          }
+
+        }
+}
+
+export send_1a
+export join_round
+export receive_one_b
+export process_join_acks
+export propose
+export cast_vote
+
+# only vote for proposed values
+conjecture vote(N,I,R,V) -> proposal(I,R,V)
+
+    object l2s = {
+
+        # the states of the monitor
+        relation waiting
+        relation frozen
+        relation saved
+        init waiting & ~frozen & ~saved
+        conjecture waiting | frozen | saved
+        conjecture ~waiting | ~frozen
+        conjecture ~waiting | ~saved
+        conjecture ~frozen  | ~saved
+
+        # d - the finite footprint
+        relation d_node(N:node)
+        relation d_quorum(Q:quorum)
+        relation d_round(R:round)
+        relation d_value(V:value)
+        relation d_inst(I:inst)
+        relation d_votemap(M:votemap)
+
+        # initially d contains elements whose existence is implied by init
+        init d_quorum(Q) <-> Q = q0
+        init d_round(R) <-> R = r0
+        init d_node(N) # the set of all nodes is finite
+        init d_value(V) <-> V = stop
+        init d_inst(I) <-> I=i0
+        init ~d_votemap(M)
+
+        # W - waiting for fairness constraints
+        relation w_send_one_a_r0
+        relation w_rcv_one_a(N:node,R:round)
+        relation w_rcv_one_b_msg(N:node, R1:round, M:votemap)
+        relation w_rcv_proposal(N:node, I:inst, R:round, V:value)
+        relation w_r0_proposal(I:inst) 
+        relation w_process_join_acks_r0
+        # initially W contains elements whose existence is implied by init
+        init w_send_one_a_r0
+        init w_rcv_one_a(N,R) <-> (member(N,q0) & d_node(N) & d_round(R))
+        init w_rcv_one_b_msg(N,R1,M) <-> (member(N,q0) & d_node(N) & d_votemap(M))
+        init w_rcv_proposal(N,I,R,V) <-> (member(N,q0) & d_node(N) & d_inst(I) & d_round(R) & d_value(V))
+        init w_r0_proposal(I) <-> inst_le(I,i0)
+        init w_process_join_acks_r0
+
+        # a - the frozen copy of d
+        relation a_node(N:node)
+        relation a_quorum(Q:quorum)
+        relation a_round(R:round)
+        relation a_value(V:value)
+        relation a_inst(I:inst)
+        relation a_votemap(M:votemap)
+
+        # copies of all the state relations and constants
+        relation s_one_a(R:round)
+        relation s_one_b_msg(N:node, R1:round, M:votemap)
+        relation s_proposal(I:inst, R:round, V:value)
+        relation s_vote(N:node, I:inst, R:round, V:value)
+        relation s_active(R:round)
+        relation s_one_a_received(N:node, R:round)
+        relation s_one_b_votemap_received(R1:round, N:node, M:votemap)
+        relation s_proposal_received(N:node, I:inst, R:round, V:value)
+        relation s_proposed(I:inst, R:round)
+        relation s_one_b_received(R:round, N:node)
+
+        # monitor actions combined with every protocol action
+
+        action prelude = {
+            if (waiting &
+                ~w_send_one_a_r0 &
+                (forall N,R. ~w_rcv_one_a(N,R)) &
+                (forall N,R1,M. ~w_rcv_one_b_msg(N,R1,M)) &
+                (forall N,I,R,V. ~w_rcv_proposal(N,I,R,V)) &
+                (forall I . ~w_r0_proposal(I)) &
+                ~w_process_join_acks_r0
+                ) {
+                frozen := *;
+                if frozen {
+                    waiting := false;
+                    a_node(N) := d_node(N);
+                    a_round(R) := d_round(R);
+                    a_value(V) := d_value(V);
+                    a_quorum(Q) := d_quorum(Q);
+                    a_inst(I) := d_inst(I);
+                    a_votemap(M) := d_votemap(M)
+                }
+            } else {
+                if frozen {
+                    saved := *;
+                    if saved {
+                        frozen := false;
+                        # copy relations
+                        s_one_a(R) := one_a(R);
+                        s_one_b_msg(N,R1,M) := one_b_msg(N,R1,M);
+                        s_proposal(I,R,V) := proposal(I,R,V);
+                        s_vote(N,I,R,V) := vote(N,I,R,V);
+                        s_active(R) := active(R);
+                        s_one_a_received(N, R) := one_a_received(N,R);
+                        s_one_b_votemap_received(R1,N,M) := one_b_votemap_received(R1,N,M);
+                        s_proposal_received(N,I,R,V) := proposal_received(N,I,R,V);
+                        s_proposed(I,R) := proposed(I,R);
+                        s_one_b_received(R,N) := one_b_received(R,N);
+                        # reset W
+                        w_send_one_a_r0 := true;
+                        w_rcv_one_a(N,R) := R=r0 & member(N,q0) & d_node(N) & d_round(R);
+                        w_rcv_one_b_msg(N,R1,M) := R1=r0 & member(N,q0) & d_node(N) & d_round(R1) & d_votemap(M);
+                        w_rcv_proposal(N,I,R,V) := R=r0 & member(N,q0) & d_node(N) & d_round(R) & d_value(V) & d_inst(I);
+                        w_r0_proposal(I) := d_inst(I);
+                        w_process_join_acks_r0 := true
+                    }
+                }
+            }
+        }
+
+        before send_1a { call prelude }
+        before join_round { call prelude }
+        before receive_one_b { call prelude }
+        before cast_vote { call prelude }
+        before process_join_acks { call prelude }
+        before propose { call prelude }
+
+        action postlude = {
+            # update W
+            w_send_one_a_r0 := w_send_one_a_r0 & ~one_a(r0);
+            w_rcv_one_a(N,R) := w_rcv_one_a(N,R) & ~(~one_a(R) | one_a_received(N, R));
+            w_rcv_one_b_msg(N,R1,M) := (
+                w_rcv_one_b_msg(N,R1,M) &
+                ~(~one_b_msg(N,R1,M) | one_b_votemap_received(R1,N,M))
+            );
+            w_rcv_proposal(N,I,R,V) := w_rcv_proposal(N,I,R,V) & ~(~proposal(I,R,V) | proposal_received(N,I,R,V));
+            # w_r0_proposal and w_process_join_acks_r0 updated in after of actions
+
+            # assert no cycle detected
+            assert ~(
+                saved &
+                # W = emptyset
+                ~w_send_one_a_r0 &
+                (forall N,R. ~w_rcv_one_a(N,R)) &
+                (forall N,R1,M. ~w_rcv_one_b_msg(N,R1,M)) &
+                (forall N,I,R,V. ~w_rcv_proposal(N,I,R,V)) &
+                (forall I . ~w_r0_proposal(I)) &
+                ~w_process_join_acks_r0 &
+                # A(t) = A(s)
+                # we only need to check the following relations:
+                (forall R,N. a_node(N) & a_round(R) -> (s_one_a_received(N,R) <-> one_a_received(N,R))) &
+                (forall I,R. a_round(R) -> (s_proposed(I,R) <-> proposed(I,R))) &
+                (forall R,N. a_round(R) & a_node(N) -> (s_one_b_received(R,N) <-> one_b_received(R,N))) &
+                (forall R,I . a_round(R) & a_inst(I) -> (s_active(R) <-> active(R)))
+            )
+        }
+
+        after send_1a {
+            d_round(r) := true;
+            call postlude
+        }
+
+        after join_round {
+            d_node(n) := true;
+            d_round(r) := true;
+            d_votemap(m) := true;
+            call postlude
+        }
+
+        after receive_one_b {
+            d_round(r) := true;
+            d_node(n) := true;
+            d_votemap(m) := true;
+            call postlude
+        }
+        
+        after process_join_acks {
+          d_round(r) := true;
+          d_quorum(q) := true;
+          d_votemap(m) := true;
+          w_process_join_acks_r0 := w_process_join_acks_r0 & (r ~= r0);
+          call postlude
+        }
+
+        after propose {
+          d_round(r) := true;
+          d_inst(i) := true;
+          d_value(v) := true;
+          w_r0_proposal(I) := w_r0_proposal(I) & ~(r = r0 & i = I);
+          call postlude
+        }
+
+        after cast_vote {
+            d_node(n) := true;
+            d_inst(i) := true;
+            d_round(r) := true;
+            d_value(v) := true;
+            call postlude
+        }
+    }
+
+    # nothing happens after r0:
+    conjecture one_a(R) -> le(R,r0)
+    conjecture one_b_msg(N,R,M) -> le(R,r0)
+    conjecture one_b_votemap_received(R,N,M) -> le(R,r0)
+    conjecture one_b_msg(N,R,M) -> le(maxr(M,I),r0)
+    conjecture proposal(I,R,V) -> le(R,r0)
+    conjecture vote(N,I,R,V) -> le(R,r0)
+    conjecture active(R) -> le(R,r0)
+
+  # proposals are unique per round
+  conjecture proposal(I,R,V1) & proposal(I,R,V2) -> V1 = V2
+  conjecture ~active(R) -> ~proposal(I,R,V)
+
+
+    # d and a are large enough at the freeze point
+    conjecture l2s.d_node(N)
+    conjecture l2s.d_round(r0)
+    conjecture l2s.d_inst(i0)
+    conjecture ~l2s.waiting -> l2s.a_node(N)
+    conjecture ~l2s.waiting -> l2s.a_round(r0)
+    conjecture ~l2s.waiting -> l2s.a_inst(i0)
+    conjecture l2s.d_value(stop)
+    conjecture ~l2s.waiting -> l2s.a_value(stop)
+
+    # all relations are monotone
+    conjecture l2s.saved -> (l2s.s_one_a(R) -> one_a(R))
+    conjecture l2s.saved -> (l2s.s_one_b_msg(N,R1,M) -> one_b_msg(N,R1,M))
+    conjecture l2s.saved -> (l2s.s_proposal(I,R,V) -> proposal(I,R,V))
+    conjecture l2s.saved -> (l2s.s_vote(N,I,R,V) -> vote(N,I,R,V))
+    conjecture l2s.saved -> (l2s.s_one_a_received(N,R) -> one_a_received(N,R))
+    conjecture l2s.saved -> (l2s.s_one_b_votemap_received(R1,N,M) -> one_b_votemap_received(R1,N,M))
+    conjecture l2s.saved -> (l2s.s_proposal_received(N,I,R,V) -> proposal_received(N,I,R,V))
+    conjecture l2s.saved -> (l2s.s_one_b_received(R,N) -> one_b_received(R,N))
+    conjecture l2s.saved -> (l2s.s_active(R) -> active(R))
+    conjecture l2s.saved -> (l2s.s_proposed(I,R) -> proposed(I,R))
+
+    # d is large enough before the save point (facilitates the next set of conjectures)
+    conjecture one_a(R) -> l2s.d_round(R)
+    conjecture proposal(I,R,V) -> l2s.d_round(R) & l2s.d_value(V) & l2s.d_inst(I)
+    conjecture vote(N,I,R,V) -> l2s.d_node(N) & l2s.d_inst(I) & l2s.d_round(R) & l2s.d_value(V)
+    conjecture one_b_msg(N,R,M) -> l2s.d_node(N) & l2s.d_round(R) & l2s.d_votemap(M)
+    conjecture one_b_msg(N,R,M) & maxr(M,I) ~= none -> l2s.d_round(maxr(M,I)) & l2s.d_value(maxv(M,I)) & l2s.d_inst(I)
+    conjecture one_b_votemap_received(R,N,M) -> l2s.d_node(N) & l2s.d_round(R) & l2s.d_votemap(M)
+    conjecture one_b_votemap_received(R,N,M) & maxr(M,I) ~= none -> l2s.d_round(maxr(M,I)) & l2s.d_value(maxv(M,I)) & l2s.d_inst(I)
+
+    # saved and sent before saving and not waiting means received (for members of q0):
+    conjecture R=r0 & l2s.saved & l2s.s_one_a(R) & member(N,q0) & ~l2s.w_rcv_one_a(N,R) -> one_a_received(N,R)
+    conjecture R1=r0 & l2s.saved & l2s.s_one_b_msg(N,R1,M) & member(N,q0) & ~l2s.w_rcv_one_b_msg(N,R1,M) -> one_b_votemap_received(R1,N,M)
+    conjecture R=r0 & l2s.saved & l2s.s_proposal(I,R,V) & member(N,q0) & ~l2s.w_rcv_proposal(N,I,R,V) -> proposal_received(N,I,R,V)
+
+    # projection properties
+    conjecture (exists V. proposal(I,R,V)) <-> proposed(I,R)
+    conjecture l2s.saved -> ((exists V. l2s.s_proposal(I,R,V)) <-> l2s.s_proposed(I,R))
+    conjecture proposal_received(N,I,R,V) -> proposed(I,R)
+    conjecture l2s.saved -> l2s.s_proposal_received(N,I,R,V) -> l2s.s_proposed(I,R)
+    conjecture one_b_received(R,N) <-> (exists M . one_b_votemap_received(R,N,M))
+    conjecture l2s.saved -> (l2s.s_one_b_received(R1,N) <-> (exists M . l2s.s_one_b_votemap_received(R1,N,M)))
+
+    # w_send_one_a_r0 conjectures
+    conjecture ~l2s.w_send_one_a_r0 -> one_a(r0)
+    conjecture ~l2s.waiting -> one_a(r0)
+    conjecture l2s.saved -> l2s.s_one_a(r0)
+
+    # progress conjectures for r0 - if msg a is received, msg b is sent
+    conjecture one_a_received(N,r0) <-> (exists M . one_b_msg(N,r0,M))
+    conjecture l2s.saved -> (l2s.s_one_a_received(N,r0) <-> (exists M. l2s.s_one_b_msg(N,r0,M)))
+    conjecture forall I . proposal_received(N,I,r0,V) <-> vote(N,I,r0,V)
+    conjecture l2s.saved -> forall I . (l2s.s_proposal_received(N,I,r0,V) <-> l2s.s_vote(N,I,r0,V))
+
+    # progress conjectures for r0 and i0 - progress of proposal at i0 and r0 
+    conjecture l2s.saved & ~l2s.w_process_join_acks_r0 & ~l2s.s_active(r0) & (exists Q . forall N . member(N,Q) -> l2s.s_one_b_received(r0,N)) -> active(r0)
+    conjecture l2s.saved & (forall N . member(N,Q) -> l2s.s_one_b_received(r0,N)) & ~active(r0) -> l2s.w_process_join_acks_r0
+    conjecture l2s.saved & l2s.s_active(r0) & ~l2s.w_r0_proposal(i0)
+      -> (proposed(i0,r0) | (exists I . ~inst_le(i0,I) & proposal(I, r0, stop)))
+
+    # once a proposal is sent, we will always wait for at least one node.
+    conjecture exists N. forall V. member(N,q0) & ~vote(N,i0,r0,V)
+    conjecture forall I . inst_le(I,i0) -> exists N. member(N,q0) & ~vote(N,I,r0,stop)
+
+# Domain size restrictions; uncomment for finding counter-example models with particular cardinality.
+#axiom exists V1:value,V2. forall V:value. V=V1 | V=V2
+#axiom exists N1:node,N2. forall N:node. N=N1 | N=N2
+#axiom exists R1:round,R2:round,R3:round. forall R:round. R=R1 | R=R2 | R=R3
+
+# A trick to make IVy display boolean variables in the GUI:
+#type typ
+#function w_r0_proposal(T:typ) = l2s.w_r0_proposal
+#function w_send_one_a_r0(T:typ) = l2s.w_send_one_a_r0
+#function saved(T:typ) = l2s.saved
+
+}
+
+
