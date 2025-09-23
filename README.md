@@ -35,10 +35,17 @@ For a simple example, check out the `examples/trivial_termination.py` file.
   - [ ] Second property in hrb 
   - [ ] All the rest
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
+    DomPW 
+    [{}, {}, {}] - options for exists y disjunctively
+    DomPermPW
+    [ ([{},{}] , [{},{}], {}), ([{},{}] , [{},{}], {}) ]
+    Soundness
+    [ [{},{}] , [{},{}] ]
 - [ ] In readme, write list of all features
 - [ ] Improve formatter
 - [ ] differentiate timeouts and violations in printing
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
+- [ ] (?) splitting checks for different cases 
 - [ ] (?) Add modified argument and check to see everything is modified
 - [ ] (?) Can we reuse invariants in diff proofs?
 - [ ] (stretch) ability to write unit tests for a spec
