@@ -8,7 +8,7 @@ class BinaryCounter(TransitionSystem):
     # Immutable constants and relations
     max: Immutable[Index]
     le: Immutable[Rel[Index, Index]]
-    le_reversed : Immutable[Rel[Index,Index]]
+    le_reversed: Immutable[Rel[Index, Index]]
 
     # Mutable state
     ptr: Index
@@ -19,9 +19,9 @@ class BinaryCounter(TransitionSystem):
         return And(
             Implies(And(self.le(X, Y), self.le(Y, X)), false),
             Implies(And(self.le(X, Y), self.le(Y, Z)), self.le(X, Z)),
-            Or(self.le(X, Y), self.le(Y, X),X==Y),
-            Or(self.le(X, self.max),X==self.max),
-            self.le_reversed(X,Y) == self.le(Y,X)
+            Or(self.le(X, Y), self.le(Y, X), X == Y),
+            Or(self.le(X, self.max), X == self.max),
+            self.le_reversed(X, Y) == self.le(Y, X),
         )
 
     def succ(self, smaller: Index, bigger: Index) -> BoolRef:
@@ -70,29 +70,21 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
     def position_of_ptr(self) -> Rank:
         def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
             return self.sys.le
-        
+
         def ptr_term(self: BinaryCounterProof) -> Index:
             return self.sys.ptr
-            
+
         return PosInOrderRank(ts_rel(le_rel), ts_term(ptr_term))
-        
-    def x_was_last_1(self,i:Index) -> BoolRef:
-        return And(
-            self.sys.a(i), 
-            self.sys.le(i,self.sys.ptr)
-        )
+
+    def x_was_last_1(self, i: Index) -> BoolRef:
+        return And(self.sys.a(i), self.sys.le(i, self.sys.ptr))
 
     def ghost_array_lex(self) -> Rank:
         def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
             return self.sys.le
 
         return DomainLexRank(
-            BinRank(
-                self.x_was_last_1
-            ),
-            ts_rel(le_rel),
-            ('i',Index),
-            None
+            BinRank(self.x_was_last_1), ts_rel(le_rel), ("i", Index), None
         )
 
     def rank(self) -> Rank:
@@ -100,7 +92,6 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
             self.ghost_array_lex(),
             # self.position_of_ptr()
         )
-
 
 
 BinaryCounterProof().check()
