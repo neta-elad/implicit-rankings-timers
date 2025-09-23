@@ -1,4 +1,3 @@
-# type: ignore
 from prelude import *
 
 
@@ -53,22 +52,22 @@ class ToyStabilizationSystem(TransitionSystem):
 
 class ToyStabilizationProperty(Prop[ToyStabilizationSystem]):
     # The property we want to prove -- if infinitely often a node with a token moves then eventually top moves
-    def negated_prop(self) -> BoolRef:
+    def prop(self) -> BoolRef:
         X = Node("X")
-        return And(
+        return Not(And(
             G(
                 F(
                     Implies(
                         Exists(X, self.sys.token(X)),
-                        Implies(self.sys.scheduled(X), self.sys.token(X)),
+                        ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
                     )
                 )
             ),
             G(Not(self.sys.scheduled(self.sys.top))),
-        )
+        ))
 
 
-class TrivialTerminationProof(
+class ToyStabilizationProof(
     Proof[ToyStabilizationSystem], prop=ToyStabilizationProperty
 ):
     @temporal_invariant
@@ -78,7 +77,7 @@ class TrivialTerminationProof(
             F(
                 Implies(
                     Exists(X, self.sys.token(X)),
-                    Implies(self.sys.scheduled(X), self.sys.token(X)),
+                    ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
                 )
             )
         )
@@ -87,25 +86,25 @@ class TrivialTerminationProof(
     def top_unscheduled(self) -> BoolRef:
         return G(Not(self.sys.scheduled(self.sys.top)))
 
-    def holds_token(self, N: Node) -> BoolRef:
-        return self.sys.token(N)
+    def holds_token(self, X: Node) -> BoolRef:
+        return self.sys.token(X)
 
     def j_counts_towards_i(self, i: Node, j: Node) -> BoolRef:
         return And(self.sys.token(i), self.sys.leq(i, j))
 
-    def binary_rank_ij(self, i: Node, j: Node) -> Rank:
-        return BinRank(self.j_counts_towards_i(i, j))
+    def binary_rank_ij(self) -> Rank:
+        return BinRank(self.j_counts_towards_i)
 
     # hint should be j=i (not sure)
-    def sum_over_j(self, i: Node) -> Rank:
-        return DomainPointwiseRank(self.binary_rank_ij(i, j), j, None)
+    def sum_over_j(self) -> Rank:
+        return DomainPointwiseRank(self.binary_rank_ij(), ParamSpec(j=Node), None)
 
     # hint should be i = sched (not sure)
     def sum_over_i(self) -> Rank:
-        return DomainPermutedRank(self.sum_over_j(), i, 1, None)
+        return DomainPermutedRank(self.sum_over_j(), ParamSpec(i=Node), 1, None)
 
-    def scheduled(self, N: Node) -> BoolRef:
-        return self.sys.scheduled(N)
+    def scheduled(self, X: Node) -> BoolRef:
+        return self.sys.scheduled(X)
 
     def scheduled_timer_rank(self) -> Rank:
         return self.timer_rank(self.scheduled, self.holds_token, None)
@@ -114,4 +113,4 @@ class TrivialTerminationProof(
         return LexRank(self.sum_over_i(), self.scheduled_timer_rank())
 
 
-TrivialTerminationProof().check()
+ToyStabilizationProof().check()

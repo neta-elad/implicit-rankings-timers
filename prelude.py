@@ -38,6 +38,7 @@ from ts import (
     axiom,
     init,
     transition,
+    ParamSpec,
 )
 from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum, false, true
 
@@ -84,6 +85,7 @@ __all__ = [
     "axiom",
     "init",
     "transition",
+    "ParamSpec",
     "Expr",
     "Rel",
     "Fun",
