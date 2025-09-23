@@ -1,6 +1,10 @@
 from prelude import *
 
 
+# Toy stabilization example from the paper Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+# Inspired by Dijsktra's k-state self-stabilization algorithm.
+
+
 class Node(Finite): ...
 
 
@@ -86,8 +90,10 @@ class ToyStabilizationProof(
     def top_unscheduled(self) -> BoolRef:
         return G(Not(self.sys.scheduled(self.sys.top)))
 
-    def holds_token(self, X: Node) -> BoolRef:
-        return self.sys.token(X)
+    @invariant
+    def exists_token(self) -> BoolRef:
+        X = Node("X")
+        return Exists(X, self.sys.token(X))
 
     def j_counts_towards_i(self, i: Node, j: Node) -> BoolRef:
         return And(self.sys.token(i), self.sys.leq(i, j))
@@ -103,14 +109,18 @@ class ToyStabilizationProof(
     def sum_over_i(self) -> Rank:
         return DomainPermutedRank(self.sum_over_j(), ParamSpec(i=Node), 1, None)
 
-    def scheduled(self, X: Node) -> BoolRef:
-        return self.sys.scheduled(X)
+    def scheduling_of_token(self) -> BoolRef:
+        X = Node("X")
+        return Implies(
+            Exists(X, self.sys.token(X)),
+            ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+        )
 
-    def scheduled_timer_rank(self) -> Rank:
-        return self.timer_rank(self.scheduled, self.holds_token, None)
+    def scheduling_of_token_timer_rank(self) -> Rank:
+        return self.timer_rank(self.scheduling_of_token, None, None)
 
     def rank(self) -> Rank:
-        return LexRank(self.sum_over_i(), self.scheduled_timer_rank())
+        return LexRank(self.sum_over_i(), self.scheduling_of_token_timer_rank())
 
 
 ToyStabilizationProof().check()
