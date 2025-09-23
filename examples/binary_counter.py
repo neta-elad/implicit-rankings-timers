@@ -8,6 +8,7 @@ class BinaryCounter(TransitionSystem):
     # Immutable constants and relations
     max: Immutable[Index]
     le: Immutable[Rel[Index, Index]]
+    le_reversed : Immutable[Rel[Index,Index]]
 
     # Mutable state
     ptr: Index
@@ -16,19 +17,19 @@ class BinaryCounter(TransitionSystem):
     @axiom
     def order_axioms(self, X: Index, Y: Index, Z: Index) -> BoolRef:
         return And(
-            Implies(And(self.le(X, Y), self.le(Y, X)), X == Y),
+            Implies(And(self.le(X, Y), self.le(Y, X)), false),
             Implies(And(self.le(X, Y), self.le(Y, Z)), self.le(X, Z)),
-            Or(self.le(X, Y), self.le(Y, X)),
-            self.le(X, self.max),
+            Or(self.le(X, Y), self.le(Y, X),X==Y),
+            Or(self.le(X, self.max),X==self.max),
+            self.le_reversed(X,Y) == self.le(Y,X)
         )
 
     def succ(self, smaller: Index, bigger: Index) -> BoolRef:
         Z = Index("Z")
         return And(
-            smaller != bigger,
             self.le(smaller, bigger),
             ForAll(
-                Z, Implies(self.le(smaller, Z), Or(Z == smaller, self.le(bigger, Z)))
+                Z, Implies(self.le(smaller, Z), Or(Z == bigger, self.le(bigger, Z)))
             ),
         )
 
@@ -95,7 +96,10 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
         )
 
     def rank(self) -> Rank:
-        return LexRank(self.ghost_array_lex(),self.position_of_ptr())
+        return LexRank(
+            self.ghost_array_lex(),
+            # self.position_of_ptr()
+        )
 
 
 
