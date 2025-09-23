@@ -1,4 +1,6 @@
- #lang ivy1.7
+# type: ignore
+
+#lang ivy1.7
 
 ################################################################################
 # A liveness proof of the TLB shootdown algorithm

@@ -626,7 +626,12 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
                 )
             ),
             F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
-            G(And(self.sys.correct(self.skolem_violation),Not(self.sys.accept(self.skolem_violation))))
+            G(
+                And(
+                    self.sys.correct(self.skolem_violation),
+                    Not(self.sys.accept(self.skolem_violation)),
+                )
+            ),
         )
 
     # intuition:
@@ -749,7 +754,6 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             self.all_sent_timers(),
             self.all_rcv_timers(),
         )
-
 
 
 RelayHRBProof().check()

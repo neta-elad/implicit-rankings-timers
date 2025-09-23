@@ -27,7 +27,9 @@ class BinaryCounter(TransitionSystem):
         return And(
             smaller != bigger,
             self.le(smaller, bigger),
-            ForAll(Z, Implies(self.le(smaller, Z), Or(Z == smaller, self.le(bigger, Z)))),
+            ForAll(
+                Z, Implies(self.le(smaller, Z), Or(Z == smaller, self.le(bigger, Z)))
+            ),
         )
 
     @init
@@ -59,7 +61,7 @@ class BinaryCounter(TransitionSystem):
 
 class BinaryCounterProp(Prop[BinaryCounter]):
     def prop(self) -> BoolRef:
-        return False
+        return false
 
 
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
@@ -73,5 +75,3 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
 
 
 BinaryCounterProof().check()
-
-
