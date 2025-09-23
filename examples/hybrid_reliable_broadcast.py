@@ -314,8 +314,8 @@ class CorrectnessHRB(Prop[HybridReliableBroadcast]):
     def prop(self) -> BoolRef:
         N = Node("N")
         M = Node("M")
-        return Not(
-            And(  # todo: simplify
+        return Implies(
+            And(
                 ForAll(
                     [N, M],
                     Implies(
@@ -333,8 +333,8 @@ class CorrectnessHRB(Prop[HybridReliableBroadcast]):
                     ),
                 ),
                 ForAll(N, Implies(self.sys.obedient(N), self.sys.rcv_init(N))),
-                G(ForAll(N, Not(And(self.sys.correct(N), self.sys.accept(N))))),
-            )
+            ),
+            F(Exists(N, (And(self.sys.correct(N), self.sys.accept(N))))),
         )
 
 
@@ -347,8 +347,8 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
     # then any correct node will accept
     # giving contradiction to the negated property
 
-    @invariant
-    def system_invariant(self, N1: Node, N2: Node) -> BoolRef:
+    # @invariant
+    def safety_invariants(self, N1: Node, N2: Node) -> BoolRef:
         M = Node("M")
         N = Node("N")
         A = QuorumA("A")
@@ -405,6 +405,17 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                 ),
                 Exists(N, And(self.sys.obedient(N), self.sys.rcv_init(N))),
             ),
+        )
+
+    # we can't use @witness to generate the witness_exists_correct
+    # because it is @witness generates a mutable node.
+    @invariant
+    def liveness_invariant(self, N1: Node, N2: Node) -> BoolRef:
+        M = Node("M")
+        N = Node("N")
+        A = QuorumA("A")
+        B = QuorumB("B")
+        return And(
             # invariant from liveness proof in l2s:
             self.sys.correct(self.sys.witness_exists_correct),
             Not(
@@ -419,43 +430,59 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                     ),
                 )
             ),
-            # all these quantified non-EPR invariants are not verifiable
-            # not from original ivy file
-            # Implies(
-            #     ForAll(
-            #         [N, M],
-            #         Implies(
-            #             And(self.sys.correct(N), self.sys.correct(M)),
-            #             self.sys.rcv_msg(N, M),
-            #         ),
-            #     ),
-            #     Exists(N, And(self.sys.correct(N), self.sys.accept(N))),
-            # ),
-            # only for the relay property - they instantiate this invariant only for specific witness nodes because its not EPR
-            # invariant forall N,B. correct(N) & ~accept(N) -> exists M. member_b(M,B) & ~rcv_msg(M,N)
-            # ForAll(
-            #     [N, B],
-            #     Implies(
-            #         And(self.sys.correct(N), Not(self.sys.accept(N))),
-            #         Exists(
-            #             M, And(self.sys.member_b(M, B), Not(self.sys.rcv_msg(M, N)))
-            #         ),
-            #     ),
-            # ),
-            # # invariant forall N,A. correct(N) & ~sent_msg_proj(N) -> exists M. member_a(M,A) & ~rcv_msg(M,N)
-            # ForAll(
-            #     [N, A],
-            #     Implies(
-            #         And(self.sys.correct(N), Not(Exists(M, self.sys.sent_msg(N, M)))),
-            #         Exists(
-            #             M, And(self.sys.member_a(M, A), Not(self.sys.rcv_msg(M, N)))
-            #         ),
-            #     ),
-            # ),
         )
 
-    @invariant
-    def timer_invariant_correctness(self, N: Node, M: Node) -> BoolRef:
+    # all these quantified non-EPR invariants are not verifiable
+    # not from original ivy file
+    # Implies(
+    #     ForAll(
+    #         [N, M],
+    #         Implies(
+    #             And(self.sys.correct(N), self.sys.correct(M)),
+    #             self.sys.rcv_msg(N, M),
+    #         ),
+    #     ),
+    #     Exists(N, And(self.sys.correct(N), self.sys.accept(N))),
+    # ),
+    # only for the relay property - they instantiate this invariant only for specific witness nodes because its not EPR
+    # invariant forall N,B. correct(N) & ~accept(N) -> exists M. member_b(M,B) & ~rcv_msg(M,N)
+    # ForAll(
+    #     [N, B],
+    #     Implies(
+    #         And(self.sys.correct(N), Not(self.sys.accept(N))),
+    #         Exists(
+    #             M, And(self.sys.member_b(M, B), Not(self.sys.rcv_msg(M, N)))
+    #         ),
+    #     ),
+    # ),
+    # # invariant forall N,A. correct(N) & ~sent_msg_proj(N) -> exists M. member_a(M,A) & ~rcv_msg(M,N)
+    # ForAll(
+    #     [N, A],
+    #     Implies(
+    #         And(self.sys.correct(N), Not(Exists(M, self.sys.sent_msg(N, M)))),
+    #         Exists(
+    #             M, And(self.sys.member_a(M, A), Not(self.sys.rcv_msg(M, N)))
+    #         ),
+    #     ),
+    # ),
+
+    @temporal_invariant
+    def timer_invariant(self, N: Node, M: Node) -> BoolRef:
+        return And(
+            Implies(
+                And(self.sys.correct(N), self.sys.rcv_init(N)),
+                F(self.sys.sent_msg(N, M)),
+            ),
+            G(
+                Implies(
+                    And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                    F(self.sys.rcv_msg(N, M)),
+                )
+            ),
+            ForAll(N, Implies(self.sys.obedient(N), self.sys.rcv_init(N))),
+            Not(F(Exists(N, (And(self.sys.correct(N), self.sys.accept(N)))))),
+        )
+
         return And(
             timer_zero(
                 self.t(
@@ -541,10 +568,9 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
 
-CorrectnessHRBProof().check()
+# CorrectnessHRBProof().check()
 
 
-## Waiting for ability to have witnesses for temporal formulas
 class RelayHRB(Prop[HybridReliableBroadcast]):
     # Second Property - Relay
     # Under the same assumptions as correctness, if some correct node accepts,
@@ -552,8 +578,8 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
     def prop(self) -> BoolRef:
         N = Node("N")
         M = Node("M")
-        return Not(
-            And(  # todo: simplify
+        return Implies(
+            And(
                 ForAll(
                     [N, M],
                     Implies(
@@ -571,63 +597,44 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
                     ),
                 ),
                 F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
-                G(Exists(N, And(self.sys.correct(N), Not(self.sys.accept(N))))),
-            )
+            ),
+            F(ForAll(N, Implies(self.sys.correct(N), self.sys.accept(N)))),
         )
 
 
 class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
 
-    pass
+    ## trying to do it the same as in the ivy example.
+    @temporal_witness
+    def skolem_violation(self, N: Node) -> BoolRef:
+        return And(
+            self.sys.correct(N),
+            G(Not(self.sys.accept(N))),
+        )
+
+    @temporal_invariant
+    def timer_invariant(self, N: Node, M: Node) -> BoolRef:
+        return And(
+            Implies(
+                And(self.sys.correct(N), self.sys.rcv_init(N)),
+                F(self.sys.sent_msg(N, M)),
+            ),
+            G(
+                Implies(
+                    And(self.sys.sent_msg(N, M), self.sys.correct(M)),
+                    F(self.sys.rcv_msg(N, M)),
+                )
+            ),
+            F(Exists(N, And(self.sys.correct(N), self.sys.accept(N)))),
+            G(And(self.sys.correct(self.skolem_violation),Not(self.sys.accept(self.skolem_violation))))
+        )
+
     # intuition:
     # first we wait for some obedient node n0 to accept
     # let B0 be the quorum that has all the correct nodes
     # and let A0 be the quorum that has only symmetric nodes from B0
     # we want to show that eventually all correct nodes accept through B0
     # didn't compeletely get this but this is related to the non-EPR invariants above.
-
-    # def timer_invariant_relay(sym):
-    #     return And(
-    #         sym["t_<G(Exists(N, And(correct(N), Not(accept(N)))))>"] == 0,
-    #         ForAll(
-    #             [N, M],
-    #             Implies(
-    #                 And(
-    #                     self.correct(N),
-    #                     self.sys.rcv_init(N),
-    #                     Not(self.sent_msg(N, M)),
-    #                 ),
-    #                 sym["t_<sent_msg(N, M)>"](N, M) > 0,
-    #             ),
-    #         ),
-    #         ForAll(
-    #             [N, M],
-    #             sym[
-    #                 "t_<G(Or(Or(Not(sent_msg(N, M)), Not(correct(M))), F(rcv_msg(N, M))))>"
-    #             ](N, M)
-    #             == 0,
-    #         ),
-    #         ForAll(
-    #             [N, M],
-    #             Implies(
-    #                 And(
-    #                     self.correct(M),
-    #                     self.sent_msg(N, M),
-    #                     Not(self.rcv_msg(N, M)),
-    #                 ),
-    #                 sym["t_<rcv_msg(N, M)>"](N, M) > 0,
-    #             ),
-    #         ),
-    #         Or(
-    #             Exists(N, And(self.sys.obedient(N), self.accept(N))),
-    #             sym["t_<Exists(N, And(obedient(N), accept(N)))>"] > 0,
-    #         ),
-    #     )
-
-    # def invariant_relay(sym):
-    #     return And(system_invariant(sym), timer_invariant_relay(sym))
-
-    # # more ranks
 
     # not_accept_correct = lambda sym, param: And(
     #     self.correct(param["N"]), Not(self.accept(param["N"]))
@@ -691,3 +698,58 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
     #         all_sent_timers_refined,
     #     ]
     # )
+
+    def not_sent(self, n: Node, m: Node) -> BoolRef:
+        return Not(self.sys.sent_msg(n, m))
+
+    def set_of_unsent(self) -> Rank:
+        return DomainPointwiseRank.close(BinRank(self.not_sent), None)
+
+    def not_recv_both_correct(self, n: Node, m: Node) -> BoolRef:
+        return And(
+            Not(self.sys.rcv_msg(n, m)), self.sys.correct(n), self.sys.correct(m)
+        )
+
+    def set_of_unrecv(self) -> Rank:
+        return DomainPointwiseRank.close(BinRank(self.not_recv_both_correct), None)
+
+    def correct_not_accepted(self, n: Node) -> BoolRef:
+        return And(self.sys.correct(n), Not(self.sys.accept(n)))
+
+    def set_correct_not_accepted(self) -> Rank:
+        return DomainPointwiseRank.close(BinRank(self.correct_not_accepted), None)
+
+    def sent_formula(self, N: Node, M: Node) -> BoolRef:
+        return self.sys.sent_msg(N, M)
+
+    def correct_and_unsent(self, N: Node, M: Node) -> BoolRef:
+        return And(self.sys.correct(N), Not(self.sys.sent_msg(N, M)))
+
+    def all_sent_timers(self) -> Rank:
+        return self.timer_rank(self.sent_formula, self.correct_and_unsent, None)
+
+    def recv_formula(self, N: Node, M: Node) -> BoolRef:
+        return self.sys.rcv_msg(N, M)
+
+    def correct_sent_not_recv(self, N: Node, M: Node) -> BoolRef:
+        return And(
+            self.sys.correct(M),
+            self.sys.sent_msg(N, M),
+            Not(self.sys.rcv_msg(N, M)),
+        )
+
+    def all_rcv_timers(self) -> Rank:
+        return self.timer_rank(self.recv_formula, self.correct_sent_not_recv, None)
+
+    def rank(self) -> Rank:
+        # could be PWRank partially at least
+        return LexRank(
+            self.set_of_unrecv(),
+            self.set_of_unsent(),
+            self.all_sent_timers(),
+            self.all_rcv_timers(),
+        )
+
+
+
+RelayHRBProof().check()
