@@ -54,7 +54,7 @@ class ToyStabilizationProperty(Prop[ToyStabilizationSystem]):
     # The property we want to prove -- if infinitely often a node with a token moves then eventually top moves
     def prop(self) -> BoolRef:
         X = Node("X")
-        return Not(And(
+        return Implies(
             G(
                 F(
                     Implies(
@@ -63,8 +63,8 @@ class ToyStabilizationProperty(Prop[ToyStabilizationSystem]):
                     )
                 )
             ),
-            G(Not(self.sys.scheduled(self.sys.top))),
-        ))
+            F(self.sys.scheduled(self.sys.top)),
+        )
 
 
 class ToyStabilizationProof(
