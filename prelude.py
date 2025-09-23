@@ -15,6 +15,7 @@ from ranks import (
     DomainPermutedRank,
     FiniteLemma,
     ts_rel,
+    TSRel,
 )
 from termination import (
     Proof,
@@ -41,6 +42,7 @@ from ts import (
     transition,
     ParamSpec,
     ts_term,
+    TSTerm,
 )
 from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum, false, true
 
@@ -68,6 +70,7 @@ __all__ = [
     "DomainPermutedRank",
     "FiniteLemma",
     "ts_rel",
+    "TSRel",
     "Proof",
     "invariant",
     "temporal_invariant",
@@ -90,6 +93,7 @@ __all__ = [
     "transition",
     "ParamSpec",
     "ts_term",
+    "TSTerm",
     "Expr",
     "Rel",
     "Fun",
