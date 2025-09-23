@@ -65,13 +65,38 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 
 
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
-    # A minimal proof skeleton with a trivial rank; can be refined later.
 
-    def dummy(self) -> BoolRef:
-        return true
+    def position_of_ptr(self) -> Rank:
+        def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
+            return self.sys.le
+        
+        def ptr_term(self: BinaryCounterProof) -> Index:
+            return self.sys.ptr
+            
+        return PosInOrderRank(ts_rel(le_rel), ts_term(ptr_term))
+        
+    def x_was_last_1(self,i:Index) -> BoolRef:
+        return And(
+            self.sys.a(i), 
+            self.sys.le(i,self.sys.ptr)
+        )
+
+    def ghost_array_lex(self) -> Rank:
+        def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
+            return self.sys.le
+
+        return DomainLexRank(
+            BinRank(
+                self.x_was_last_1
+            ),
+            ts_rel(le_rel),
+            ('i',Index),
+            None
+        )
 
     def rank(self) -> Rank:
-        return BinRank(self.dummy)
+        return LexRank(self.ghost_array_lex(),self.position_of_ptr())
+
 
 
 BinaryCounterProof().check()
