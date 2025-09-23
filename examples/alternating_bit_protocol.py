@@ -78,9 +78,7 @@ class AlternatingBitProtocol(TransitionSystem):
             # guard
             v != self.bottom,
             # updates
-            self.sender_array.update(
-                lambda old, new, I: new(I) == If(I == self.sender_gen_index, v, old(I))
-            ),
+            self.sender_array.update({(self.sender_gen_index,): v}),
             self.succ(self.sender_gen_index, self.next.sender_gen_index),
             self.receiver_array.unchanged(),
             self.sender_index.unchanged(),
@@ -109,12 +107,14 @@ class AlternatingBitProtocol(TransitionSystem):
                     self.dbit(m) == self.sender_bit,
                     Not(self.le_data_msg(m, m)),
                     # updates
-                    self.le_data_msg.update(
-                        lambda old, new, D1, D2: new(D1, D2)
-                        == Or(
-                            old(D1, D2),
-                            And(D1 == m, D2 == m),
-                            And(D1 == m, old(D2, D2)),
+                    self.le_data_msg.forall(
+                        lambda D1, D2: (
+                            self.next.le_data_msg(D1, D2)
+                            == Or(
+                                self.le_data_msg(D1, D2),
+                                And(D1 == m, D2 == m),
+                                And(D1 == m, self.le_data_msg(D2, D2)),
+                            )
                         )
                     ),
                 ),
@@ -189,10 +189,7 @@ class AlternatingBitProtocol(TransitionSystem):
                 self.dbit(m) == self.receiver_bit,
                 And(
                     self.next.receiver_bit == Not(self.receiver_bit),
-                    self.receiver_array.update(
-                        lambda old, new, J: new(J)
-                        == If(J == self.receiver_index, self.d(m), old(J))
-                    ),
+                    self.receiver_array.update({(self.receiver_index,): self.d(m)}),
                     self.succ(self.receiver_index, self.next.receiver_index),
                 ),
                 And(
@@ -251,9 +248,11 @@ class AlternatingBitProtocol(TransitionSystem):
     @transition
     def data_msg_drop(self, m: DataMsg) -> BoolRef:
         return And(
-            self.le_data_msg.update(
-                lambda old, new, D1, D2: new(D1, D2)
-                == And(old(D1, D2), D1 != m, D2 != m)
+            self.le_data_msg.forall(
+                lambda D1, D2: (
+                    self.next.le_data_msg(D1, D2)
+                    == And(self.le_data_msg(D1, D2), D1 != m, D2 != m)
+                )
             ),
             self.sender_gen_index.unchanged(),
             self.sender_index.unchanged(),
@@ -275,9 +274,11 @@ class AlternatingBitProtocol(TransitionSystem):
     @transition
     def ack_msg_drop(self, a: AckMsg) -> BoolRef:
         return And(
-            self.le_ack_msg.update(
-                lambda old, new, A1, A2: new(A1, A2)
-                == And(old(A1, A2), A1 != a, A2 != a)
+            self.le_ack_msg.forall(
+                lambda A1, A2: (
+                    self.next.le_ack_msg(A1, A2)
+                    == And(self.le_ack_msg(A1, A2), A1 != a, A2 != a)
+                )
             ),
             self.sender_gen_index.unchanged(),
             self.sender_index.unchanged(),

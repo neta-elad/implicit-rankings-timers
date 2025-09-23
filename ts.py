@@ -110,12 +110,13 @@ class BaseTransitionSystem(ABC):
         *args: z3.BoolRef,
         with_next: bool = False,
     ) -> bool:
+        print(f"Checking {name}: ", end="", flush=True)
         args += (self.axiom,)
         if with_next:
             args += (self.next.axiom,)
         result = unsat_check(args, minimize_sorts=self.sorts)
         if result.unsat:
-            print(f"Checking {name}: passed")
+            print("passed")
             return True
         else:
             symbols = {symbol: None for symbol in self.symbols.values()}
@@ -125,7 +126,7 @@ class BaseTransitionSystem(ABC):
                     for symbol in self.next.symbols.values()
                     if symbol not in symbols
                 }
-            print(f"Checking {name}: failed")
+            print("failed")
             print_model_in_order(result, symbols, name)
             return False
 

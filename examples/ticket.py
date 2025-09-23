@@ -55,12 +55,13 @@ class TicketSystem(TransitionSystem):
             # guard
             self.pc1(t),
             # updates
-            self.m.update(
-                lambda old, new, T, X: new(T, X)
-                == If(T == t, X == self.next_ticket, old(T, X))
+            self.m.forall(
+                lambda T, X: (
+                    self.next.m(T, X) == If(T == t, X == self.next_ticket, self.m(T, X))
+                )
             ),
-            self.pc1.update(lambda old, new, T: new(T) == And(T != t, old(T))),
-            self.pc2.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.pc1.update({(t,): false}),
+            self.pc2.update({(t,): true}),
             self.pc3.unchanged(),
             self.service.unchanged(),
             self.succ(self.next_ticket, self.next.next_ticket),
@@ -97,8 +98,8 @@ class TicketSystem(TransitionSystem):
             self.le(k, self.service),
             # updates
             self.pc1.unchanged(),
-            self.pc2.update(lambda old, new, T: new(T) == And(T != t, old(T))),
-            self.pc3.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.pc2.update({(t,): false}),
+            self.pc3.update({(t,): true}),
             self.m.unchanged(),
             self.service.unchanged(),
             self.next_ticket.unchanged(),
@@ -113,9 +114,9 @@ class TicketSystem(TransitionSystem):
             # guard
             self.pc3(t),
             # updates
-            self.pc1.update(lambda old, new, T: new(T) == Or(T == t, old(T))),
+            self.pc1.update({(t,): true}),
             self.pc2.unchanged(),
-            self.pc3.update(lambda old, new, T: new(T) == And(T != t, old(T))),
+            self.pc3.update({(t,): false}),
             self.m.unchanged(),
             self.succ(self.service, self.next.service),
             self.next_ticket.unchanged(),

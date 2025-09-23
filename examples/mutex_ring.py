@@ -63,28 +63,19 @@ class MutexRing(TransitionSystem):
                 If(
                     self.node_loc(n) == Loc.neutral,
                     And(
-                        self.token.update(
-                            lambda old, new, N: new(N)
-                            == Or(And(old(N), N != n), N == s)
-                        ),
+                        self.token.update({(s,): true, (n,): false}),
                         self.node_loc.unchanged(),
                     ),
                     If(
                         self.node_loc(n) == Loc.waiting,
                         And(
                             self.token.unchanged(),
-                            self.node_loc.update(
-                                lambda old, new, N: new(N)
-                                == If(N == n, Loc.critical, old(N))
-                            ),
+                            self.node_loc.update({(n,): Loc.critical}),
                         ),
                         # else loc = critical
                         And(
                             self.token.unchanged(),
-                            self.node_loc.update(
-                                lambda old, new, N: new(N)
-                                == If(N == n, Loc.neutral, old(N))
-                            ),
+                            self.node_loc.update({(n,): Loc.neutral}),
                         ),
                     ),
                 ),
@@ -93,10 +84,7 @@ class MutexRing(TransitionSystem):
                     self.token.unchanged(),
                     If(
                         self.node_loc(n) == Loc.neutral,
-                        self.node_loc.update(
-                            lambda old, new, N: new(N)
-                            == If(N == n, Loc.waiting, old(N))
-                        ),
+                        self.node_loc.update({(n,): Loc.waiting}),
                         self.node_loc.unchanged(),
                     ),
                 ),

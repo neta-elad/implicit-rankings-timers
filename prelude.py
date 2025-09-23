@@ -39,7 +39,7 @@ from ts import (
     init,
     transition,
 )
-from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum
+from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum, false, true
 
 __all__ = [
     "Self",
@@ -91,4 +91,6 @@ __all__ = [
     "WFRel",
     "Bool",
     "Enum",
+    "false",
+    "true",
 ]

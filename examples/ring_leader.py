@@ -85,14 +85,9 @@ class RingLeader(TransitionSystem):
                                 B == self.id(n),
                                 # B is the same as n's id -> elect n as leader
                                 And(
-                                    self.leader.update(
-                                        lambda old, new, N: new(N) == Or(old(N), N == n)
-                                    ),
+                                    self.leader.update({(n,): true}),
                                     self.sent_own.unchanged(),
-                                    self.pending.update(
-                                        lambda old, new, A, N: new(A, N)
-                                        == And(old(A, N), Not(And(A == B, N == n)))
-                                    ),
+                                    self.pending.update({(B, n): false}),
                                 ),
                                 If(
                                     self.le(self.id(n), B),
@@ -101,23 +96,14 @@ class RingLeader(TransitionSystem):
                                         self.leader.unchanged(),
                                         self.sent_own.unchanged(),
                                         self.pending.update(
-                                            lambda old, new, A, N: new(A, N)
-                                            == Or(
-                                                And(
-                                                    old(A, N), Not(And(A == B, N == n))
-                                                ),
-                                                And(N == succ, A == B),
-                                            )
+                                            {(B, n): false, (B, succ): true}
                                         ),
                                     ),
                                     # B is lower - drop
                                     And(
                                         self.leader.unchanged(),
                                         self.sent_own.unchanged(),
-                                        self.pending.update(
-                                            lambda old, new, A, N: new(A, N)
-                                            == And(old(A, N), Not(And(A == B, N == n))),
-                                        ),
+                                        self.pending.update({(B, n): false}),
                                     ),
                                 ),
                             ),
@@ -127,13 +113,8 @@ class RingLeader(TransitionSystem):
                 # yet to send own id
                 And(
                     self.leader.unchanged(),
-                    self.sent_own.update(
-                        lambda old, new, N: new(N) == Or(old(N), N == n)
-                    ),
-                    self.pending.update(
-                        lambda old, new, A, N: new(A, N)
-                        == Or(old(A, N), And(A == self.id(n), N == succ))
-                    ),
+                    self.sent_own.update({(n,): true}),
+                    self.pending.update({(self.id(n), succ): true}),
                 ),
             ),
         )

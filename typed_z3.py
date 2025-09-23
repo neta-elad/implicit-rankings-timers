@@ -1,5 +1,5 @@
 from abc import ABC
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from functools import cached_property
 from typing import TYPE_CHECKING, Self, ClassVar, cast, get_type_hints, Any
 
@@ -61,6 +61,10 @@ if not TYPE_CHECKING:
             if not self.mutable:
                 return z3.BoolVal(True)
             return self == self.__class__(self.const_name + "'", self.mutable)
+
+        def update(self, val: Self) -> z3.BoolRef:
+            assert not self.mutable, f"Trying to update immutable constant {self}"
+            return self.__class__(self.const_name + "'", self.mutable) == val
 
     class Bool(Expr):
         @classmethod
@@ -150,26 +154,6 @@ class Enum(Expr, ABC):
 
         cls.enum_values = tuple(enum_values)
 
-    # origin = get_origin(hint) or hint
-    # mutable = True
-    # if origin is Immutable:
-    #     mutable = False
-    #     origin = get_args(hint)[0]
-    #
-    # name = field
-    # if mutable:
-    #     name += self.suffix
-    #
-    # if issubclass(origin, Expr):
-    #     symbol = origin(name, mutable)
-    #     symbols[field] = symbol.fun_ref
-    # elif issubclass(origin, Fun):
-    #     symbol = origin(name, mutable)
-    #     symbols[field] = symbol.fun
-    # else:
-    #     continue
-    # object.__setattr__(self, field, symbol)
-
     @classmethod
     def ref(cls) -> z3.SortRef:
         return cls.enum_sort
@@ -219,13 +203,36 @@ class Fun[*Ts, T: Expr]:
         return self.fun(*args)  # type: ignore
 
     def unchanged(self) -> z3.BoolRef:
-        return self.update(lambda old, new, *args: old(*args) == new(*args))
+        return self.update_with_lambda(lambda old, new, *args: old(*args) == new(*args))
 
-    def update(self, fun: Callable[[Self, Self, *Ts], z3.BoolRef]) -> z3.BoolRef:
+    def update_with_lambda(
+        self, fun: Callable[[Self, Self, *Ts], z3.BoolRef]
+    ) -> z3.BoolRef:
         consts = tuple(sort(f"X{i}") for i, sort in enumerate(self.signature[0:-1]))
         args = cast(tuple[*Ts], consts)
         self_next = self.__class__(self.name + "'", self.mutable)
         return z3.ForAll(consts, fun(self, self_next, *args))
+
+    def forall(self, fun: Callable[[*Ts], z3.BoolRef]) -> z3.BoolRef:
+        return self.update_with_lambda(lambda _old, _new, *args: fun(*args))
+
+    def set_next(self, fun: Callable[[Self, *Ts], T]) -> z3.BoolRef:
+        return self.update_with_lambda(
+            lambda old, new, *args: new(*args) == fun(old, *args)
+        )
+
+    def update(self, places: Mapping[tuple[*Ts], T]) -> z3.BoolRef:
+        def update(old: Self, new: Self, *args: *Ts) -> z3.BoolRef:
+            if_expr = old(*args)
+            for place_args, new_value in places.items():
+                if_expr = z3.If(_pairwise_equal(place_args, args), new_value, if_expr)
+            return new(*args) == if_expr
+
+        return self.update_with_lambda(update)
+
+
+def _pairwise_equal[*Ts](args1: tuple[*Ts], args2: tuple[*Ts]) -> z3.BoolRef:
+    return z3.And(*(parg == arg for parg, arg in zip(args1, args2)))  # type: ignore
 
 
 class Rel[*Ts](Fun[*Ts, Bool]):
@@ -243,7 +250,17 @@ class Rel[*Ts](Fun[*Ts, Bool]):
     def well_founded(self) -> bool:
         return False
 
+    def update(self, places: Mapping[tuple[*Ts], z3.BoolRef]) -> z3.BoolRef:
+        return super().update(cast(Mapping[tuple[*Ts], Bool], places))
+
+    def set_next(self, fun: Callable[[Self, *Ts], z3.BoolRef]) -> z3.BoolRef:
+        return super().set_next(cast(Callable[[Self, *Ts], Bool], fun))
+
 
 class WFRel[T: Expr](Rel[T, T]):
     def well_founded(self) -> bool:
         return True
+
+
+false = cast(Bool, z3.BoolVal(False))
+true = cast(Bool, z3.BoolVal(True))

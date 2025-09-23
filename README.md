@@ -29,15 +29,19 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
-- [ ] Give prop unnegated and do NNF whenever a timer is used
-- [ ] Add option to track more temporal formulas in the timer system
-- [ ] witnesses for temporal formulas (skolemization) - related to above
+- [ ] Fix broken / slow examples
+  - [ ] Toy stabilization
+  - [ ] Ring leader
+  - [ ] Ackerman
+- [x] Give prop unnegated and do NNF whenever a timer is used
+- [x] Add option to track more temporal formulas in the timer system
+- [x] witnesses for temporal formulas (skolemization) - related to above
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
-- [ ] State witnesses (mutable)
+- [x] State witnesses (mutable)
 - [ ] In readme, write list of all features
 - [ ] Improve formatter
 - [ ] differentiate timeouts and violations in printing
-- [ ] Remove .update() function - it's confusing, or make better update function for updating just one relation/function value
+- [x] Remove .update() function - it's confusing, or make better update function for updating just one relation/function value
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) Add modified argument and check to see everything is modified
 - [ ] (?) Can we reuse invariants in diff proofs?

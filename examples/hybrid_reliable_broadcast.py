@@ -104,13 +104,11 @@ class HybridReliableBroadcast(TransitionSystem):
             self.rcv_init(n),
             self.accept.unchanged(),
             self.rcv_msg.unchanged(),
-            self.sent_msg.update(
-                lambda old, new, N1, N2: new(N1, N2) == Or(old(N1, N2), N1 == n)
+            self.sent_msg.forall(
+                lambda N1, N2: self.next.sent_msg(N1, N2)
+                == Or(self.sent_msg(N1, N2), N1 == n)
             ),
-            self.sent_msg_proj.update(
-                lambda old, new, N1: new(N1)
-                == If(N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1))
-            ),
+            self.sent_msg_proj.update({(n,): Exists(N2, self.next.sent_msg(n, N2))}),
         )
 
     @transition
@@ -121,15 +119,12 @@ class HybridReliableBroadcast(TransitionSystem):
         N = Node("N")
         return And(
             self.sent_msg(s, n),
-            self.rcv_msg.update(
-                lambda old, new, N1, N2: new(N1, N2)
-                == Or(old(N1, N2), And(N1 == s, N2 == n))
-            ),
+            self.rcv_msg.update({(s, n): true}),
             If(
                 Exists(
                     B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
                 ),
-                self.accept.update(lambda old, new, N: new(N) == Or(old(N), N == n)),
+                self.accept.update({(n,): true}),
                 self.accept.unchanged(),
             ),
             If(
@@ -137,12 +132,14 @@ class HybridReliableBroadcast(TransitionSystem):
                     A, ForAll(N, Implies(self.member_a(N, A), self.next.rcv_msg(N, n)))
                 ),
                 And(
-                    self.sent_msg.update(
-                        lambda old, new, N1, N2: new(N1, N2) == Or(old(N1, N2), N1 == n)
+                    self.sent_msg.forall(
+                        lambda N1, N2: (
+                            self.next.sent_msg(N1, N2)
+                            == Or(self.sent_msg(N1, N2), N1 == n)
+                        )
                     ),
                     self.sent_msg_proj.update(
-                        lambda old, new, N1: new(N1)
-                        == If(N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1))
+                        {(n,): Exists(N2, self.next.sent_msg(n, N2))}
                     ),
                 ),
                 And(self.sent_msg.unchanged(), self.sent_msg_proj.unchanged()),
@@ -158,15 +155,12 @@ class HybridReliableBroadcast(TransitionSystem):
         return And(
             self.sent_msg(s, n),
             self.member_fc(n),
-            self.rcv_msg.update(
-                lambda old, new, N1, N2: new(N1, N2)
-                == Or(old(N1, N2), And(N1 == s, N2 == n))
-            ),
+            self.rcv_msg.update({(s, n): true}),
             If(
                 Exists(
                     B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
                 ),
-                self.accept.update(lambda old, new, N: new(N) == Or(old(N), N == n)),
+                self.accept.update({(n,): true}),
                 self.accept.unchanged(),
             ),
             If(
@@ -175,15 +169,12 @@ class HybridReliableBroadcast(TransitionSystem):
                 ),
                 Or(
                     And(
-                        self.sent_msg.update(
-                            lambda old, new, N1, N2: new(N1, N2)
-                            == Or(old(N1, N2), N1 == n)
+                        self.sent_msg.forall(
+                            lambda N1, N2: self.next.sent_msg(N1, N2)
+                            == Or(self.sent_msg(N1, N2), N1 == n)
                         ),
                         self.sent_msg_proj.update(
-                            lambda old, new, N1: new(N1)
-                            == If(
-                                N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1)
-                            )
+                            {(n,): Exists(N2, self.next.sent_msg(n, N2))}
                         ),
                     ),
                     And(self.sent_msg.unchanged(), self.sent_msg_proj.unchanged()),
@@ -212,10 +203,7 @@ class HybridReliableBroadcast(TransitionSystem):
             ForAll(
                 [N1, N2], Implies(self.sent_msg(N1, N2), self.next.sent_msg(N1, N2))
             ),  # all existing messages remain
-            self.sent_msg_proj.update(
-                lambda old, new, N1: new(N1)
-                == If(N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1))
-            ),
+            self.sent_msg_proj.update({(n,): Exists(N2, self.next.sent_msg(n, N2))}),
         )
 
     @transition
@@ -228,17 +216,12 @@ class HybridReliableBroadcast(TransitionSystem):
         return And(
             self.member_fi(n),
             self.sent_msg(s, n),
-            self.rcv_msg.update(
-                lambda old, new, N1, N2: new(N1, N2)
-                == Or(old(N1, N2), And(N1 == s, N2 == n))
-            ),
+            self.rcv_msg.update({(s, n): true}),
             If(
                 Exists(
                     B, ForAll(N, Implies(self.member_b(N, B), self.next.rcv_msg(N, n)))
                 ),
-                self.accept.update(
-                    lambda old, new, N1: new(N1) == Or(old(N1), N1 == n)
-                ),
+                self.accept.update({(n,): true}),
                 self.accept.unchanged(),
             ),
             If(
@@ -263,10 +246,7 @@ class HybridReliableBroadcast(TransitionSystem):
                             Implies(self.sent_msg(N1, N2), self.next.sent_msg(N1, N2)),
                         ),  # messages are not deleted.
                         self.sent_msg_proj.update(
-                            lambda old, new, N1: new(N1)
-                            == If(
-                                N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1)
-                            )
+                            {(n,): Exists(N2, self.next.sent_msg(n, N2))}
                         ),
                     ),
                     And(self.sent_msg.unchanged(), self.sent_msg_proj.unchanged()),
@@ -282,13 +262,11 @@ class HybridReliableBroadcast(TransitionSystem):
             self.member_fs(n),
             self.accept.unchanged(),
             self.rcv_msg.unchanged(),
-            self.sent_msg.update(
-                lambda old, new, N1, N2: new(N1, N2) == Or(old(N1, N2), N1 == n)
+            self.sent_msg.forall(
+                lambda N1, N2: self.next.sent_msg(N1, N2)
+                == Or(self.sent_msg(N1, N2), N1 == n)
             ),
-            self.sent_msg_proj.update(
-                lambda old, new, N1: new(N1)
-                == If(N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1))
-            ),
+            self.sent_msg_proj.update({(n,): Exists(N2, self.next.sent_msg(n, N2))}),
         )
 
     @transition
@@ -325,10 +303,7 @@ class HybridReliableBroadcast(TransitionSystem):
             ForAll(
                 [N1, N2], Implies(self.sent_msg(N1, N2), self.next.sent_msg(N1, N2))
             ),  # messages are not deleted.
-            self.sent_msg_proj.update(
-                lambda old, new, N1: new(N1)
-                == If(N1 == n, Exists(N2, self.next.sent_msg(N1, N2)), old(N1))
-            ),
+            self.sent_msg_proj.update({(n,): Exists(N2, self.next.sent_msg(n, N2))}),
         )
 
 

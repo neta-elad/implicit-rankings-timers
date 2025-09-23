@@ -56,10 +56,7 @@ class AckermannSystem(TransitionSystem):
             self.stack(len_pop, m_pop),
             # updates
             self.next.len == len_pop,
-            self.stack.update(
-                lambda old, new, X, Y: new(X, Y)
-                == And(old(X, Y), Not(And(X == len_pop, Y == m_pop)))
-            ),
+            self.stack.update({(len_pop, m_pop): false}),
             self.next.m == m_pop,
             self.succ(self.n, self.next.n),
         )
@@ -87,10 +84,7 @@ class AckermannSystem(TransitionSystem):
             self.n != self.zero,
             self.succ(m_push, self.m),
             # updates
-            self.stack.update(
-                lambda old, new, X, Y: new(X, Y)
-                == Or(old(X, Y), And(X == self.len, Y == m_push))
-            ),
+            self.stack.update({(self.len, m_push): true}),
             self.succ(self.len, self.next.len),
             self.succ(self.next.n, self.n),
             self.m.unchanged(),

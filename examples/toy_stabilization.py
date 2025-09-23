@@ -44,10 +44,7 @@ class ToyStabilizationSystem(TransitionSystem):
             If(
                 self.token(n),
                 And(
-                    self.token.update(
-                        lambda old, new, M: new(M)
-                        == And(Or(old(M), M == self.next_node(n)), M != n)
-                    )
+                    self.token.update({(n,): false, (self.next_node(n),): true}),
                 ),
                 And(self.token.unchanged()),
             ),
