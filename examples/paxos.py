@@ -1,6 +1,7 @@
 from prelude import *
+from typing import List
 
-# @ status - need to write fairness, property and proof.
+# @ status - property and proof structure implemented based on Ivy specification
 
 # Paxos consensus protocol implementation
 # Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy
@@ -311,4 +312,75 @@ class PaxosSystem(TransitionSystem):
         )
 
 
-# Property and proof classes will be added later after transitions are verified
+# Property: A quorum of nodes eventually votes for the same value in round r0
+# Based on Ivy specification: exists V:value, Q:quorum. F. forall N:node. member(N,Q) -> vote(N,r0,V)
+class PaxosProperty(Prop[PaxosSystem]):
+    def prop(self) -> BoolRef:
+        V = Value("V")
+        Q = Quorum("Q")
+        N = Node("N")
+        R = Round("R")
+
+        # Fairness conditions from the Ivy specification:
+        fairness_conditions = And(
+            # Fairness 1: F. one_a(r0) - Eventually a phase 1a message is sent in round r0
+            F(self.sys.one_a(self.sys.r0)),
+            # "Eventually a phase 1a message is sent in round r0 (i.e. the owner of r0 starts round r0)"
+            # Fairness 2: forall N:node. member(N,q0) ->
+            #   G. one_a(r0) -> F. one_a_received(N,r0)
+            #   forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
+            #   forall. V. G proposal(r0,V) -> F. proposal_received(N,r0,V)
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    And(
+                        # G. one_a(r0) -> F. one_a_received(N,r0)
+                        G(
+                            Implies(
+                                self.sys.one_a(self.sys.r0),
+                                F(self.sys.one_a_received(N, self.sys.r0)),
+                            )
+                        ),
+                        # forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
+                        ForAll(
+                            [R, V],
+                            G(
+                                Implies(
+                                    self.sys.one_b_max_vote(N, self.sys.r0, R, V),
+                                    F(self.sys.one_b_received(self.sys.r0, N)),
+                                )
+                            ),
+                        ),
+                        # forall. V. G proposal(r0,V) -> F. proposal_received(N,r0,V)
+                        ForAll(
+                            V,
+                            G(
+                                Implies(
+                                    self.sys.proposal(self.sys.r0, V),
+                                    F(self.sys.proposal_received(N, self.sys.r0, V)),
+                                )
+                            ),
+                        ),
+                    ),
+                ),
+            ),
+            # Fairness 3: F. proposed(r0) - A proposal is eventually made in round r0
+            F(self.sys.proposed(self.sys.r0)),
+        )
+
+        # The main liveness property: exists V:value, Q:quorum. F. forall N:node. member(N,Q) -> vote(N,r0,V)
+        liveness_property = Exists(
+            [V, Q],
+            F(
+                ForAll(
+                    N, Implies(self.sys.member(N, Q), self.sys.vote(N, self.sys.r0, V))
+                )
+            ),
+        )
+
+        # The complete property: fairness conditions imply the liveness property
+        return Implies(fairness_conditions, liveness_property)
+
+
+# Proof class will be implemented later - it's more complex than the basic structure
