@@ -1,7 +1,7 @@
 from prelude import *
 from typing import List
 
-# @ status - property and proof structure implemented based on Ivy specification
+# @ status - property and proof implemented based on Ivy specification
 
 # Paxos consensus protocol implementation
 # Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy
@@ -383,4 +383,30 @@ class PaxosProperty(Prop[PaxosSystem]):
         return Implies(fairness_conditions, liveness_property)
 
 
-# Proof class will be implemented later - it's more complex than the basic structure
+class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
+    @invariant
+    def proposal_uniqueness(self, R: Round, V1: Value, V2: Value) -> BoolRef:
+        return Implies(
+            And(self.sys.proposal(R, V1), self.sys.proposal(R, V2)), V1 == V2
+        )
+
+    @invariant
+    def vote_proposal_consistency(self, N: Node, R: Round, V: Value) -> BoolRef:
+        return Implies(self.sys.vote(N, R, V), self.sys.proposal(R, V))
+
+    @invariant
+    def no_activity_after_r0(
+        self, R: Round, N: Node, R1: Round, R2: Round, V: Value
+    ) -> BoolRef:
+        return And(
+            Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0)),
+            Implies(
+                self.sys.one_b_max_vote(N, R1, R2, V), self.sys.le(R1, self.sys.r0)
+            ),
+            Implies(
+                self.sys.one_b_max_vote_received(R, N, R2, V),
+                self.sys.le(R, self.sys.r0),
+            ),
+            Implies(self.sys.proposal(R, V), self.sys.le(R, self.sys.r0)),
+            Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0)),
+        )
