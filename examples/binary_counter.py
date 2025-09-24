@@ -1,6 +1,7 @@
 from prelude import *
+import z3
 
-# @status - rank should be right but doesn't work
+# @status - soundness doesn't work
 
 
 class Index(Finite): ...
@@ -10,8 +11,8 @@ class BinaryCounter(TransitionSystem):
     # Immutable constants and relations
     max: Immutable[Index]
     le: Immutable[Rel[Index, Index]]
-    le_reversed: Immutable[Rel[Index, Index]]
-
+    # if I do Immutable[WFRel[Index]] it also doesn't work
+    
     # Mutable state
     ptr: Index
     a: Rel[Index]  # a(i) == True means bit i is 1
@@ -23,7 +24,6 @@ class BinaryCounter(TransitionSystem):
             Implies(And(self.le(X, Y), self.le(Y, Z)), self.le(X, Z)),
             Or(self.le(X, Y), self.le(Y, X), X == Y),
             Or(self.le(X, self.max), X == self.max),
-            self.le_reversed(X, Y) == self.le(Y, X),
         )
 
     def succ(self, smaller: Index, bigger: Index) -> BoolRef:
@@ -79,7 +79,7 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
         return PosInOrderRank(ts_rel(le_rel), ts_term(ptr_term))
 
     def x_was_last_1(self, i: Index) -> BoolRef:
-        return And(self.sys.a(i), self.sys.le(i, self.sys.ptr))
+        return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i==self.sys.ptr))
 
     def ghost_array_lex(self) -> Rank:
         def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
@@ -92,7 +92,7 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
     def rank(self) -> Rank:
         return LexRank(
             self.ghost_array_lex(),
-            # self.position_of_ptr()
+            self.position_of_ptr()
         )
 
 

@@ -29,11 +29,7 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
-- [ ] Finish Examples
-  - [ ] Ring leader
-  - [ ] Ackermann - no proof
-  - [ ] Second property in hrb 
-  - [ ] All the rest
+- [ ] Many examples TODO
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
     DomPW 
     [{}, {}, {}] - options for exists y disjunctively
@@ -42,7 +38,8 @@ For a simple example, check out the `examples/trivial_termination.py` file.
     Soundness
     [ [{},{}] , [{},{}] ]
 - [ ] In readme, write list of all features
-- [ ] Improve formatter
+- [ ] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
+- [ ] Improve formatter"
 - [ ] differentiate timeouts and violations in printing
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] (?) splitting checks for different cases 
