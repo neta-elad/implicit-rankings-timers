@@ -1,5 +1,6 @@
 from prelude import *
 
+# @ status - need to write fairness, property and proof.
 
 # Paxos consensus protocol implementation
 # Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy

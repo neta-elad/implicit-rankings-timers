@@ -1,5 +1,7 @@
 from prelude import *
 
+# @status - done
+
 # Classic mutex in a ring - a token moves around a ring, allowing the holder to enter the critical section
 # taken from Fang, Y., Piterman, N., Pnueli, A. and Zuck, L., 2004, January.
 # Liveness with invisible ranking.

@@ -1,5 +1,8 @@
 from prelude import *
 
+# @status - timeout, need hints.
+
+
 # Leader Election in a Ring, due to Chang and Roberts
 # Chang, E.J.H., Roberts, R.: An improved algorithm for decentralized extremafinding in circular configurations of processes.
 # Commun. ACM 22(5), 281–283 (1979), https://doi.org/10.1145/359104.359108

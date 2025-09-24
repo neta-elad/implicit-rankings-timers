@@ -1,5 +1,7 @@
 from prelude import *
 
+# @status - first property proved, second property has issues.
+
 # HRB from Berkovits' paper (Hybrid Reliable Broadcast)
 # currently not encoding the finiteness, and not checking side conditions
 # currently commented out sent_msg_proj but maybe we do need it

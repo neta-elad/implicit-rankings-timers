@@ -1,5 +1,6 @@
 from prelude import *
 
+# @status - done
 
 # Notice we assume finitely many indices - a bit different from original modeling, we can modify later.
 class Index(Finite): ...

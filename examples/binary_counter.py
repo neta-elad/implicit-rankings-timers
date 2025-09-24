@@ -1,5 +1,6 @@
 from prelude import *
 
+# @status - rank should be right but doesn't work
 
 class Index(Finite): ...
 

@@ -1,5 +1,7 @@
 from prelude import *
 
+# @status - need to think of the rank
+
 # Ackermann function implementation using a stack-based approach
 # Slightly modified - removed the finish action, instead we prove eventually m=0 and len=0
 # Additionally removed temporal instrumentation / witness variables
