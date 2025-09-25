@@ -1,7 +1,7 @@
 from inspect import stack
 from prelude import *
 
-# @status - need to think of the rank
+# @status - It verifies but I'm suspicious, don't know if DomPerm is right!!
 
 # Ackermann function implementation using a stack-based approach
 # Slightly modified - removed the finish action, instead we prove eventually m=0 and len=0
@@ -156,6 +156,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
         return PosInOrderRank(ts_rel(lt_rel), ts_term(ptr_term))
 
+    # this is a way more complicated one that also works? why?
     def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
         m_minus_1 = Nat("m_minus_1")
         return Or(
@@ -165,23 +166,23 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
                 T == StackType.concrete,
             ),
             # n copies of Y == m - 1
-            And(
-                self.sys.lt(X, self.sys.n),
-                self.sys.succ(Y, self.sys.m),
-                T == StackType.ghost,
-            ),
+            # And(
+            #     self.sys.lt(X, self.sys.n),
+            #     self.sys.succ(Y, self.sys.m),
+            #     T == StackType.ghost,
+            # ),
             # 1 copy of Y = m - 2
-            And(
-                Exists(
-                    m_minus_1,
-                    And(
-                        self.sys.succ(Y, m_minus_1),
-                        self.sys.succ(m_minus_1, self.sys.m),
-                    ),
-                ),
-                X == self.sys.zero,
-                T == StackType.ghost,
-            ),
+            # And(
+            #     Exists(
+            #         m_minus_1,
+            #         And(
+            #             self.sys.succ(Y, m_minus_1),
+            #             self.sys.succ(m_minus_1, self.sys.m),
+            #         ),
+            #     ),
+            #     X == self.sys.zero,
+            #     T == StackType.ghost,
+            # ),
         )
 
     def finite_lemma_for_stack_value_or_ghost(
@@ -195,14 +196,29 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             And(self.sys.lt(X, self.sys.n), T == StackType.ghost),
         )
 
-    def stack_value_binary(self) -> Rank:
+    def stack_value_or_ghost_binary(self) -> Rank:
         return BinRank(self.stack_value_or_ghost)
 
-    def num_appearances_of_val(self) -> Rank:
+    def num_appearances_of_value_or_ghost(self) -> Rank:
         return DomainPermutedRank(
             self.stack_value_binary(),
             ParamSpec(X=Nat, T=StackType),
             k=1,
+            finite_lemma=None,
+        )
+
+    def stack_value(self, X: Nat, Y: Nat) -> BoolRef:
+        return self.sys.stack(X, Y)
+
+    def stack_value_binary(self) -> Rank:
+        return BinRank(self.stack_value)
+
+    # apparently this just works??
+    def num_appearances_of_value(self) -> Rank:
+        return DomainPermutedRank(
+            self.stack_value_binary(),
+            ParamSpec(X=Nat),
+            # k=1,
             finite_lemma=None,
         )
 
@@ -211,7 +227,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         def lt_rel(self: AckermannProof) -> Rel[Nat, Nat]:
             return self.sys.lt
 
-        return DomainLexRank(self.num_appearances_of_val(), ts_rel(lt_rel), ("Y", Nat))
+        return DomainLexRank(self.num_appearances_of_value(), ts_rel(lt_rel), ("Y", Nat))
 
     def rank(self) -> Rank:
         return LexRank(
@@ -275,7 +291,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     # stack = [5, 5, 5, 5, 5] m=5 n=1 ghost: [5, 5, 5, 5, 5, 4]
 
     # so my final idea currently
-    # number of appearances in stack lexicographically, including n+1 copies of m. then m, then n
+    # number of appearances in stack lexicographically, including n+1 copies of m-1. then m, then n
     # step 3 decreases n, doesn't change m or stack
     # step 2 decreases stack, m.
     # step 1 decreases stack
