@@ -728,7 +728,11 @@ class DomainPermutedRank(Rank):
         ys_sigma = self.ys.params()
         for left, right in ys_left_right:
             ys_sigma = {
-                name: z3.If(ys[name] == right[name], left[name], param)
+                name: z3.If(
+                    ys[name] == right[name],
+                    left[name],
+                    z3.If(ys[name] == left[name], right[name], param),
+                )  # FIXED BUG here
                 for name, param in ys_sigma.items()
             }
         return ys_sigma
