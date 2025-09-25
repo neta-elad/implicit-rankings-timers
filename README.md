@@ -30,6 +30,8 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
 - [ ] Many examples TODO
+- [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
+- [ ] Figure out how to use Pos - see below.
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
     DomPW 
     [{}, {}, {}] - options for exists y disjunctively

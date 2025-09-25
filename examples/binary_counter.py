@@ -12,7 +12,7 @@ class BinaryCounter(TransitionSystem):
     max: Immutable[Index]
     le: Immutable[Rel[Index, Index]]
     # if I do Immutable[WFRel[Index]] it also doesn't work
-    
+
     # Mutable state
     ptr: Index
     a: Rel[Index]  # a(i) == True means bit i is 1
@@ -79,7 +79,7 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
         return PosInOrderRank(ts_rel(le_rel), ts_term(ptr_term))
 
     def x_was_last_1(self, i: Index) -> BoolRef:
-        return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i==self.sys.ptr))
+        return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i == self.sys.ptr))
 
     def ghost_array_lex(self) -> Rank:
         def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
@@ -90,10 +90,7 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
         )
 
     def rank(self) -> Rank:
-        return LexRank(
-            self.ghost_array_lex(),
-            self.position_of_ptr()
-        )
+        return LexRank(self.ghost_array_lex(), self.position_of_ptr())
 
 
 BinaryCounterProof().check()

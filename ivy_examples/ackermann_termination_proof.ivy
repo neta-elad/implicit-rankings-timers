@@ -1,0 +1,425 @@
+#lang ivy1.7
+
+################################################################################
+# A termination proof for the Ackermann function
+################################################################################
+#
+# The proof is explained in:
+#
+# Jochen Hoenicke, Oded Padon, and Sharon Shoham. On the Power of
+# Temporal Prophecy. On the pursuit of insight and elegance: essays on
+# the occasion of Andreas Podelski's 65th birthday. 2024.
+#
+# This Ivy file is slightly different from Fig. 1 in the paper because
+# of the way Ivy adds an idle action, which requires adding a fairness
+# assumption that the protocol steps are taken infinitely often.
+#
+# Note: this file is not in EPR and contains cyclic quantifier
+# alternations. To check it with Ivy, run:
+#
+# $ ivy_check complete=fo ackermann_termination_proof.ivy
+#
+# The Ackermann function is defined as:
+# A(0, n) = n + 1
+# A(m, 0) = A(m - 1, 1)
+# A(m, n) = A(m - 1, A(m, n - 1))
+#
+# Example (from https://en.wikipedia.org/wiki/Ackermann_function#Huge_numbers):
+# A(4, 3) ->
+# A(3, A(4, 2)) ->
+# A(3, A(3, A(4, 1))) ->
+# A(3, A(3, A(3, A(4, 0)))) ->
+# A(3, A(3, A(3, A(3, 1)))) ->
+# A(3, A(3, A(3, A(2, A(3, 0))))) ->
+# A(3, A(3, A(3, A(2, A(2, 1))))) ->
+# A(3, A(3, A(3, A(2, A(1, A(2, 0)))))) ->
+# A(3, A(3, A(3, A(2, A(1, A(1, 1)))))) ->
+# A(3, A(3, A(3, A(2, A(1, A(0, A(1, 0))))))) ->
+# A(3, A(3, A(3, A(2, A(1, A(0, A(0, 1))))))) ->
+# A(3, A(3, A(3, A(2, A(1, A(0, 2)))))) ->
+# A(3, A(3, A(3, A(2, A(1, 3))))) ->
+# A(3, A(3, A(3, A(2, A(0, A(1,2)))))) ->
+#
+
+
+################################################################################
+#
+# Module for axiomatizing a total order
+#
+################################################################################
+
+module total_order(r) = {
+    axiom r(X,X)                        # Reflexivity
+    axiom r(X, Y) & r(Y, Z) -> r(X, Z)  # Transitivity
+    axiom r(X, Y) & r(Y, X) -> X = Y    # Anti-symmetry
+    axiom r(X, Y) | r(Y, X)             # Totality
+}
+
+
+isolate ackermann = {
+
+    ################################################################################
+    #
+    # The protocol description
+    #
+    ################################################################################
+
+    type nat
+
+    action setup_m
+    action setup_n
+    action start
+    action finish
+    action step1
+    action step2
+    action step3
+
+    specification {
+
+	################################################################################
+	#
+	# Types, relations and functions describing the state
+	#
+	################################################################################
+
+
+	# a total order
+	relation le(X:nat, Y:nat)
+	instantiate total_order(le)
+	individual zero:nat
+	axiom forall X. le(zero, X)
+
+	# state
+	relation stack(I:nat, M:nat)
+	relation started
+	individual len:nat
+	individual m:nat
+	individual n:nat
+
+	# temporal events:
+	relation dec(M:nat) # event triggered when entries with value M is popped in step1
+	relation stepped # event triggered when one of the step actions is executed
+	relation finished # event trigerred when start happens
+
+	# prophecy:
+	individual m_init:nat
+
+	################################################################################
+	#
+	# Initialization
+	#
+	################################################################################
+
+	after init {
+            len := zero;
+            stack(D,V) := false;
+            m := zero;
+            n := zero;
+            started := false;
+	    stepped := false;
+	    dec(M) := false;
+	}
+
+	################################################################################
+	#
+	# Auxiliary actions
+	#
+	################################################################################
+
+	action succ(x:nat) returns (y:nat) = {
+            assume ~le(y,x) & forall Z:nat. ~le(Z,x) -> le(y,Z)
+	}
+
+	action pred(y:nat) returns (x:nat) = {
+            assume ~le(y,x) & forall Z:nat. ~le(Z,x) -> le(y,Z)
+	}
+
+	action push(x:nat) = {
+            stack(len, x) := true;
+            len := succ(len);
+	}
+
+	action pop returns (x:nat) = {
+            len := pred(len);
+            assume stack(len, x);
+            stack(len, x) := false;
+	}
+
+	################################################################################
+	#
+	# Protocol actions
+	#
+	################################################################################
+
+	before setup_m {
+            require ~started;
+            m := succ(m)
+	}
+
+	before setup_n {
+            require ~started;
+            n := succ(n)
+	}
+
+	before start {
+            require ~started;
+            require m = m_init;
+            started := true;
+	}
+
+	before finish {
+	    require started;
+	    require m = zero;
+	    require len = zero;
+
+	    # trigger events
+            finished := true;
+            finished := false;
+            stepped := true;
+            stepped := false
+	}
+
+	# A(0, n) = n + 1
+	# pop the last pushed value of m from stack and continue with n := n + 1
+	before step1 {
+            require started;
+            require le(m, zero);
+            require ~le(len, zero);
+
+            # pop the stack and update m and n
+            n := succ(n);
+            m := pop;
+
+            # trigger events
+            dec(X) := X = m;
+            dec(X) := false;
+            stepped := true;
+            stepped := false;
+	}
+
+	# A(m, 0) = A(m - 1, 1)
+	before step2 {
+            require started;
+            require ~le(m, zero);
+            require le(n, zero);
+
+            # update m and n
+            n := succ(zero);
+            m := pred(m);
+
+	    # trigger events
+            stepped := true;
+            stepped := false;
+	}
+
+	# recursive call a(m,n) = a(m - 1, a(m, n - 1))
+	# push pred(m) on the stack and continue with m,n := m,n-1
+	before step3 {
+            require started;
+            require ~le(m, zero);
+            require ~le(n, zero);
+
+	    # push m - 1 and update n
+            push(pred(m));
+            n := pred(n);
+
+            # trigger events
+            stepped := true;
+            stepped := false;
+	}
+
+        ################################################################################
+        #
+        # Temporal property and its proof
+        #
+        ################################################################################
+
+	# witness for the following formula, which means it's the *maximal* value up to m_init that "dec's" infinitely often:
+	#    exists X. le(X, m_init) & (globally eventually dec(X)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, X)
+	individual p: nat
+
+	temporal property [termination] (
+	    # defining p
+	    (
+                (exists X. le(X, m_init) & (globally eventually dec(X)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, X)) ->
+                          (le(p, m_init) & (globally eventually dec(p)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, p))
+            ) &
+
+	    # fairness for steps
+	    (globally eventually stepped)
+	) -> (eventually finished)
+	proof {
+            tactic l2s with
+
+	    ################################################################################
+            #
+            # Invariants for proving liveness
+            #
+            ################################################################################
+
+	    # basic l2s
+            invariant l2s_waiting | l2s_frozen | l2s_saved
+            invariant ~l2s_waiting | ~l2s_frozen
+            invariant ~l2s_waiting | ~l2s_saved
+            invariant ~l2s_frozen  | ~l2s_saved
+
+	    # fairness events (set to true only inside actions)
+            invariant ~dec(X)
+            invariant ~stepped
+
+	    # The stack is only populated for elements smaller than len
+	    invariant stack(I, M) -> ~le(len, I)
+
+	    # as long as we haven't started the stack is empty
+	    invariant ~started -> len = zero
+
+	    # The stack contains at most one element on each position
+	    invariant stack(I, M1) & stack(I, M2) -> M1 = M2
+
+	    # The stack is always decreasing
+	    invariant stack(I1, M1) & stack(I2, M2) & le(I1, I2) -> le(M2, M1)
+
+	    # The m and the stack are up to m_init
+	    invariant started -> le(m, m_init)
+	    invariant stack(I, M) -> le(M, m_init)
+
+	    # m is at most the greatest value in the stack + 1
+	    invariant stack(I, M) & ~le(X, M) -> le(m, X)
+
+	    # basic temporal information
+	    invariant globally eventually stepped
+	    invariant eventually stepped
+	    invariant globally ~finished
+
+	    # we must start before we freeze
+	    invariant ~($l2s_w. stepped) -> started
+	    invariant ~l2s_waiting -> started
+
+	    # zero and p are in l2s_d, l2s_a
+	    invariant l2s_d(zero)
+	    invariant l2s_d(p)
+	    invariant ~l2s_waiting -> l2s_a(zero)
+	    invariant ~l2s_waiting -> l2s_a(p)
+
+	    # l2s_d is large enough
+	    invariant le(X, m) -> l2s_d(X)
+	    invariant le(X, n) -> l2s_d(X)
+	    invariant le(X, len) -> l2s_d(X)
+	    invariant started & le(X, m_init) -> l2s_d(X)
+
+	    # l2s_a is large enough for stack values
+	    invariant ~l2s_waiting & le(X, m_init) -> l2s_a(X)
+
+	    #### The case: eventually globally ~exists M. le(M, m_init) & dec(M):
+
+	    # we freeze only after dec stops
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & ~($l2s_w. globally ~exists M. le(M, m_init) & dec(M)) -> globally ~exists M. le(M, m_init) & dec(M)
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & ~l2s_waiting -> globally ~exists M. le(M, m_init) & dec(M)
+
+	    # l2s_a is large enough for n
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & ~l2s_waiting & le(X, n) -> l2s_a(X)
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & l2s_saved & le(X, ($l2s_s. n)) -> l2s_a(X)
+
+	    # the termination argument for this case, lexicographic argument for (m, n)
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & l2s_saved -> le(m, ($l2s_s. m))
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & l2s_saved -> le(n, ($l2s_s. n)) | m ~= ($l2s_s. m)
+	    invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) & l2s_saved & ~($l2s_w. stepped) -> n ~= ($l2s_s. n) | m ~= ($l2s_s. m)
+
+      	    ##### The "main omega^omega" case: globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))
+
+	    # l2s_a is large enough for stack indices (TODO: can these invariants be simplified?)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~($l2s_w.   (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) ->
+	              started
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~($l2s_w.   (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) ->
+	              forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~($l2s_w.   (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) ->
+	              forall M. le(M, m_init) & ~le(M, p) -> ~dec(M)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~($l2s_w.   (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)))
+	              ->
+	              le(m, p)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~l2s_waiting ->
+	              started
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~l2s_waiting ->
+	              forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~l2s_waiting ->
+	              forall M. le(M, m_init) & ~le(M, p) -> ~dec(M)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~l2s_waiting
+	              ->
+	              le(m, p)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              ~l2s_waiting & le(p, M) & stack(I, M) & le(X, I) -> l2s_a(X)
+	    invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              l2s_saved & le(p, M) & ($l2s_s I, M. stack(I, M))(I, M) & le(X, I) -> l2s_a(X)
+
+    	    # the termination argument for the "main case":
+	    # 1. the "stack value" of p does not increase
+            invariant (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              l2s_saved & stack(I, p) -> ($l2s_s I, M. stack(I, M))(I, p)
+	    # 2. the "stack value" of p must visibly decrease after "dec(p)"
+            invariant (
+	        (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	        l2s_saved &
+	        ~($l2s_w. (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) ->
+	        exists I. ~stack(I, p) & ($l2s_s I, M. stack(I, M))(I, p)
+            )
+
+	    #### Other cases, simpler temporal reasoning, unfolding p's definition to "prove" the following true statement:
+	    # invariant (eventually globally ~exists M. le(M, m_init) & dec(M)) | (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)))
+
+	    # the case of ~(eventually globally ~exists M. le(M, m_init) & dec(M)) but forall X. le(X, m_init) -> ~(globally eventually dec(X)):
+	    invariant l2s_saved & ($l2s_s M. globally ~dec(M))(M) -> globally ~dec(M)
+	    invariant l2s_saved & le(M, m_init) & ~(globally eventually dec(M)) & ~($l2s_w M. globally ~dec(M))(M) -> globally ~dec(M)
+            invariant l2s_saved & ~(eventually globally ~exists M. le(M, m_init) & dec(M)) & ~($l2s_w. exists M. le(M, m_init) & dec(M)) -> exists M. le(M, m_init) & ~($l2s_s M. globally ~dec(M))(M)
+
+	    # we have now reduced the problem to "proving" the following true statement:
+	    # invariant (forall M. le(M, m_init) -> eventually globally ~dec(M)) | (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)))
+
+	    # properties of p and its existance (by induction on m until we start, and then for m_init)
+	    invariant (exists X. le(X, m_init) & (globally eventually dec(X)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, X)) ->
+                                (le(p, m_init) & (globally eventually dec(p)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, p))
+            invariant ~started -> # without the ~started there is probably an infinite CTI
+    	        (forall X. le(X, m) -> ~(le(X, m_init) & (globally eventually dec(X)))) |
+	        (exists X. le(X, m) & le(X, m_init) & (globally eventually dec(X)) & forall Y. le(Y, m) & le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, X))
+	    invariant started ->
+	        (forall X. le(X, m_init) -> ~(globally eventually dec(X))) |
+   	        (exists X. le(X, m_init) & (globally eventually dec(X)) & forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, X))
+
+	    # we have now reduced the problem to "proving" the following almost trivial statement:
+	    # invariant (le(p, m_init) & (globally eventually dec(p)) & (forall Y. le(Y, m_init) & (globally eventually dec(Y)) -> le(Y, p))) ->
+	    #           (globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M)))
+
+	    # we freeze only once globally ~(dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))
+	    invariant ~(globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+        	      ~($l2s_w. globally ~(dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) ->
+	              globally ~(dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))
+	    invariant ~(globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+        	      ~l2s_waiting ->
+	              globally ~(dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))
+
+	    # if in the saved state, values greater than p did not all stop decreasing, then we can't have a cycle (invariants from prior cases show this)
+
+	    # if in the saved state values greater than p already stopped decreasing, then we can't dec(p)
+	    invariant ~(globally eventually (dec(p) & forall M. le(M, m_init) & ~le(M, p) -> globally ~dec(M))) &
+	              (globally eventually dec(p)) &
+	              l2s_saved &
+            	      ~(exists M. le(M, m_init) & ~le(M, p) & ~($l2s_s M. globally ~dec(M))(M)) ->
+	              ($l2s_w. dec(p))
+	}
+    }
+}
+
+export ackermann.setup_m
+export ackermann.setup_n
+export ackermann.start
+export ackermann.finish
+export ackermann.step1
+export ackermann.step2
+export ackermann.step3
