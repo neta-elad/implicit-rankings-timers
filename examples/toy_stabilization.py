@@ -1,6 +1,6 @@
 from prelude import *
 
-# @status - done
+# @status - doesn't work (there was a bug before)
 
 # Toy stabilization example from the paper Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
 # Inspired by Dijsktra's k-state self-stabilization algorithm.

@@ -165,13 +165,13 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
                 self.sys.stack(X, Y),
                 T == StackType.concrete,
             ),
-            # n copies of Y == m - 1
+            # # n copies of Y == m - 1
             # And(
             #     self.sys.lt(X, self.sys.n),
             #     self.sys.succ(Y, self.sys.m),
             #     T == StackType.ghost,
             # ),
-            # 1 copy of Y = m - 2
+            # # 1 copy of Y = m - 2
             # And(
             #     Exists(
             #         m_minus_1,
@@ -183,6 +183,12 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             #     X == self.sys.zero,
             #     T == StackType.ghost,
             # ),
+            # n+1 copies of Y == m - 1
+            And(
+                Or(self.sys.lt(X, self.sys.n), X == self.sys.n),
+                self.sys.succ(Y, self.sys.m),
+                T == StackType.ghost,
+            ),
         )
 
     def finite_lemma_for_stack_value_or_ghost(
@@ -201,33 +207,35 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
     def num_appearances_of_value_or_ghost(self) -> Rank:
         return DomainPermutedRank(
-            self.stack_value_binary(),
+            self.stack_value_or_ghost_binary(),
             ParamSpec(X=Nat, T=StackType),
             k=1,
             finite_lemma=None,
         )
 
-    def stack_value(self, X: Nat, Y: Nat) -> BoolRef:
-        return self.sys.stack(X, Y)
+    # def stack_value(self, X: Nat, Y: Nat) -> BoolRef:
+    #     return self.sys.stack(X, Y)
 
-    def stack_value_binary(self) -> Rank:
-        return BinRank(self.stack_value)
+    # def stack_value_binary(self) -> Rank:
+    #     return BinRank(self.stack_value)
 
-    # apparently this just works??
-    def num_appearances_of_value(self) -> Rank:
-        return DomainPermutedRank(
-            self.stack_value_binary(),
-            ParamSpec(X=Nat),
-            # k=1,
-            finite_lemma=None,
-        )
+    # # this was verified as decreasing but this was a bug with DomPerm
+    # def num_appearances_of_value(self) -> Rank:
+    #     return DomainPermutedRank(
+    #         self.stack_value_binary(),
+    #         ParamSpec(X=Nat),
+    #         k=1,
+    #         finite_lemma=None,
+    #     )
 
     def stack_appearances_lexicographically(self) -> Rank:
 
         def lt_rel(self: AckermannProof) -> Rel[Nat, Nat]:
             return self.sys.lt
 
-        return DomainLexRank(self.num_appearances_of_value(), ts_rel(lt_rel), ("Y", Nat))
+        return DomainLexRank(
+            self.num_appearances_of_value_or_ghost(), ts_rel(lt_rel), ("Y", Nat)
+        )
 
     def rank(self) -> Rank:
         return LexRank(
