@@ -29,9 +29,9 @@
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## TODOs
-- [ ] Many examples TODO
-- [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
+- [ ] prove all examples.
 - [ ] Figure out how to use Pos - see below.
+- [ ] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
 - [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
     DomPW 
     [{}, {}, {}] - options for exists y disjunctively
@@ -39,14 +39,16 @@ For a simple example, check out the `examples/trivial_termination.py` file.
     [ ([{},{}] , [{},{}], {}), ([{},{}] , [{},{}], {}) ]
     Soundness
     [ [{},{}] , [{},{}] ]
-- [ ] In readme, write list of all features
-- [ ] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
-- [ ] Improve formatter"
-- [ ] differentiate timeouts and violations in printing
+- [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
+- [ ] In readme, write list of all features
+- [ ] (optional) timeouts and violations in printing
+- [ ] (optional) timeout as given argument
+- [ ] (optional) improve formatter
+- [ ] (optional) option to compute quantifier structure for calls
 - [ ] (?) splitting checks for different cases 
 - [ ] (?) Add modified argument and check to see everything is modified
-- [ ] (?) Can we reuse invariants in diff proofs?
+- [ ] (?) Reusing invariants and ranks between proofs
 - [ ] (stretch) ability to write unit tests for a spec
 - [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces
