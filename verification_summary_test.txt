@@ -1,5 +1,29 @@
-Starting run_all_examples.sh at Fri Sep 26 11:31:56 IDT 2025
-Output will be saved to: run_all_examples_output.txt
+===========================================
+SUMMARY
+===========================================
+make check: PASS
+
+ackermann.py: FAIL: conserved
+alternating_bit_protocol.py: PASS
+binary_counter.py: FAIL: soundness
+hybrid_reliable_broadcast.py: FAIL: inv
+mutex_ring.py: PASS
+paxos.py: FAIL
+ring_leader.py: FAIL: conserved
+ticket.py: PASS
+toy_stabilization.py: FAIL: conserved
+trivial_termination.py: PASS
+
+Total: 10 examples
+Passed: 4
+Failed: 6
+
+===========================================
+DETAILED OUTPUT
+===========================================
+
+Starting run_all_examples.sh at Fri Sep 26 11:50:42 IDT 2025
+Output will be saved to: verification_summary_test.txt
 ===========================================
 
 Running: make check
@@ -37,9 +61,9 @@ Checking inv in step2_X_timers: passed
 Checking inv in step3_X_timers: passed
 Checking conserved in step1_X_timers: failed
 Checking conserved in step2_X_timers: failed
+Model written to /Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/models/1-conserved-in-step2_X_timers.txt
 Checking conserved in step3_X_timers: failed
 fail: conserved
-make examples/ackermann.py completed successfully
 
 Running: make examples/alternating_bit_protocol.py
 -------------------------------------------
@@ -97,7 +121,6 @@ Checking sender_receive_ack_X_timers->at most m alpha added_<Bin(bad_in_data_que
 Checking sender_send_data_X_timers->at most m alpha added_<Bin(bad_in_data_queue)>: passed
 Checking soundness: passed
 All passed!
-make examples/alternating_bit_protocol.py completed successfully
 
 Running: make examples/binary_counter.py
 -------------------------------------------
@@ -113,7 +136,6 @@ Checking conserved in decrease_X_timers: passed
 Checking decreases in decrease_X_timers: passed
 Checking soundness: failed
 fail: soundness
-make examples/binary_counter.py completed successfully
 
 Running: make examples/hybrid_reliable_broadcast.py
 -------------------------------------------
@@ -130,44 +152,16 @@ Checking sat trans_faulty_send_s: passed
 Checking sat trans_faulty_state_sa: passed
 Checking sat trans_receive_msg_i: passed
 Checking sat init and tr: passed
-Traceback (most recent call last):
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/examples/hybrid_reliable_broadcast.py", line 761, in <module>
-    RelayHRBProof().check()
-    ~~~~~~~~~~~~~~~~~~~~~^^
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 331, in check
-    if not self._check_inv():
-           ~~~~~~~~~~~~~~~^^
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 351, in _check_inv
-    return self.check_inductiveness(lambda this: this.invariant, "inv")
-           ~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/ts.py", line 91, in check_inductiveness
-    self.check_and_print(f"{inv_name} in init", self.init, z3.Not(inv(self)))
-                                                ^^^^^^^^^
-  File "/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/functools.py", line 1026, in __get__
-    val = self.func(instance)
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/ts.py", line 61, in init
-    return z3.And(*self.inits.values())
-                   ^^^^^^^^^^
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 115, in inits
-    return self.intersection.inits
-           ^^^^^^^^^^^^^^^^^
-  File "/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/functools.py", line 1026, in __get__
-    val = self.func(instance)
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 221, in intersection
-    self.suffix, self.sys_with_witnesses, self.timers
-                                          ^^^^^^^^^^^
-  File "/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/functools.py", line 1026, in __get__
-    val = self.func(instance)
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 160, in timers
-    self.reset.instantiated_prop,
-    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-  File "/opt/homebrew/Cellar/python@3.13/3.13.7/Frameworks/Python.framework/Versions/3.13/lib/python3.13/functools.py", line 1026, in __get__
-    val = self.func(instance)
-  File "/Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/termination.py", line 202, in instantiated_prop
-    not pending
-AssertionError: Some temporal witnesses could not be instantiated: skolem_violation
-make: *** [examples/hybrid_reliable_broadcast.py] Error 1
-make examples/hybrid_reliable_broadcast.py completed successfully
+Checking inv in init: passed
+Checking inv in receive_init_X_timers: passed
+Checking inv in receive_init_i_X_timers: passed
+Checking inv in receive_msg_X_timers: failed
+Checking inv in receive_msg_c_X_timers: failed
+Checking inv in trans_faulty_send_a_X_timers: passed
+Checking inv in trans_faulty_send_s_X_timers: passed
+Checking inv in trans_faulty_state_sa_X_timers: passed
+Checking inv in trans_receive_msg_i_X_timers: passed
+fail: inv
 
 Running: make examples/mutex_ring.py
 -------------------------------------------
@@ -183,14 +177,12 @@ Checking conserved in wakeup_X_timers: passed
 Checking decreases in wakeup_X_timers: passed
 Checking soundness: passed
 All passed!
-make examples/mutex_ring.py completed successfully
 
 Running: make examples/paxos.py
 -------------------------------------------
 PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
 Success: no issues found in 32 source files
 PYTHONPATH=. .venv/bin/python examples/paxos.py
-make examples/paxos.py completed successfully
 
 Running: make examples/ring_leader.py
 -------------------------------------------
@@ -204,7 +196,6 @@ Checking inv in init: passed
 Checking inv in wakeup_X_timers: passed
 Checking conserved in wakeup_X_timers: failed
 fail: conserved
-make examples/ring_leader.py completed successfully
 
 Running: make examples/ticket.py
 -------------------------------------------
@@ -244,7 +235,6 @@ Checking step23_X_timers->at most m alpha added_<Cond(Pos(t_<scheduled(T)>), non
 Checking step31_X_timers->at most m alpha added_<Cond(Pos(t_<scheduled(T)>), non_pc1_serviced)>: passed
 Checking soundness: passed
 All passed!
-make examples/ticket.py completed successfully
 
 Running: make examples/toy_stabilization.py
 -------------------------------------------
@@ -258,7 +248,6 @@ Checking inv in init: passed
 Checking inv in wakeup_X_timers: passed
 Checking conserved in wakeup_X_timers: failed
 fail: conserved
-make examples/toy_stabilization.py completed successfully
 
 Running: make examples/trivial_termination.py
 -------------------------------------------
@@ -274,8 +263,7 @@ Checking conserved in turn_off_X_timers: passed
 Checking decreases in turn_off_X_timers: passed
 Checking soundness: passed
 All passed!
-make examples/trivial_termination.py completed successfully
 
 ===========================================
-All examples completed at Fri Sep 26 11:32:31 IDT 2025
-Output saved to: run_all_examples_output.txt
+All examples completed at Fri Sep 26 11:51:02 IDT 2025
+Output saved to: verification_summary_test.txt
