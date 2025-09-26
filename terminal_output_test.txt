@@ -6,7 +6,7 @@ make check: PASS
 ackermann.py: FAIL: conserved
 alternating_bit_protocol.py: PASS
 binary_counter.py: FAIL: soundness
-hybrid_reliable_broadcast.py: FAIL: inv
+hybrid_reliable_broadcast.py: PASS
 mutex_ring.py: PASS
 paxos.py: FAIL
 ring_leader.py: FAIL: conserved
@@ -15,15 +15,15 @@ toy_stabilization.py: FAIL: conserved
 trivial_termination.py: PASS
 
 Total: 10 examples
-Passed: 4
-Failed: 6
+Passed: 5
+Failed: 5
 
 ===========================================
 DETAILED OUTPUT
 ===========================================
 
-Starting run_all_examples.sh at Fri Sep 26 11:50:42 IDT 2025
-Output will be saved to: verification_summary_test.txt
+Starting run_all_examples.sh at Fri Sep 26 14:44:39 IDT 2025
+Output will be saved to: terminal_output_test.txt
 ===========================================
 
 Running: make check
@@ -61,7 +61,6 @@ Checking inv in step2_X_timers: passed
 Checking inv in step3_X_timers: passed
 Checking conserved in step1_X_timers: failed
 Checking conserved in step2_X_timers: failed
-Model written to /Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/models/1-conserved-in-step2_X_timers.txt
 Checking conserved in step3_X_timers: failed
 fail: conserved
 
@@ -155,13 +154,30 @@ Checking sat init and tr: passed
 Checking inv in init: passed
 Checking inv in receive_init_X_timers: passed
 Checking inv in receive_init_i_X_timers: passed
-Checking inv in receive_msg_X_timers: failed
-Checking inv in receive_msg_c_X_timers: failed
+Checking inv in receive_msg_X_timers: passed
+Checking inv in receive_msg_c_X_timers: passed
 Checking inv in trans_faulty_send_a_X_timers: passed
 Checking inv in trans_faulty_send_s_X_timers: passed
 Checking inv in trans_faulty_state_sa_X_timers: passed
 Checking inv in trans_receive_msg_i_X_timers: passed
-fail: inv
+Checking conserved in receive_init_X_timers: passed
+Checking conserved in receive_init_i_X_timers: passed
+Checking conserved in receive_msg_X_timers: passed
+Checking conserved in receive_msg_c_X_timers: passed
+Checking conserved in trans_faulty_send_a_X_timers: passed
+Checking conserved in trans_faulty_send_s_X_timers: passed
+Checking conserved in trans_faulty_state_sa_X_timers: passed
+Checking conserved in trans_receive_msg_i_X_timers: passed
+Checking decreases in receive_init_X_timers: passed
+Checking decreases in receive_init_i_X_timers: passed
+Checking decreases in receive_msg_X_timers: passed
+Checking decreases in receive_msg_c_X_timers: passed
+Checking decreases in trans_faulty_send_a_X_timers: passed
+Checking decreases in trans_faulty_send_s_X_timers: passed
+Checking decreases in trans_faulty_state_sa_X_timers: passed
+Checking decreases in trans_receive_msg_i_X_timers: passed
+Checking soundness: passed
+All passed!
 
 Running: make examples/mutex_ring.py
 -------------------------------------------
@@ -265,5 +281,5 @@ Checking soundness: passed
 All passed!
 
 ===========================================
-All examples completed at Fri Sep 26 11:51:02 IDT 2025
-Output saved to: verification_summary_test.txt
+All examples completed at Fri Sep 26 14:48:51 IDT 2025
+Output saved to: terminal_output_test.txt
