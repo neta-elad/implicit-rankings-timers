@@ -1,6 +1,7 @@
 from prelude import *
 
-# @status - first property proved, second property some progress.
+# @status - first property proved, second property some progress, but need to understand the proof more thoroughly.
+# currently timeouts on decrease check but not sure exactly what invariants are needed for the proof.
 
 # HRB from Berkovits' paper (Hybrid Reliable Broadcast)
 
@@ -16,8 +17,8 @@ class QuorumB(Finite): ...
 
 class HybridReliableBroadcast(TransitionSystem):
     witness_exists_correct: Immutable[Node]
-    witness_correct_not_accept: Immutable[Node] #used only for second proof
-    witness_correct_not_sent: Immutable[Node] #used only for second proof
+    witness_correct_not_accept: Immutable[Node]  # used only for second proof
+    witness_correct_not_sent: Immutable[Node]  # used only for second proof
 
     # Immutable relations
     member_a: Immutable[Rel[Node, QuorumA]]
@@ -362,14 +363,18 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                 Exists(N, And(self.sys.obedient(N), self.sys.accept(N))),
                 Exists(M, And(self.sys.obedient(M), self.sys.rcv_init(M))),
             ),
-            Implies(self.sys.sent_msg(N1, N2), self.sys.sent_msg_proj(N1)),
+            Implies(
+                self.sys.sent_msg(N1, N2), self.sys.sent_msg_proj(N1)
+            ),  # invariant using sent_msg_proj - not necessary
             # Implies(self.sys.sent_msg_proj(N1), Exists(N, self.sys.sent_msg(N1, N))),
             Implies(
                 And(self.sys.obedient(N2), self.sys.rcv_msg(N1, N2)),
                 self.sys.sent_msg(N1, N2),
             ),
             Implies(
-                And(self.sys.symmetric(N1), self.sys.sent_msg_proj(N1)),
+                And(
+                    self.sys.symmetric(N1), self.sys.sent_msg_proj(N1)
+                ),  # using sent_msg_proj - can replace with no new quantification
                 self.sys.sent_msg(N1, N2),
             ),
             Implies(
@@ -381,7 +386,10 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                 Exists(
                     A,
                     ForAll(
-                        M, Implies(self.sys.member_a(M, A), self.sys.sent_msg_proj(M))
+                        M,
+                        Implies(
+                            self.sys.member_a(M, A), self.sys.sent_msg_proj(M)
+                        ),  # invariant using sent_msg_proj
                     ),
                 ),
             ),
@@ -390,7 +398,10 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                 Exists(
                     B,
                     ForAll(
-                        M, Implies(self.sys.member_b(M, B), self.sys.sent_msg_proj(M))
+                        M,
+                        Implies(
+                            self.sys.member_b(M, B), self.sys.sent_msg_proj(M)
+                        ),  # invariant using sent_msg_proj
                     ),
                 ),
             ),
@@ -401,7 +412,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
                         M,
                         Implies(
                             And(self.sys.member_a(M, A), self.sys.obedient(M)),
-                            self.sys.sent_msg_proj(M),
+                            self.sys.sent_msg_proj(M),  # invariant using sent_msg_proj
                         ),
                     ),
                 ),
@@ -547,12 +558,26 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
         return Implies(
             And(
                 Implies(
-                    Exists(N, And(self.sys.correct(N),G(Not(self.sys.accept(N))))),
-                    And(self.sys.correct(self.sys.witness_correct_not_accept),G(Not(self.sys.accept(self.sys.witness_correct_not_accept))))
+                    Exists(N, And(self.sys.correct(N), G(Not(self.sys.accept(N))))),
+                    And(
+                        self.sys.correct(self.sys.witness_correct_not_accept),
+                        G(Not(self.sys.accept(self.sys.witness_correct_not_accept))),
+                    ),
                 ),
                 Implies(
-                    Exists(N, And(self.sys.correct(N),G(Not(self.sys.sent_msg_proj(N))))),
-                    And(self.sys.correct(self.sys.witness_correct_not_sent),G(Not(self.sys.sent_msg_proj(self.sys.witness_correct_not_sent))))
+                    Exists(
+                        N, And(self.sys.correct(N), G(Not(self.sys.sent_msg_proj(N))))
+                    ),  # witness using sent_msg_proj
+                    And(
+                        self.sys.correct(self.sys.witness_correct_not_sent),
+                        G(
+                            Not(
+                                self.sys.sent_msg_proj(
+                                    self.sys.witness_correct_not_sent
+                                )
+                            )
+                        ),
+                    ),  # witness using sent_msg_proj
                 ),
                 ForAll(
                     [N, M],
@@ -595,39 +620,102 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             G(Exists(N, And(self.sys.correct(N), Not(self.sys.accept(N))))),
             Implies(
                 Exists(N, And(self.sys.correct(N), G(Not(self.sys.accept(N))))),
-                And(self.sys.correct(self.sys.witness_correct_not_accept), G(Not(self.sys.accept(self.sys.witness_correct_not_accept))))
+                And(
+                    self.sys.correct(self.sys.witness_correct_not_accept),
+                    G(Not(self.sys.accept(self.sys.witness_correct_not_accept))),
+                ),
             ),
             Implies(
-                Exists(N, And(self.sys.correct(N), G(Not(self.sys.sent_msg_proj(N))))),
-                And(self.sys.correct(self.sys.witness_correct_not_sent), G(Not(self.sys.sent_msg_proj(self.sys.witness_correct_not_sent))))
+                Exists(
+                    N, And(self.sys.correct(N), G(Not(self.sys.sent_msg_proj(N))))
+                ),  # invariant using sent_msg_proj
+                And(
+                    self.sys.correct(self.sys.witness_correct_not_sent),
+                    G(Not(self.sys.sent_msg_proj(self.sys.witness_correct_not_sent))),
+                ),
             ),
         )
-
 
     @invariant
     def relay_invariant_b(self, B: QuorumB) -> BoolRef:
         # invariant forall B. correct(n1) & ~accept(n1) -> exists M. member_b(M,B) & ~rcv_msg(M,n1)
         n1 = self.sys.witness_correct_not_accept
-        M = Node('M')
+        M = Node("M")
         return Implies(
             And(self.sys.correct(n1), Not(self.sys.accept(n1))),
-            Exists(
-                M,
-                And(self.sys.member_b(M, B), Not(self.sys.rcv_msg(M, n1)))
-            )
+            Exists(M, And(self.sys.member_b(M, B), Not(self.sys.rcv_msg(M, n1)))),
         )
-    
+
     @invariant
     def relay_invariant_a(self, A: QuorumA) -> BoolRef:
         # invariant forall A. correct(n2) & ~sent_msg_proj(n2) -> exists M. member_a(M,A) & ~rcv_msg(M,n2)
         n2 = self.sys.witness_correct_not_sent
-        M = Node('M')
+        M = Node("M")
         return Implies(
-            And(self.sys.correct(n2), Not(self.sys.sent_msg_proj(n2))),
-            Exists(
-                M,
-                And(self.sys.member_a(M, A), Not(self.sys.rcv_msg(M, n2)))
-            )
+            And(
+                self.sys.correct(n2), Not(self.sys.sent_msg_proj(n2))
+            ),  # invariant using sent_msg_proj
+            Exists(M, And(self.sys.member_a(M, A), Not(self.sys.rcv_msg(M, n2)))),
+        )
+
+    @invariant
+    def safety_invariants(self, N1: Node, N2: Node) -> BoolRef:
+        M = Node("M")
+        N = Node("N")
+        A = QuorumA("A")
+        B = QuorumB("B")
+        return And(
+            # System invariants from ivy file
+            # Safety Property: if some obedient node accepted then some obedient node initially received the message
+            # Implies(
+            #     Exists(N, And(self.sys.obedient(N), self.sys.accept(N))),
+            #     Exists(M, And(self.sys.obedient(M), self.sys.rcv_init(M))),
+            # ),
+            # Implies(self.sys.sent_msg(N1, N2), self.sys.sent_msg_proj(N1)),
+            # Implies(self.sys.sent_msg_proj(N1), Exists(N, self.sys.sent_msg(N1, N))),
+            Implies(
+                And(self.sys.obedient(N2), self.sys.rcv_msg(N1, N2)),
+                self.sys.sent_msg(N1, N2),
+            ),
+            Implies(
+                And(self.sys.symmetric(N1), self.sys.sent_msg_proj(N1)),
+                self.sys.sent_msg(N1, N2),
+            ),
+            # Implies(
+            #     And(
+            #         self.sys.obedient(N1),
+            #         self.sys.sent_msg(N1, N2),
+            #         Not(self.sys.rcv_init(N1)),
+            #     ),
+            #     Exists(
+            #         A,
+            #         ForAll(
+            #             M, Implies(self.sys.member_a(M, A), self.sys.sent_msg_proj(M))
+            #         ),
+            #     ),
+            # ),
+            # Implies(
+            #     And(self.sys.obedient(N1), self.sys.accept(N1)),
+            #     Exists(
+            #         B,
+            #         ForAll(
+            #             M, Implies(self.sys.member_b(M, B), self.sys.sent_msg_proj(M))
+            #         ),
+            #     ),
+            # ),
+            # Implies(
+            #     Exists(
+            #         A,
+            #         ForAll(
+            #             M,
+            #             Implies(
+            #                 And(self.sys.member_a(M, A), self.sys.obedient(M)),
+            #                 self.sys.sent_msg_proj(M),
+            #             ),
+            #         ),
+            #     ),
+            #     Exists(N, And(self.sys.obedient(N), self.sys.rcv_init(N))),
+            # ),
         )
 
     # intuition:
@@ -679,10 +767,10 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
         return self.timer_rank(self.recv_formula, self.correct_sent_not_recv, None)
 
     def exists_correct_accept(self) -> BoolRef:
-        N = Node('N')
+        N = Node("N")
         return Exists(N, And(self.sys.correct(N), self.sys.accept(N)))
 
-    def timer_exists_correct_accept(self) -> Rank: 
+    def timer_exists_correct_accept(self) -> Rank:
         return self.timer_rank(self.exists_correct_accept, None, None)
 
     def rank(self) -> Rank:

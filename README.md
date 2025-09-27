@@ -47,8 +47,9 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
 - [ ] (?) splitting checks for different cases 
-- [ ] (?) Add modified argument and check to see everything is modified
-- [ ] (?) Reusing invariants and ranks between proofs
+- [ ] (?) add modified argument and check to see everything is modified
+- [ ] (?) reusing invariants and ranks between proofs
+- [ ] (?) sometimes a rank decreases for some transition only if it decreases for all transitions - annoying conceptually
 - [ ] (stretch) ability to write unit tests for a spec
 - [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces

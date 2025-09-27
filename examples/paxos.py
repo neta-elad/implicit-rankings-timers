@@ -44,8 +44,6 @@ class PaxosSystem(TransitionSystem):
         Round, Node
     ]  # invariant: one_b_received(R,N) <-> exists R2,V. one_b_max_vote_received(R,N,R2,V)
 
-    # Fairness variables will be added later
-
     @axiom
     def total_order_axioms(self, X: Round, Y: Round, Z: Round) -> BoolRef:
         return And(
@@ -384,6 +382,8 @@ class PaxosProperty(Prop[PaxosSystem]):
 
 
 class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
+
+    # these invariant checks are quite slow.
     @invariant
     def proposal_uniqueness(self, R: Round, V1: Value, V2: Value) -> BoolRef:
         return Implies(
@@ -410,3 +410,28 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             Implies(self.sys.proposal(R, V), self.sys.le(R, self.sys.r0)),
             Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0)),
         )
+
+    # @temporal_invariant
+    def temporal_invariant(self) -> BoolRef:
+        return And(
+            F(self.sys.one_a(self.sys.r0)),
+            F(self.sys.proposed(self.sys.r0)),
+        )
+
+    def one_a_r0_formula(self) -> BoolRef:
+        return self.sys.one_a(self.sys.r0)
+
+    def one_a_r0_timer_rank(self) -> Rank:
+        return self.timer_rank(self.one_a_r0_formula, None, None)
+
+    def proposed_r0_formula(self) -> BoolRef:
+        return self.sys.proposed(self.sys.r0)
+
+    def proposed_r0_timer_rank(self) -> Rank:
+        return self.timer_rank(self.proposed_r0_formula, None, None)
+
+    def rank(self) -> Rank:
+        return PointwiseRank(self.one_a_r0_timer_rank(), self.proposed_r0_timer_rank())
+
+
+PaxosProof().check()
