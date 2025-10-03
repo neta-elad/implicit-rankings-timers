@@ -70,7 +70,7 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
 
     def position_of_ptr(self) -> Rank:
-        return PosInOrderRank(self.sys.le, self.sys.ptr)
+        return PosInOrderRank(self.sys.ptr, self.sys.le)
 
     def x_was_last_1(self, i: Index) -> BoolRef:
         return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i == self.sys.ptr))

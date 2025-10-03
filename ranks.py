@@ -107,7 +107,8 @@ class WellFoundedSC(SoundnessCondition):
 
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
         rel = self.order(ts)
-        return rel.well_founded()
+        sort, *_ = rel.signature
+        return sort.finite() or rel.well_founded()
 
 
 @dataclass(frozen=True)
@@ -368,8 +369,8 @@ class BinRank(Rank):
 
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
-    order_like: RelLike[T]
     term_src: TermLike[T]
+    order_like: RelLike[T]
 
     @cached_property
     def term(self) -> TSTerm[T]:
@@ -1045,11 +1046,11 @@ def timer_rank[*Ts](
 ) -> Rank:
     if alpha is None:
         return DomainPointwiseRank.close(
-            PosInOrderRank(ts_rel(lambda ts: timer_order()), term), finite_lemma
+            PosInOrderRank(term, ts_rel(lambda ts: timer_order())), finite_lemma
         )
     # assert term.spec == alpha.spec, f"Mismatch in params"
     return DomainPointwiseRank.close(
-        CondRank(PosInOrderRank(ts_rel(lambda ts: timer_order()), term), alpha),
+        CondRank(PosInOrderRank(term, ts_rel(lambda ts: timer_order())), alpha),
         finite_lemma,
     )
 

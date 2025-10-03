@@ -336,8 +336,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             print("fail: conserved")
             return False
 
-        if not self._check_decrease():
-            print("fail: decrease")
+        if not self._check_decreases():
+            print("fail: decreases")
             return False
 
         if not self._check_soundness():
@@ -364,7 +364,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             )
         return all(results)
 
-    def _check_decrease(self) -> bool:
+    def _check_decreases(self) -> bool:
         results = []
         for name, trans in self.transitions.items():
             results.append(

@@ -139,10 +139,10 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         return G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
 
     def position_of_m(self) -> Rank:
-        return PosInOrderRank(self.sys.lt, self.sys.m)
+        return PosInOrderRank(self.sys.m, self.sys.lt)
 
     def position_of_n(self) -> Rank:
-        return PosInOrderRank(self.sys.lt, self.sys.n)
+        return PosInOrderRank(self.sys.n, self.sys.lt)
 
     # this is a way more complicated one that also works? why?
     def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
