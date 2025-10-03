@@ -32,13 +32,13 @@ For a simple example, check out the `examples/trivial_termination.py` file.
 - [ ] prove all examples.
 - [ ] Figure out how to use Pos - see below.
 - [ ] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
-- [ ] Implementing hints for existentially quantified constructors, including soundness conditions.
-    DomPW 
-    [{}, {}, {}] - options for exists y disjunctively
-    DomPermPW
-    [ ([{},{}] , [{},{}], {}), ([{},{}] , [{},{}], {}) ]
-    Soundness
-    [ [{},{}] , [{},{}] ]
+- [ ] Implementing hints for existentially quantified constructors, including soundness conditions. 
+  - DomPW
+  - [{}, {}, {}] - options for exists y disjunctively 
+  - DomPermPW
+  - [ ([{},{}] , [{},{}], {}), ([{},{}] , [{},{}], {}) ]
+  - Soundness
+  - [ [{},{}] , [{},{}] ]
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] In readme, write list of all features

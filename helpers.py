@@ -1,9 +1,10 @@
 import io
 from collections.abc import Iterable
 from dataclasses import dataclass
+from enum import Flag, auto
 from functools import cached_property
 from pathlib import Path
-from typing import cast
+from typing import cast, Literal
 
 import z3
 
@@ -265,3 +266,42 @@ def unpack_quantifier(
     )  # Z3 uses vars in reverse order
 
     return bounding_vars, body
+
+
+type InstantiationMode = Literal["exists", "forall", "both"]
+
+
+def instantiate[T: z3.ExprRef](
+    expr: T,
+    instantiations: dict[str, z3.ExprRef],
+    mode: InstantiationMode = "both",
+) -> T:
+    def do_instantiate(
+        expr_: z3.ExprRef, instants: dict[str, z3.ExprRef]
+    ) -> z3.ExprRef:
+        if z3.is_quantifier(expr_):
+            variables, body = unpack_quantifier(expr_)
+            names = {str(var): var for var in variables}
+            instants_left = {
+                name: value for name, value in instants.items() if name not in names
+            }
+            if mode == "both" or (expr_.is_exists() == (mode == "exists")):
+                subs = [
+                    (names[name], value)
+                    for name, value in instants.items()
+                    if name in names
+                ]
+                body = z3.substitute(body, *subs)
+                variables_left = [
+                    var for name, var in names.items() if name not in instants
+                ]
+                body = cast(z3.BoolRef, do_instantiate(body, instants_left))
+                return quantify(expr_.is_forall(), variables_left, body)
+            else:  # remove bound variables
+                body = cast(z3.BoolRef, do_instantiate(body, instants_left))
+                return quantify(expr_.is_forall(), variables, body)
+        decl = expr_.decl()
+        children = [do_instantiate(child, instants) for child in expr_.children()]
+        return decl(*children)
+
+    return cast(T, do_instantiate(expr, instantiations))

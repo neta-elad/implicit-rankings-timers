@@ -1,5 +1,5 @@
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Iterable, Mapping
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
 from inspect import signature
@@ -14,6 +14,7 @@ from typing import (
     TypeAliasType,
     cast,
     Protocol,
+    overload,
 )
 
 import z3
@@ -24,8 +25,9 @@ from helpers import (
     print_model_in_order,
     sat_check,
     print_unsat_core,
+    unpack_quantifier,
 )
-from typed_z3 import Fun, Expr, Sort, Bool
+from typed_z3 import Fun, Expr, Sort
 
 
 class BaseTransitionSystem(ABC):
@@ -160,12 +162,18 @@ class BaseTransitionSystem(ABC):
             return False
 
 
-type TypedTerm[T: BaseTransitionSystem, *Ts, R: z3.ExprRef] = Callable[[T, *Ts], R]
-type BoundTypedTerm[*Ts, R: z3.ExprRef] = Callable[[*Ts], R]
-type TypedFormula[T: BaseTransitionSystem, *Ts] = TypedTerm[T, *Ts, z3.BoolRef]
+type TypedTerm[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef] = Callable[[TR, *Ts], E]
+type BoundTypedTerm[*Ts, E: z3.ExprRef] = Callable[[*Ts], E]
+type ErasedBoundTypedTerm[E: z3.ExprRef] = Callable[..., E]
+
+type TypedFormula[TR: BaseTransitionSystem, *Ts] = TypedTerm[TR, *Ts, z3.BoolRef]
 type BoundTypedFormula[*Ts] = BoundTypedTerm[*Ts, z3.BoolRef]
-type ErasedBoundTypedFormula = Callable[..., z3.BoolRef]
+
+type ErasedBoundTypedFormula = ErasedBoundTypedTerm[z3.BoolRef]
+
 type RawTSTerm[T] = Callable[[BaseTransitionSystem, Params], T]
+
+
 type Immutable[T] = Annotated[T, "immutable"]
 
 
@@ -210,10 +218,15 @@ class ParamSpec(dict[str, Sort]):
         return [sort(param + suffix) for param, sort in self.items()]
 
 
+from typing import TypeVar, Generic
+
+_T = TypeVar("_T", covariant=True, default=z3.ExprRef, bound=z3.ExprRef)
+
+
 @dataclass(frozen=True)
-class TSTerm[T: z3.ExprRef = z3.ExprRef]:
+class TSTerm(Generic[_T]):
     spec: ParamSpec
-    fun: RawTSTerm[T]
+    fun: RawTSTerm[_T]
     name: str
 
     @cached_property
@@ -232,17 +245,19 @@ class TSTerm[T: z3.ExprRef = z3.ExprRef]:
             self.name + "'",
         )
 
-    def __call__(self, ts: BaseTransitionSystem, params: Params | None = None) -> T:
+    def __call__(self, ts: BaseTransitionSystem, params: Params | None = None) -> _T:
         return self.fun(ts, params or self.params)
 
 
-@dataclass(frozen=True)
-class TSFormula(TSTerm[z3.BoolRef]):
-    def forall(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(True, self.spec.consts(), self(ts), qid=self.name)
+type TSFormula = TSTerm[z3.BoolRef]
 
-    def exists(self, ts: BaseTransitionSystem) -> z3.BoolRef:
-        return quantify(False, self.spec.consts(), self(ts), qid=self.name)
+
+def universal_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
+    return quantify(True, formula.spec.consts(), formula(ts), qid=formula.name)
+
+
+def existential_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
+    return quantify(False, formula.spec.consts(), formula(ts), qid=formula.name)
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
@@ -287,20 +302,21 @@ class TransitionSystem(BaseTransitionSystem, ABC):
     def inits(self) -> dict[str, z3.BoolRef]:
         inits: dict[str, z3.BoolRef] = {}
         for name, method in _get_methods(self, _TS_INIT):
-            inits[name] = method.forall(self)
+            inits[name] = universal_closure(method, self)
         return inits
 
     @cached_property
     def axioms(self) -> dict[str, z3.BoolRef]:
         return {
-            name: method.forall(self) for name, method in _get_methods(self, _TS_AXIOM)
+            name: universal_closure(method, self)
+            for name, method in _get_methods(self, _TS_AXIOM)
         }
 
     @cached_property
     def transitions(self) -> dict[str, z3.BoolRef]:
         transitions: dict[str, z3.BoolRef] = {}
         for name, method in _get_methods(self, _TS_TRANSITION):
-            transitions[name] = method.exists(self)
+            transitions[name] = existential_closure(method, self)
         return transitions
 
 
@@ -376,12 +392,90 @@ class UnionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
         return self.left.transitions | self.right.transitions
 
 
-def ts_formula[T: BaseTransitionSystem, *Ts](
-    formula: TypedFormula[T, *Ts],
-) -> TSFormula:
-    spec = get_spec(formula, z3.BoolRef, Bool)
-    raw_term = compile_with_spec(formula, spec)
-    return TSFormula(spec, raw_term, formula.__name__)
+@overload
+def ts_term2[E: z3.ExprRef](term: TSTerm[E], /) -> TSTerm[E]: ...
+
+
+@overload
+def ts_term2[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef](
+    term: Callable[[TR, *Ts], E], /
+) -> TSTerm[E]: ...
+
+
+@overload
+def ts_term2[*Ts, E: z3.ExprRef](term: Callable[[*Ts], E], /) -> TSTerm[E]: ...
+
+
+@overload
+def ts_term2[E: z3.ExprRef](term: E, /, **kwargs: Sort) -> TSTerm[E]: ...
+
+
+@overload
+def ts_term2[E: z3.ExprRef](term: E, spec: ParamSpec, /) -> TSTerm[E]: ...
+
+
+@overload
+def ts_term2[E: z3.ExprRef](term: E, /, *args: Expr) -> TSTerm[E]: ...
+
+
+# @overload
+# def ts_term2[*Ts, E: Expr](term: Fun[*Ts, E], /, *args: *Ts) -> TSTerm[E]: ...
+
+
+def ts_term2(term: Any, /, *args: Any, **kwargs: Any) -> TSTerm[Any]:
+    if isinstance(term, TSTerm):
+        return term
+    # elif isinstance(term, Fun):
+    #     return _ts_term_from_fun(term, _spec_for_term(args, kwargs))
+    elif callable(term) and not isinstance(term, MethodType):
+        return _ts_term_from_unbound(term)
+    elif callable(term):
+        return _ts_term_from_bound(term)
+
+    assert isinstance(term, z3.ExprRef)
+    return _ts_term_from_expr(term, _spec_for_term(args, kwargs))
+
+
+def _spec_for_term(args: tuple[Expr, ...], kwargs: dict[str, Sort]) -> ParamSpec:
+    if len(args) == 1 and isinstance(args[0], ParamSpec):
+        return args[0]
+    if args:
+        kwargs = {str(arg): arg.__class__ for arg in args}
+
+    return ParamSpec(**kwargs)
+
+
+def _ts_term_from_unbound[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef](
+    term: Callable[[TR, *Ts], E],
+) -> TSTerm[E]:
+    return ts_term(term)
+
+
+def _ts_term_from_bound[*Ts, E: z3.ExprRef](term: Callable[[*Ts], E]) -> TSTerm[E]:
+    return ts_term(unbind(term))
+
+
+def _ts_term_from_expr[E: z3.ExprRef](expr: E, spec: ParamSpec) -> TSTerm[E]:
+    def raw_term(ts: BaseTransitionSystem, params: Params) -> E:
+        return substitute(expr, ts, params)
+
+    return TSTerm(spec, raw_term, str(expr))
+
+
+def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm[E]:
+    fun_name = str(fun)
+
+    def raw_term(ts: BaseTransitionSystem, params: Params) -> E:
+        args = [params[name] for name in spec]
+        fun_decl = fun.fun
+        if fun_name in ts.symbols:
+            fun_decl = ts.symbols[fun_name]
+        return cast(E, fun_decl(*args))
+
+    return TSTerm(spec, raw_term, fun_name)
+
+
+type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
 
 
 def ts_term[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
@@ -490,7 +584,7 @@ def _get_methods(
             and hasattr(attr, _TS_METADATA)
             and getattr(attr, _TS_METADATA) is marker
         ):
-            yield name, ts_formula(attr)
+            yield name, ts_term(attr)
 
 
 def _resolve_type(t: Any) -> type:
@@ -499,3 +593,27 @@ def _resolve_type(t: Any) -> type:
     elif isinstance(t, type):
         return t
     assert False, f"Unresolvable type {t}"
+
+
+def substitute[T: z3.ExprRef](
+    expr: T, ts: BaseTransitionSystem, params: Params | None = None
+) -> T:
+    if params is None:
+        params = cast(Params, {})
+
+    def do_substitute(expr_: z3.ExprRef) -> z3.ExprRef:
+        if z3.is_quantifier(expr_):
+            variables, body = unpack_quantifier(expr_)
+            body = cast(z3.BoolRef, do_substitute(body))
+            return quantify(expr_.is_forall(), variables, body)
+        decl = expr_.decl()
+        name = str(decl)
+        children = [do_substitute(child) for child in expr_.children()]
+        if decl.kind() == z3.Z3_OP_UNINTERPRETED:
+            if decl.arity() == 0 and name in params:
+                return params[name]
+            if name in ts.symbols:
+                return ts.symbols[name](*children)
+        return decl(*children)
+
+    return cast(T, do_substitute(expr))

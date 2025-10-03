@@ -22,7 +22,6 @@ class TrivialTerminationSystem(TransitionSystem):
         return And(
             # updates
             self.on.update({(t,): false}),
-            # self.on.update(lambda old, new, T: new(T) == And(old(T), T != t)),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
         )

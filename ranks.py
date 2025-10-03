@@ -1,12 +1,13 @@
+import operator
 from abc import ABC, abstractmethod
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
-from functools import cached_property
-from typing import cast, Any
+from functools import cached_property, reduce
+from typing import cast, Any, overload
 
 import z3
 
-from helpers import order_lt, minimal_in_order_lt, quantify
+from helpers import order_lt, minimal_in_order_lt, quantify, instantiate
 from timers import timer_order, Time
 from ts import (
     BaseTransitionSystem,
@@ -15,14 +16,29 @@ from ts import (
     TSTerm,
     BoundTypedFormula,
     unbind,
-    ts_formula,
     BoundTypedTerm,
     ts_term,
     ErasedBoundTypedFormula,
     Params,
     RawTSTerm,
+    universal_closure,
+    TermLike,
+    ts_term2,
 )
 from typed_z3 import Expr, Rel, Sort
+
+
+type Hint = Mapping[str, TSTerm]
+type DomainPointwiseHints = list[Hint]
+type LeftHint = list[Hint]
+type RightHint = list[Hint]
+type DomainPermutedConservedHint = tuple[LeftHint, RightHint]
+type DomainPermutedConservedHints = list[DomainPermutedConservedHint]
+type DomainPermutedDecreasedHint = tuple[LeftHint, RightHint, Hint]
+type DomainPermutedDecreasedHints = list[DomainPermutedDecreasedHint]
+type FiniteSCHint = list[Hint]
+type FiniteSCHints = list[FiniteSCHint]
+
 
 type _RawTSRel[T: Expr] = Callable[[BaseTransitionSystem], Rel[T, T]]
 
@@ -33,6 +49,51 @@ class TSRel[T: Expr]:
 
     def __call__(self, ts: BaseTransitionSystem) -> Rel[T, T]:
         return self.fun(ts)
+
+
+@overload
+def ts_rel[T: Expr](rel: TSRel[T]) -> TSRel[T]: ...
+
+
+@overload
+def ts_rel[T: Expr](rel: Rel[T, T]) -> TSRel[T]: ...
+
+
+@overload
+def ts_rel[TR: BaseTransitionSystem, T: Expr](
+    rel: Callable[[TR], Rel[T, T]],
+) -> TSRel[T]: ...
+
+
+def ts_rel(rel: Any) -> TSRel[Any]:
+    if isinstance(rel, TSRel):
+        return rel
+    elif isinstance(rel, Rel):
+        return _ts_rel_from_rel(rel)
+    else:
+        return _ts_rel_from_callable(rel)
+
+
+def _ts_rel_from_rel[T: Expr](rel: Rel[T, T]) -> TSRel[T]:
+    name = str(rel)
+
+    def fun(ts: BaseTransitionSystem) -> Rel[T, T]:
+        if name in ts.symbols:
+            return Rel(name, rel.mutable, ts.symbols[name])
+        return rel
+
+    return TSRel(fun)
+
+
+def _ts_rel_from_callable[T: Expr](
+    rel: Callable[[BaseTransitionSystem], Rel[T, T]],
+) -> TSRel[T]:
+    return TSRel(rel)
+
+
+type RelLike[T: Expr] = TSRel[T] | Rel[T, T] | _RawTSRel[T] | Callable[
+    [BaseTransitionSystem], Rel[T, T]
+]
 
 
 class SoundnessCondition(ABC):
@@ -72,12 +133,14 @@ class FiniteSCBySort(SoundnessCondition):
 
 @dataclass(frozen=True)
 class FiniteLemma:
-    alpha_src: ErasedBoundTypedFormula
+    alpha_src: TermLike[z3.BoolRef]
     m: int = 1  # number of elements added initially and in each transition
+    init_hints: FiniteSCHints | None = None
+    tr_hints: FiniteSCHints | None = None
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_formula(unbind(self.alpha_src))
+        return ts_term2(self.alpha_src)
 
 
 @dataclass(frozen=True)
@@ -92,7 +155,7 @@ class FiniteSCByAlpha(SoundnessCondition):
     @cached_property
     def beta(self) -> TSFormula:
         theta_min = self.rank.minimal
-        return TSFormula(
+        return TSTerm(
             theta_min.spec,
             lambda ts, params: z3.Not(theta_min(ts, params)),
             f"beta_<{theta_min.name}>",
@@ -104,13 +167,39 @@ class FiniteSCByAlpha(SoundnessCondition):
 
     @cached_property
     def beta_implies_alpha(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.alpha.spec,
             lambda ts, params: z3.Implies(
                 self.beta(ts, params), self.alpha(ts, params)
             ),
             f"beta->alpha_<{self.rank}>",
         )
+
+    def exists_ys_with_hints(
+        self, ts: BaseTransitionSystem, body: z3.BoolRef, hints: FiniteSCHints | None
+    ) -> z3.BoolRef:
+        ys = [
+            [sort(f"{param}_{i}") for param, sort in self.spec.items()]
+            for i in range(self.lemma.m)
+        ]
+
+        formula = z3.Exists([y for y_tuple in ys for y in y_tuple], body)
+
+        if hints is None:
+            return formula
+
+        def one_instantiation(hint_set: FiniteSCHint) -> z3.BoolRef:
+            instantiation_params = reduce(
+                operator.or_,
+                (
+                    _hint_to_params(ts, cast(Params, {}), hint, f"_{i}")
+                    for i, hint in enumerate(hint_set)
+                ),
+            )
+            instantiations = {name: var for name, var in instantiation_params.items()}
+            return instantiate(formula, instantiations)
+
+        return z3.Or(*(one_instantiation(hint_set) for hint_set in hints))
 
     def at_most_m_alpha_at_init(self, ts: BaseTransitionSystem) -> z3.BoolRef:
         ys = [
@@ -120,21 +209,20 @@ class FiniteSCByAlpha(SoundnessCondition):
 
         params = self.spec.consts()
 
-        return z3.Exists(
-            [y for y_tuple in ys for y in y_tuple],
-            z3.ForAll(
-                params,
-                z3.Implies(
-                    self.alpha(ts),
-                    z3.Or(
-                        *(
-                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
-                            for y_tuple in ys
-                        )
-                    ),
+        body = z3.ForAll(
+            params,
+            z3.Implies(
+                self.alpha(ts),
+                z3.Or(
+                    *(
+                        z3.And(*(param == y for param, y in zip(params, y_tuple)))
+                        for y_tuple in ys
+                    )
                 ),
             ),
         )
+
+        return self.exists_ys_with_hints(ts, body, self.lemma.init_hints)
 
     def at_most_m_alpha_added(self, ts: BaseTransitionSystem) -> z3.BoolRef:
         ys = [
@@ -144,28 +232,28 @@ class FiniteSCByAlpha(SoundnessCondition):
 
         params = self.spec.consts()
 
-        return z3.Exists(
-            [y for y_tuple in ys for y in y_tuple],
-            z3.ForAll(
-                params,
-                z3.Implies(
-                    self.alpha(ts.next),
-                    z3.Or(
-                        self.alpha(ts),
-                        *(
-                            z3.And(*(param == y for param, y in zip(params, y_tuple)))
-                            for y_tuple in ys
-                        ),
+        body = z3.ForAll(
+            params,
+            z3.Implies(
+                self.alpha(ts.next),
+                z3.Or(
+                    self.alpha(ts),
+                    *(
+                        z3.And(*(param == y for param, y in zip(params, y_tuple)))
+                        for y_tuple in ys
                     ),
                 ),
             ),
         )
 
+        return self.exists_ys_with_hints(ts, body, self.lemma.tr_hints)
+
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
+        ts_formula = self.beta_implies_alpha
         if not ts.check_and_print(
             self.beta_implies_alpha.name,
             invariant,
-            z3.Not(self.beta_implies_alpha.forall(ts)),
+            z3.Not(universal_closure(ts_formula, ts)),
         ):
             return False
         self.at_most_m_alpha_at_init(ts)
@@ -235,11 +323,11 @@ class Rank(ClosedRank, ABC):
 
 @dataclass(frozen=True)
 class BinRank(Rank):
-    alpha_src: ErasedBoundTypedFormula
+    alpha_src: TermLike[z3.BoolRef]
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_formula(unbind(self.alpha_src))
+        return ts_term2(self.alpha_src)
 
     @property
     def spec(self) -> ParamSpec:
@@ -247,7 +335,7 @@ class BinRank(Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Implies(
                 z3.Not(self.alpha(ts, params)), z3.Not(self.alpha.next(ts, params))
@@ -257,7 +345,7 @@ class BinRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.Not(self.alpha(ts, params)),
             f"{self}_<minimal>",
@@ -269,7 +357,7 @@ class BinRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 self.alpha(ts, params),
@@ -285,14 +373,16 @@ class BinRank(Rank):
 
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
-    order: TSRel[T]
-    term_src: BoundTypedTerm[Any, T] | TSTerm[T]
+    order_like: RelLike[T]
+    term_src: TermLike[T]
 
     @cached_property
     def term(self) -> TSTerm[T]:
-        if isinstance(self.term_src, TSTerm):
-            return self.term_src
-        return ts_term(unbind(self.term_src))
+        return ts_term2(self.term_src)
+
+    @cached_property
+    def order(self) -> TSRel[T]:
+        return ts_rel(self.order_like)
 
     @property
     def spec(self) -> ParamSpec:
@@ -300,7 +390,7 @@ class PosInOrderRank[T: Expr](Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 order_lt(self.order(ts)),
@@ -317,7 +407,7 @@ class PosInOrderRank[T: Expr](Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: minimal_in_order_lt(
                 self.term(ts, params), self.order(ts)
@@ -331,7 +421,7 @@ class PosInOrderRank[T: Expr](Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 order_lt(self.order(ts)),
@@ -362,7 +452,7 @@ class LexRank(Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
                 self.decreased(ts, params),
@@ -373,7 +463,7 @@ class LexRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.And(
                 *(rank.minimal(ts, params) for rank in self.ranks)
@@ -387,7 +477,7 @@ class LexRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
                 *(
@@ -427,7 +517,7 @@ class PointwiseRank(Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 *(rank.conserved(ts, params) for rank in self.ranks)
@@ -437,7 +527,7 @@ class PointwiseRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.And(
                 *(rank.minimal(ts, params) for rank in self.ranks)
@@ -451,7 +541,7 @@ class PointwiseRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 z3.Or(*(rank.decreased(ts, params) for rank in self.ranks)),
@@ -467,11 +557,11 @@ class PointwiseRank(Rank):
 @dataclass(frozen=True)
 class CondRank(Rank):
     rank: Rank
-    alpha_src: ErasedBoundTypedFormula
+    alpha_src: TermLike[z3.BoolRef]
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_formula(unbind(self.alpha_src))
+        return ts_term2(self.alpha_src)
 
     def __post_init__(self) -> None:
         assert (
@@ -484,7 +574,7 @@ class CondRank(Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
                 z3.Not(self.alpha.next(ts, params)),
@@ -499,7 +589,7 @@ class CondRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.Not(self.alpha(ts, params)),
             f"{self}_<minimal>",
@@ -511,7 +601,7 @@ class CondRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
                 z3.And(self.alpha(ts, params), z3.Not(self.alpha.next(ts, params))),
@@ -533,6 +623,7 @@ class DomainPointwiseRank(Rank):
     rank: Rank
     quant_spec: ParamSpec
     finite_lemma: FiniteLemma | None
+    decreased_hints: DomainPointwiseHints | None = None
 
     @classmethod
     def close(cls, rank: Rank, finite_lemma: FiniteLemma | None) -> Rank:
@@ -555,7 +646,7 @@ class DomainPointwiseRank(Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.ForAll(
                 self.quant_spec.consts(),
@@ -569,7 +660,7 @@ class DomainPointwiseRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.ForAll(
                 self.quant_spec.consts(),
@@ -591,19 +682,35 @@ class DomainPointwiseRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
-                z3.Exists(
-                    self.quant_spec.consts(),
-                    self.rank.decreased(
-                        ts,
-                        params | self.quant_spec.params() | self.quant_spec.params("'"),
-                    ),
-                ),
+                self.exists_with_hints(ts, params),
             ),
             f"{self}_<decreased>",
+        )
+
+    def exists_with_hints(self, ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
+        if self.decreased_hints is None:
+            return z3.Exists(
+                self.quant_spec.consts(),
+                self.rank.decreased(
+                    ts,
+                    params | self.quant_spec.params() | self.quant_spec.params("'"),
+                ),
+            )
+
+        return z3.Or(
+            *(
+                self.rank.decreased(
+                    ts,
+                    params
+                    | _hint_to_params(ts, params, hint)
+                    | _hint_to_params(ts, params, hint, "'"),
+                )
+                for hint in self.decreased_hints
+            )
         )
 
     def __str__(self) -> str:
@@ -613,9 +720,13 @@ class DomainPointwiseRank(Rank):
 @dataclass(frozen=True)
 class DomainLexRank(Rank):
     rank: Rank
-    order: TSRel[Any]
+    order_like: RelLike[Any]
     param: tuple[str, Sort]
     finite_lemma: FiniteLemma | None = None
+
+    @cached_property
+    def order(self) -> TSRel[Any]:
+        return ts_rel(self.order_like)
 
     @property
     def quant_spec(self) -> ParamSpec:
@@ -635,7 +746,7 @@ class DomainLexRank(Rank):
     def conserved(self) -> TSFormula:
         y0 = self.param[1]("y0")
         y = self.param[1]("y")
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 order_lt(self.order(ts)),
@@ -666,7 +777,7 @@ class DomainLexRank(Rank):
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.ForAll(
                 self.quant_spec.consts(),
@@ -688,7 +799,7 @@ class DomainLexRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 self.conserved(ts, params),
@@ -711,8 +822,10 @@ class DomainLexRank(Rank):
 class DomainPermutedRank(Rank):
     rank: Rank
     ys: ParamSpec
-    k: int = 1
-    finite_lemma: FiniteLemma | None = None
+    k: int
+    finite_lemma: FiniteLemma | None
+    conserved_hints: DomainPermutedConservedHints | None = None
+    decreased_hints: DomainPermutedDecreasedHints | None = None
 
     @cached_property
     def ys_left_right(self) -> list[tuple[dict[str, Expr], dict[str, Expr]]]:
@@ -732,7 +845,7 @@ class DomainPermutedRank(Rank):
                     ys[name] == right[name],
                     left[name],
                     z3.If(ys[name] == left[name], right[name], param),
-                )  # FIXED BUG here
+                )
                 for name, param in ys_sigma.items()
             }
         return ys_sigma
@@ -767,28 +880,123 @@ class DomainPermutedRank(Rank):
                     for j, (left_j, right_j) in enumerate(self.ys_left_right)
                     if i < j
                 ),
-                alpha(ts, params),
+                alpha(ts, params | self.ys.prime(self.ys_sigma)),
             ),
         )
 
-    @property
-    def conserved(self) -> TSFormula:
-        return TSFormula(
-            self.spec,
-            self.exists_permutation(
-                lambda ts, params: z3.ForAll(
-                    self.ys.consts(),
-                    self.rank.conserved(
-                        ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+    def exists_permutation_conserved(self) -> RawTSTerm[z3.BoolRef]:
+        alpha = lambda ts, params: z3.ForAll(
+            self.ys.consts(),
+            self.rank.conserved(ts, params | self.ys.params()),
+        )
+
+        def formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
+            result = self.exists_permutation(alpha)(ts, params)
+            if self.conserved_hints is None:
+                return result
+
+            def hinted_exists_permutation(
+                ts: BaseTransitionSystem,
+                params: Params,
+                hint: DomainPermutedConservedHint,
+            ) -> z3.BoolRef:
+                left_hint, right_hint = hint
+                left_params = reduce(
+                    operator.or_,
+                    (
+                        _hint_to_params(ts, params, hint, f"-left-{i + 1}")
+                        for i, hint in enumerate(left_hint)
                     ),
                 )
+                right_params = reduce(
+                    operator.or_,
+                    (
+                        _hint_to_params(ts, params, hint, f"-right-{i + 1}")
+                        for i, hint in enumerate(right_hint)
+                    ),
+                )
+                instantiations = {
+                    name: var for name, var in (left_params | right_params).items()
+                }
+                return instantiate(result, instantiations)
+
+            return z3.Or(
+                *(
+                    hinted_exists_permutation(ts, params, hint)
+                    for hint in self.conserved_hints
+                )
+            )
+
+        return formula
+
+    def exists_permutation_decreased(self) -> RawTSTerm[z3.BoolRef]:
+        alpha = lambda ts, params: z3.And(
+            z3.ForAll(
+                self.ys.consts(),
+                self.rank.conserved(
+                    ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                ),
             ),
+            z3.Exists(
+                self.ys.consts(),
+                self.rank.decreased(
+                    ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                ),
+            ),
+        )
+
+        def formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
+            result = self.exists_permutation(alpha)(ts, params)
+            if self.decreased_hints is None:
+                return result
+
+            def hinted_exists_permutation(
+                ts: BaseTransitionSystem,
+                params: Params,
+                hint: DomainPermutedDecreasedHint,
+            ) -> z3.BoolRef:
+                left_hint, right_hint, ys_hint = hint
+                left_params = reduce(
+                    operator.or_,
+                    (
+                        _hint_to_params(ts, params, hint, f"-left-{i + 1}")
+                        for i, hint in enumerate(left_hint)
+                    ),
+                )
+                right_params = reduce(
+                    operator.or_,
+                    (
+                        _hint_to_params(ts, params, hint, f"-right-{i + 1}")
+                        for i, hint in enumerate(right_hint)
+                    ),
+                )
+                ys_params = _hint_to_params(ts, params, ys_hint)
+                instantiations = {
+                    name: var
+                    for name, var in (left_params | right_params | ys_params).items()
+                }
+                return instantiate(result, instantiations)
+
+            return z3.Or(
+                *(
+                    hinted_exists_permutation(ts, params, hint)
+                    for hint in self.decreased_hints
+                )
+            )
+
+        return formula
+
+    @property
+    def conserved(self) -> TSFormula:
+        return TSTerm(
+            self.spec,
+            self.exists_permutation_conserved(),
             f"{self}_<conserved>",
         )
 
     @property
     def minimal(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             lambda ts, params: z3.ForAll(
                 self.ys.consts(),
@@ -810,7 +1018,7 @@ class DomainPermutedRank(Rank):
 
     @property
     def decreased(self) -> TSFormula:
-        return TSFormula(
+        return TSTerm(
             self.spec,
             self.exists_permutation(
                 lambda ts, params: z3.And(
@@ -835,14 +1043,10 @@ class DomainPermutedRank(Rank):
         return f"DomPerm({self.rank}, {self.ys}, {self.k})"
 
 
-def ts_rel[T: BaseTransitionSystem, R: Expr](rel: Callable[[T], Rel[R, R]]) -> TSRel[R]:
-    return TSRel[R](cast(_RawTSRel[R], rel))
-
-
 def timer_rank[*Ts](
     finite_lemma: FiniteLemma | None,
-    term: BoundTypedTerm[*Ts, Time] | TSTerm[Time],
-    alpha: BoundTypedFormula[*Ts] | None = None,
+    term: TermLike[Time],
+    alpha: TermLike[z3.BoolRef] | None = None,
 ) -> Rank:
     if alpha is None:
         return DomainPointwiseRank.close(
@@ -853,3 +1057,9 @@ def timer_rank[*Ts](
         CondRank(PosInOrderRank(ts_rel(lambda ts: timer_order()), term), alpha),
         finite_lemma,
     )
+
+
+def _hint_to_params(
+    ts: BaseTransitionSystem, params: Params, hint: Hint, suffix: str = ""
+) -> Params:
+    return {f"{key}{suffix}": term(ts, params) for key, term in hint.items()}

@@ -284,7 +284,14 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         )
 
     def rk1(self) -> Rank:
-        return self.timer_rank(self.locked, None, None)
+        return self.timer_rank(
+            And(
+                self.sys.pc2(self.skolem_thread),
+                G(Not(self.sys.pc3(self.skolem_thread))),
+            ),
+            None,
+            None,
+        )
 
     def rk2_body(self, k: Ticket) -> BoolRef:
         X = Ticket("X")

@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, cast, Any, Self, get_type_hints, get_origin
+from typing import ClassVar, cast, Any, Self
 
 import z3
 
@@ -13,7 +13,6 @@ from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_ze
 from ts import (
     BaseTransitionSystem,
     IntersectionTransitionSystem,
-    ts_formula,
     TSFormula,
     TransitionSystem,
     BoundTypedFormula,
@@ -22,6 +21,11 @@ from ts import (
     TSTerm,
     ParamSpec,
     UnionTransitionSystem,
+    universal_closure,
+    existential_closure,
+    ts_term,
+    TermLike,
+    ts_term2,
 )
 from typed_z3 import Bool, Expr, Sort
 
@@ -83,7 +87,8 @@ class TemporalWitness:
         return self.sort(self.name, False)  # type: ignore
 
     def source(self, sys: BaseTransitionSystem) -> z3.BoolRef:
-        return self.formula.exists(sys)
+        ts_formula = self.formula
+        return existential_closure(ts_formula, sys)
 
     def instantiated(self, sys: BaseTransitionSystem) -> z3.BoolRef:
         return self.formula(sys, {self.param: self.symbol})
@@ -228,14 +233,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     @cached_property
     def invariants(self) -> dict[str, z3.BoolRef]:
         return {
-            name: method.forall(self)
+            name: universal_closure(method, self)
             for name, method in _get_methods(self, _PROOF_INVARIANT)
         }
 
     @cached_property
     def temporal_invariant_formulas(self) -> dict[str, z3.BoolRef]:
         return {
-            name: method.forall(self.reset)
+            name: universal_closure(method, self.reset)
             for name, method in _get_methods(self, _PROOF_TEMPORAL_INVARIANT)
         }
 
@@ -260,7 +265,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             ), f"Witness method {method_name} must except exactly one argument"
             ((param, sort),) = method.spec.items()
             symbol = sort(witness_name + self.suffix, True)  # type: ignore
-            axiom = z3.Implies(method.exists(self), method(self, {param: symbol}))
+            axiom = z3.Implies(
+                existential_closure(method, self), method(self, {param: symbol})
+            )
             witnesses[witness_name] = (symbol, axiom)
             setattr(self, witness_name, symbol)
         return witnesses
@@ -292,19 +299,15 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def temporal_witness_symbols(self) -> dict[str, z3.FuncDeclRef]:
         return {name: w.symbol.fun_ref for name, w in self.temporal_witnesses.items()}
 
-    def timer_rank[*Ts](
+    def timer_rank(
         self,
-        phi: BoundTypedFormula[*Ts] | Bool,
-        alpha: BoundTypedFormula[*Ts] | None,
+        phi: TermLike[z3.BoolRef],
+        alpha: TermLike[z3.BoolRef] | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
-        if isinstance(phi, Bool):
-            timer_name = f"t_<{phi.const_name}>"
-            spec = ParamSpec()
-        else:
-            ts_phi = ts_formula(unbind(phi))
-            timer_name = f"t_<{nnf(ts_phi(self))}>"
-            spec = ts_phi.spec
+        ts_phi = ts_term2(phi)
+        timer_name = f"t_<{nnf(ts_phi(self))}>"
+        spec = ts_phi.spec
 
         phi_term = self._compile_timer(timer_name, spec)
 
@@ -450,4 +453,4 @@ def _get_methods(ts: Proof[Any], marker: object) -> Iterable[tuple[str, TSFormul
             and hasattr(attr, _PROOF_METADATA)
             and getattr(attr, _PROOF_METADATA) is marker
         ):
-            yield name, ts_formula(attr)
+            yield name, ts_term(attr)

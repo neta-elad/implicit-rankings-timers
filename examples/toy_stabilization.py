@@ -106,9 +106,26 @@ class ToyStabilizationProof(
     def sum_over_j(self) -> Rank:
         return DomainPointwiseRank(self.binary_rank_ij(), ParamSpec(j=Node), None)
 
+    @witness
+    def sched(self, T: Node) -> BoolRef:
+        return self.sys.scheduled(T)
+
+    def sched_term(self) -> Node:
+        return self.sched
+
     # hint should be i = sched (not sure)
     def sum_over_i(self) -> Rank:
-        return DomainPermutedRank(self.sum_over_j(), ParamSpec(i=Node), 1, None)
+        from ts import unbind
+
+        sched_term = ts_term(unbind(self.sched_term))
+        from ranks import DomainPermutedConservedHints
+
+        conserved_hint: DomainPermutedConservedHints = [
+            ([{"i": sched_term}], [{"i": sched_term}])
+        ]
+        return DomainPermutedRank(
+            self.sum_over_j(), ParamSpec(i=Node), 1, None, conserved_hint
+        )
 
     def scheduling_of_token(self) -> BoolRef:
         X = Node("X")
@@ -121,7 +138,8 @@ class ToyStabilizationProof(
         return self.timer_rank(self.scheduling_of_token, None, None)
 
     def rank(self) -> Rank:
-        return LexRank(self.sum_over_i(), self.scheduling_of_token_timer_rank())
+        return self.sum_over_i()
+        # return LexRank(self.sum_over_i(), self.scheduling_of_token_timer_rank())
 
 
 ToyStabilizationProof().check()
