@@ -70,23 +70,14 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
 
     def position_of_ptr(self) -> Rank:
-        def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
-            return self.sys.le
-
-        def ptr_term(self: BinaryCounterProof) -> Index:
-            return self.sys.ptr
-
-        return PosInOrderRank(ts_rel(le_rel), ts_term(ptr_term))
+        return PosInOrderRank(self.sys.le, self.sys.ptr)
 
     def x_was_last_1(self, i: Index) -> BoolRef:
         return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i == self.sys.ptr))
 
     def ghost_array_lex(self) -> Rank:
-        def le_rel(self: BinaryCounterProof) -> Rel[Index, Index]:
-            return self.sys.le
-
         return DomainLexRank(
-            BinRank(self.x_was_last_1), ts_rel(le_rel), ("i", Index), None
+            BinRank(self.x_was_last_1), self.sys.le, ("i", Index), None
         )
 
     def rank(self) -> Rank:

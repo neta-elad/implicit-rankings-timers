@@ -1,6 +1,6 @@
 import operator
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 from functools import cached_property, reduce
 from typing import cast, Any, overload
@@ -14,30 +14,25 @@ from ts import (
     ParamSpec,
     TSFormula,
     TSTerm,
-    BoundTypedFormula,
-    unbind,
-    BoundTypedTerm,
-    ts_term,
-    ErasedBoundTypedFormula,
     Params,
     RawTSTerm,
     universal_closure,
     TermLike,
-    ts_term2,
+    ts_term,
 )
 from typed_z3 import Expr, Rel, Sort
 
 
-type Hint = Mapping[str, TSTerm]
-type DomainPointwiseHints = list[Hint]
-type LeftHint = list[Hint]
-type RightHint = list[Hint]
+type Hint = Mapping[str, TermLike[z3.ExprRef]]
+type DomainPointwiseHints = Sequence[Hint]
+type LeftHint = Sequence[Hint]
+type RightHint = Sequence[Hint]
 type DomainPermutedConservedHint = tuple[LeftHint, RightHint]
-type DomainPermutedConservedHints = list[DomainPermutedConservedHint]
+type DomainPermutedConservedHints = Sequence[DomainPermutedConservedHint]
 type DomainPermutedDecreasedHint = tuple[LeftHint, RightHint, Hint]
-type DomainPermutedDecreasedHints = list[DomainPermutedDecreasedHint]
-type FiniteSCHint = list[Hint]
-type FiniteSCHints = list[FiniteSCHint]
+type DomainPermutedDecreasedHints = Sequence[DomainPermutedDecreasedHint]
+type FiniteSCHint = Sequence[Hint]
+type FiniteSCHints = Sequence[FiniteSCHint]
 
 
 type _RawTSRel[T: Expr] = Callable[[BaseTransitionSystem], Rel[T, T]]
@@ -140,7 +135,7 @@ class FiniteLemma:
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_term2(self.alpha_src)
+        return ts_term(self.alpha_src)
 
 
 @dataclass(frozen=True)
@@ -327,7 +322,7 @@ class BinRank(Rank):
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_term2(self.alpha_src)
+        return ts_term(self.alpha_src)
 
     @property
     def spec(self) -> ParamSpec:
@@ -378,7 +373,7 @@ class PosInOrderRank[T: Expr](Rank):
 
     @cached_property
     def term(self) -> TSTerm[T]:
-        return ts_term2(self.term_src)
+        return ts_term(self.term_src)
 
     @cached_property
     def order(self) -> TSRel[T]:
@@ -561,7 +556,7 @@ class CondRank(Rank):
 
     @cached_property
     def alpha(self) -> TSFormula:
-        return ts_term2(self.alpha_src)
+        return ts_term(self.alpha_src)
 
     def __post_init__(self) -> None:
         assert (
@@ -1062,4 +1057,4 @@ def timer_rank[*Ts](
 def _hint_to_params(
     ts: BaseTransitionSystem, params: Params, hint: Hint, suffix: str = ""
 ) -> Params:
-    return {f"{key}{suffix}": term(ts, params) for key, term in hint.items()}
+    return {f"{key}{suffix}": ts_term(term)(ts, params) for key, term in hint.items()}

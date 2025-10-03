@@ -15,19 +15,16 @@ from ts import (
     IntersectionTransitionSystem,
     TSFormula,
     TransitionSystem,
-    BoundTypedFormula,
-    unbind,
     compile_with_spec,
     TSTerm,
     ParamSpec,
     UnionTransitionSystem,
     universal_closure,
     existential_closure,
-    ts_term,
     TermLike,
-    ts_term2,
+    ts_term,
 )
-from typed_z3 import Bool, Expr, Sort
+from typed_z3 import Expr, Sort
 
 
 class WitnessSystem(BaseTransitionSystem):
@@ -305,7 +302,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         alpha: TermLike[z3.BoolRef] | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
-        ts_phi = ts_term2(phi)
+        ts_phi = ts_term(phi)
         timer_name = f"t_<{nnf(ts_phi(self))}>"
         spec = ts_phi.spec
 

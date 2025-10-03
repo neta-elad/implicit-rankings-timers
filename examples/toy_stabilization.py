@@ -110,19 +110,9 @@ class ToyStabilizationProof(
     def sched(self, T: Node) -> BoolRef:
         return self.sys.scheduled(T)
 
-    def sched_term(self) -> Node:
-        return self.sched
-
     # hint should be i = sched (not sure)
     def sum_over_i(self) -> Rank:
-        from ts import unbind
-
-        sched_term = ts_term(unbind(self.sched_term))
-        from ranks import DomainPermutedConservedHints
-
-        conserved_hint: DomainPermutedConservedHints = [
-            ([{"i": sched_term}], [{"i": sched_term}])
-        ]
+        conserved_hint = [([{"i": self.sched}], [{"i": self.sched}])]
         return DomainPermutedRank(
             self.sum_over_j(), ParamSpec(i=Node), 1, None, conserved_hint
         )

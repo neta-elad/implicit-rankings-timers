@@ -393,36 +393,36 @@ class UnionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
 
 
 @overload
-def ts_term2[E: z3.ExprRef](term: TSTerm[E], /) -> TSTerm[E]: ...
+def ts_term[E: z3.ExprRef](term: TSTerm[E], /) -> TSTerm[E]: ...
 
 
 @overload
-def ts_term2[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef](
+def ts_term[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef](
     term: Callable[[TR, *Ts], E], /
 ) -> TSTerm[E]: ...
 
 
 @overload
-def ts_term2[*Ts, E: z3.ExprRef](term: Callable[[*Ts], E], /) -> TSTerm[E]: ...
+def ts_term[*Ts, E: z3.ExprRef](term: Callable[[*Ts], E], /) -> TSTerm[E]: ...
 
 
 @overload
-def ts_term2[E: z3.ExprRef](term: E, /, **kwargs: Sort) -> TSTerm[E]: ...
+def ts_term[E: z3.ExprRef](term: E, /, **kwargs: Sort) -> TSTerm[E]: ...
 
 
 @overload
-def ts_term2[E: z3.ExprRef](term: E, spec: ParamSpec, /) -> TSTerm[E]: ...
+def ts_term[E: z3.ExprRef](term: E, spec: ParamSpec, /) -> TSTerm[E]: ...
 
 
 @overload
-def ts_term2[E: z3.ExprRef](term: E, /, *args: Expr) -> TSTerm[E]: ...
+def ts_term[E: z3.ExprRef](term: E, /, *args: Expr) -> TSTerm[E]: ...
 
 
 # @overload
 # def ts_term2[*Ts, E: Expr](term: Fun[*Ts, E], /, *args: *Ts) -> TSTerm[E]: ...
 
 
-def ts_term2(term: Any, /, *args: Any, **kwargs: Any) -> TSTerm[Any]:
+def ts_term(term: Any, /, *args: Any, **kwargs: Any) -> TSTerm[Any]:
     if isinstance(term, TSTerm):
         return term
     # elif isinstance(term, Fun):
@@ -448,11 +448,13 @@ def _spec_for_term(args: tuple[Expr, ...], kwargs: dict[str, Sort]) -> ParamSpec
 def _ts_term_from_unbound[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef](
     term: Callable[[TR, *Ts], E],
 ) -> TSTerm[E]:
-    return ts_term(term)
+    spec = get_spec(term, z3.ExprRef)
+    raw_term = compile_with_spec(term, spec)
+    return TSTerm(spec, raw_term, term.__name__)
 
 
 def _ts_term_from_bound[*Ts, E: z3.ExprRef](term: Callable[[*Ts], E]) -> TSTerm[E]:
-    return ts_term(unbind(term))
+    return _ts_term_from_unbound(unbind(term))
 
 
 def _ts_term_from_expr[E: z3.ExprRef](expr: E, spec: ParamSpec) -> TSTerm[E]:
@@ -476,14 +478,6 @@ def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm
 
 
 type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
-
-
-def ts_term[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
-    term: TypedTerm[T, *Ts, R],
-) -> TSTerm[R]:
-    spec = get_spec(term, z3.ExprRef)
-    raw_term = compile_with_spec(term, spec)
-    return TSTerm(spec, raw_term, term.__name__)
 
 
 def unbind[T: BaseTransitionSystem, *Ts, R](

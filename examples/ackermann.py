@@ -139,22 +139,10 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         return G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
 
     def position_of_m(self) -> Rank:
-        def lt_rel(self: AckermannProof) -> Rel[Nat, Nat]:
-            return self.sys.lt
-
-        def ptr_term(self: AckermannProof) -> Nat:
-            return self.sys.m
-
-        return PosInOrderRank(ts_rel(lt_rel), ts_term(ptr_term))
+        return PosInOrderRank(self.sys.lt, self.sys.m)
 
     def position_of_n(self) -> Rank:
-        def lt_rel(self: AckermannProof) -> Rel[Nat, Nat]:
-            return self.sys.lt
-
-        def ptr_term(self: AckermannProof) -> Nat:
-            return self.sys.n
-
-        return PosInOrderRank(ts_rel(lt_rel), ts_term(ptr_term))
+        return PosInOrderRank(self.sys.lt, self.sys.n)
 
     # this is a way more complicated one that also works? why?
     def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
@@ -229,12 +217,8 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     #     )
 
     def stack_appearances_lexicographically(self) -> Rank:
-
-        def lt_rel(self: AckermannProof) -> Rel[Nat, Nat]:
-            return self.sys.lt
-
         return DomainLexRank(
-            self.num_appearances_of_value_or_ghost(), ts_rel(lt_rel), ("Y", Nat)
+            self.num_appearances_of_value_or_ghost(), self.sys.lt, ("Y", Nat)
         )
 
     def rank(self) -> Rank:
