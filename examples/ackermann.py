@@ -1,7 +1,7 @@
 from inspect import stack
 from prelude import *
 
-# @status - It verifies but I'm suspicious, don't know if DomPerm is right!!
+# @status - inv fails
 
 # Ackermann function implementation using a stack-based approach
 # Slightly modified - removed the finish action, instead we prove eventually m=0 and len=0

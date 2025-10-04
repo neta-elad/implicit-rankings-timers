@@ -1,6 +1,6 @@
 from prelude import *
 
-# @status - conserved fail
+# @status - done
 
 
 class Index(Finite): ...

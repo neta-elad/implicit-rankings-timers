@@ -1,6 +1,6 @@
 from prelude import *
 
-# @status - timeout, need hints.
+# @status - inv fails
 
 
 # Leader Election in a Ring, due to Chang and Roberts
