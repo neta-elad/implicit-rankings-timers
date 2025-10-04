@@ -127,7 +127,7 @@ class ToyStabilizationProof(
     def sum_over_i(self) -> Rank:
         conserved_hint = [
             ([{"i": self.sys.sched}], [{"i": self.sys.sched}]),
-            ([{"i": self.sys.sched}], [{"i": self.sys.next_node(self.sys.sched)}])
+            ([{"i": self.sys.sched}], [{"i": self.sys.next_node(self.sys.sched)}]),
         ]
         decreases_hint = [
             (

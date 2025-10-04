@@ -308,6 +308,10 @@ class ClosedRank(ABC):
     @abstractmethod
     def decreases(self) -> TSFormula: ...
 
+    @property
+    @abstractmethod
+    def size(self) -> int: ...
+
 
 class Rank(ClosedRank, ABC):
     @property
@@ -368,6 +372,10 @@ class BinRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1
 
     def __str__(self) -> str:
         return f"Bin({self.alpha.name})"
@@ -431,6 +439,10 @@ class PosInOrderRank[T: Expr](Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1
 
     def __str__(self) -> str:
         return f"Pos({self.term.name})"
@@ -497,6 +509,10 @@ class LexRank(Rank):
             f"{self}_<decreases>",
         )
 
+    @property
+    def size(self) -> int:
+        return 1 + sum(rank.size for rank in self.ranks)
+
     def __str__(self) -> str:
         return f"Lex({", ".join(map(str, self.ranks))})"
 
@@ -551,6 +567,10 @@ class PointwiseRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + sum(rank.size for rank in self.ranks)
 
     def __str__(self) -> str:
         return f"PW({", ".join(map(str, self.ranks))})"
@@ -615,6 +635,10 @@ class CondRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def __str__(self) -> str:
         return f"Cond({self.rank}, {self.alpha.name})"
@@ -692,6 +716,10 @@ class DomainPointwiseRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def exists_with_hints(self, ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
         formula = z3.Exists(
@@ -811,6 +839,10 @@ class DomainLexRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def __str__(self) -> str:
         return f"DomLex({self.rank}, {self.param[0]})"
@@ -1017,6 +1049,10 @@ class DomainPermutedRank(Rank):
             f"{self}_<decreases>",
         )
 
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
+
     def __str__(self) -> str:
         return f"DomPerm({self.rank}, {self.ys}, {self.k})"
 
@@ -1069,23 +1105,69 @@ class TimerPosInOrderRank(Rank):
             f"{self}_<decreases>",
         )
 
+    @property
+    def size(self) -> int:
+        return 1
+
     def __str__(self) -> str:
         return f"TimerPos({self.term.name})"
 
 
-def timer_rank(
-    finite_lemma: FiniteLemma | None,
-    term: TermLike[Time],
-    alpha: TermLike[z3.BoolRef] | None = None,
-) -> Rank:
-    if alpha is None:
-        return DomainPointwiseRank.close(TimerPosInOrderRank(term), finite_lemma)
+@dataclass(frozen=True)
+class TimerRank(Rank):
+    term_like: TermLike[Time]
+    alpha_like: TermLike[z3.BoolRef] | None = None
+    finite_lemma: FiniteLemma | None = None
 
-    assert ts_term(alpha).spec == ts_term(term).spec, f"Mismatch in params"
-    return DomainPointwiseRank.close(
-        CondRank(TimerPosInOrderRank(term), alpha),
-        finite_lemma,
-    )
+    @cached_property
+    def term(self) -> TSTerm[Time]:
+        return ts_term(self.term_like)
+
+    @cached_property
+    def alpha(self) -> TSFormula | None:
+        if self.alpha_like is None:
+            return None
+        return ts_term(self.alpha_like)
+
+    def __post_init__(self) -> None:
+        assert (
+            self.alpha is None or self.term.spec == self.alpha.spec
+        ), f"Mismatch in params"
+
+    @cached_property
+    def rank(self) -> Rank:
+        if self.alpha is None:
+            return DomainPointwiseRank.close(
+                TimerPosInOrderRank(self.term), self.finite_lemma
+            )
+        return DomainPointwiseRank.close(
+            CondRank(TimerPosInOrderRank(self.term), self.alpha),
+            self.finite_lemma,
+        )
+
+    @property
+    def spec(self) -> ParamSpec:
+        return self.rank.spec
+
+    @property
+    def conserved(self) -> TSFormula:
+        return self.rank.conserved
+
+    @property
+    def minimal(self) -> TSFormula:
+        return self.rank.minimal
+
+    @property
+    def condition(self) -> SoundnessCondition:
+        return self.rank.condition
+
+    @property
+    def decreases(self) -> TSFormula:
+        return self.rank.decreases
+
+    @property
+    def size(self) -> int:
+        return 1
 
 
 def _hint_to_params(

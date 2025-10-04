@@ -8,7 +8,7 @@ import z3
 
 from helpers import unpack_quantifier
 from metadata import add_marker, get_methods
-from ranks import Rank, FiniteLemma, timer_rank
+from ranks import Rank, FiniteLemma, TimerRank
 from temporal import Prop, nnf, is_F, F, is_G, G
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
@@ -307,7 +307,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
         phi_term = self._compile_timer(timer_name, spec)
 
-        return timer_rank(finite_lemma, phi_term, alpha)
+        return TimerRank(phi_term, alpha, finite_lemma)
 
     @staticmethod
     def _compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:
@@ -344,6 +344,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             return False
 
         print(f"All passed!")
+        print(f"Rank size: {self.rank().size}")
         return True
 
     def _check_inv(self) -> bool:
