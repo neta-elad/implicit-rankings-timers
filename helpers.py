@@ -277,7 +277,7 @@ type InstantiationMode = Literal["exists", "forall", "both"]
 def instantiate[T: z3.ExprRef](
     expr: T,
     instantiations: dict[str, z3.ExprRef],
-    mode: InstantiationMode = "both",
+    mode: InstantiationMode = "exists",
 ) -> T:
     def do_instantiate(
         expr_: z3.ExprRef, instants: dict[str, z3.ExprRef]
