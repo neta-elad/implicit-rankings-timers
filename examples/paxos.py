@@ -1,7 +1,7 @@
 from prelude import *
 from typing import List
 
-# @ status - property and proof implemented based on Ivy specification
+# @ status - timeout of inv in init
 
 # Paxos consensus protocol implementation
 # Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy
