@@ -52,20 +52,12 @@ TIMERS=unint make examples/ticket.py
 
 ## TODOs
 - [ ] prove all examples.
-- [x] Figure out how to use Pos - see below.
-- [x] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
-- [x] Implementing hints for existentially quantified constructors, including soundness conditions. 
-  - DomPW
-  - [{}, {}, {}] - options for exists y disjunctively 
-  - DomPermPW
-  - [ ([{},{}] , [{},{}], {}), ([{},{}] , [{},{}], {}) ]
-  - Soundness
-  - [ [{},{}] , [{},{}] ]
+- [ ] test out hints
+- [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] In readme, write list of all features
-- [ ] (optional) timeouts and violations in printing
-- [x] (optional) timeout as given argument
+- [ ] (optional) differentiate timeouts and violations in printing
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
 - [ ] (?) splitting checks for different cases 
