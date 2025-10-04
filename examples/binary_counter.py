@@ -45,7 +45,6 @@ class BinaryCounter(TransitionSystem):
     def decrease(self) -> BoolRef:
         # If current bit at ptr is 0, flip it to 1 and move ptr one step down.
         # Otherwise, flip it to 0 and reset ptr to max.
-        I = Index("I")
         return And(
             If(
                 Not(self.a(self.ptr)),

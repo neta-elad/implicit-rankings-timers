@@ -52,6 +52,7 @@ def timer_order_axioms() -> z3.BoolRef:
             z3.ForAll(x, z3.Not(timer_order(x, x))),
             z3.ForAll(x, z3.Or(x == _zero, timer_order(_zero, x))),
             z3.ForAll(x, z3.Or(x == _inf, timer_order(x, _inf))),
+            _zero != _inf,
         )
 
     return z3.BoolVal(True)
@@ -306,10 +307,14 @@ class TimerTransitionSystem(BaseTransitionSystem):
 
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
+        if _UNINTERPRETED_TIMERS:
+            added_symbols = {"zero": _zero.decl(), "inf": _inf.decl()}
+        else:
+            added_symbols = {}
         return (
             self.ts.symbols
             | {timer.name: timer.to_fun(self.suffix) for timer in self.timers.values()}
-            | {"zero": _zero.decl(), "inf": _inf.decl()}
+            | added_symbols
         )
 
     def clone(self, suffix: str) -> Self:
