@@ -589,9 +589,20 @@ def substitute[T: z3.ExprRef](
     return cast(T, do_substitute(expr))
 
 
-def _rename_dict[T](dictionary: dict[str, T], prefix: str) -> dict[str, T]:
-    return {f"{prefix}{key}": value for key, value in dictionary.items()}
-
-
 def _disjoint_merge[T](dict1: dict[str, T], dict2: dict[str, T]) -> dict[str, T]:
-    return _rename_dict(dict1, "left-") | _rename_dict(dict2, "right-")
+    if not dict1:
+        return dict2
+    if not dict2:
+        return dict1
+
+    result = {}
+    for key, value in dict1.items():
+        if key in dict2:
+            key = "left-" + key
+        result[key] = value
+
+    for key, value in dict2.items():
+        if key in dict1:
+            key = "right-" + key
+        result[key] = value
+    return result
