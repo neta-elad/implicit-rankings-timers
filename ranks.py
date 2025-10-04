@@ -308,6 +308,10 @@ class ClosedRank(ABC):
     @abstractmethod
     def decreases(self) -> TSFormula: ...
 
+    @property
+    @abstractmethod
+    def size(self) -> int: ...
+
 
 class Rank(ClosedRank, ABC):
     @property
@@ -368,6 +372,10 @@ class BinRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1
 
     def __str__(self) -> str:
         return f"Bin({self.alpha.name})"
@@ -431,6 +439,10 @@ class PosInOrderRank[T: Expr](Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1
 
     def __str__(self) -> str:
         return f"Pos({self.term.name})"
@@ -497,6 +509,10 @@ class LexRank(Rank):
             f"{self}_<decreases>",
         )
 
+    @property
+    def size(self) -> int:
+        return 1 + sum(rank.size for rank in self.ranks)
+
     def __str__(self) -> str:
         return f"Lex({", ".join(map(str, self.ranks))})"
 
@@ -551,6 +567,10 @@ class PointwiseRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + sum(rank.size for rank in self.ranks)
 
     def __str__(self) -> str:
         return f"PW({", ".join(map(str, self.ranks))})"
@@ -615,6 +635,10 @@ class CondRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def __str__(self) -> str:
         return f"Cond({self.rank}, {self.alpha.name})"
@@ -692,6 +716,10 @@ class DomainPointwiseRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def exists_with_hints(self, ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
         formula = z3.Exists(
@@ -811,6 +839,10 @@ class DomainLexRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
 
     def __str__(self) -> str:
         return f"DomLex({self.rank}, {self.param[0]})"
@@ -1017,6 +1049,10 @@ class DomainPermutedRank(Rank):
             f"{self}_<decreases>",
         )
 
+    @property
+    def size(self) -> int:
+        return 1 + self.rank.size
+
     def __str__(self) -> str:
         return f"DomPerm({self.rank}, {self.ys}, {self.k})"
 
@@ -1068,6 +1104,10 @@ class TimerPosInOrderRank(Rank):
             ),
             f"{self}_<decreases>",
         )
+
+    @property
+    def size(self) -> int:
+        return 1
 
     def __str__(self) -> str:
         return f"TimerPos({self.term.name})"
@@ -1124,6 +1164,10 @@ class TimerRank(Rank):
     @property
     def decreases(self) -> TSFormula:
         return self.rank.decreases
+
+    @property
+    def size(self) -> int:
+        return 1
 
 
 def _hint_to_params(
