@@ -308,7 +308,7 @@ class TimerTransitionSystem(BaseTransitionSystem):
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
         if _UNINTERPRETED_TIMERS:
-            added_symbols = {"zero": _zero.decl(), "inf": _inf.decl()}
+            added_symbols = {"zero": _zero.decl(), "inf": _inf.decl(), "timer_order": _timer_order.fun}
         else:
             added_symbols = {}
         return (
