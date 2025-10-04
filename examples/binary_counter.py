@@ -9,8 +9,7 @@ class Index(Finite): ...
 class BinaryCounter(TransitionSystem):
     # Immutable constants and relations
     max: Immutable[Index]
-    le: Immutable[Rel[Index, Index]]
-    # if I do Immutable[WFRel[Index]] it also doesn't work
+    lt: Immutable[Rel[Index, Index]]
 
     # Mutable state
     ptr: Index
@@ -19,18 +18,18 @@ class BinaryCounter(TransitionSystem):
     @axiom
     def order_axioms(self, X: Index, Y: Index, Z: Index) -> BoolRef:
         return And(
-            Implies(And(self.le(X, Y), self.le(Y, X)), false),
-            Implies(And(self.le(X, Y), self.le(Y, Z)), self.le(X, Z)),
-            Or(self.le(X, Y), self.le(Y, X), X == Y),
-            Or(self.le(X, self.max), X == self.max),
+            Implies(And(self.lt(X, Y), self.lt(Y, X)), false),
+            Implies(And(self.lt(X, Y), self.lt(Y, Z)), self.lt(X, Z)),
+            Or(self.lt(X, Y), self.lt(Y, X), X == Y),
+            Or(self.lt(X, self.max), X == self.max),
         )
 
     def succ(self, smaller: Index, bigger: Index) -> BoolRef:
         Z = Index("Z")
         return And(
-            self.le(smaller, bigger),
+            self.lt(smaller, bigger),
             ForAll(
-                Z, Implies(self.le(smaller, Z), Or(Z == bigger, self.le(bigger, Z)))
+                Z, Implies(self.lt(smaller, Z), Or(Z == bigger, self.lt(bigger, Z)))
             ),
         )
 
@@ -67,14 +66,14 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
     def position_of_ptr(self) -> Rank:
-        return PosInOrderRank(self.sys.ptr, self.sys.le)
+        return PosInOrderRank(self.sys.ptr, self.sys.lt)
 
     def x_was_last_1(self, i: Index) -> BoolRef:
-        return And(self.sys.a(i), Or(self.sys.le(i, self.sys.ptr), i == self.sys.ptr))
+        return And(self.sys.a(i), Or(self.sys.lt(i, self.sys.ptr), i == self.sys.ptr))
 
     def ghost_array_lex(self) -> Rank:
         return DomainLexRank(
-            BinRank(self.x_was_last_1), self.sys.le, ("i", Index), None
+            BinRank(self.x_was_last_1), self.sys.lt, ("i", Index), None
         )
 
     def rank(self) -> Rank:

@@ -1,0 +1,16 @@
+# From Proving Termination with Multiset Orderings / Manna & Dershovitz
+# actually this is based on one of Dijkstra's notes [1] in the above
+
+# loop until the shunting yard is empty
+# select a train
+# if the train consists of only a single car
+# then remove it from the yard
+# else split it into two shorter trains
+# fi
+# repeat
+
+# Another example from this paper:
+
+# white, red--~ red, white
+# blue, red ~ red, blue
+# blue, white --~ white, blue. 
