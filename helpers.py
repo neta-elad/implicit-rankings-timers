@@ -2,6 +2,7 @@ import io
 from collections.abc import Iterable
 from dataclasses import dataclass
 from functools import cached_property
+from os import getenv
 from pathlib import Path
 from typing import cast, Literal
 
@@ -105,8 +106,11 @@ def sat_check(
     return SatResult(result, core)
 
 
+_DEFAULT_TIMEOUT = int(getenv("TIMEOUT_MS", "300_000"))  # 5 minute timeout
+
+
 def default_solver() -> z3.Solver:
-    z3.set_param("timeout", 5 * 60 * 1000)  # 5 minute timeout
+    z3.set_param("timeout", _DEFAULT_TIMEOUT)
     solver = z3.Solver()
     solver.set(mbqi=True)
     return solver

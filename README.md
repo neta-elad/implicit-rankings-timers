@@ -28,7 +28,15 @@
   
 For a simple example, check out the `examples/trivial_termination.py` file.
 
-## Timers mode
+## Features
+### Timeout
+Set global timeout (in milliseconds) for SMT queries
+with the `TIMEOUT_MS` environment variable:
+```shell
+TIMEOUT_MS=50 make examples/ticket.py
+```
+
+### Timers mode
 Timers can be implemented either as uninterpreted sort, or by using integers.
 Default mode is defined in `timers.py` (`_DEFAULT_TIMERS_MODE` variable).
 Mode can be changed on the fly when running an example, 
@@ -57,7 +65,7 @@ TIMERS=unint make examples/ticket.py
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0?
 - [ ] In readme, write list of all features
 - [ ] (optional) timeouts and violations in printing
-- [ ] (optional) timeout as given argument
+- [x] (optional) timeout as given argument
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
 - [ ] (?) splitting checks for different cases 
