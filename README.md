@@ -52,7 +52,7 @@ TIMERS=unint make examples/ticket.py
 
 ## TODOs
 - [ ] prove all examples.
-- [ ] Figure out how to use Pos - see below.
+- [x] Figure out how to use Pos - see below.
 - [x] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
 - [x] Implementing hints for existentially quantified constructors, including soundness conditions. 
   - DomPW
