@@ -1,7 +1,6 @@
 from prelude import *
-import z3
 
-# @status - soundness doesn't work
+# @status - conserved fail
 
 
 class Index(Finite): ...
@@ -68,7 +67,6 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 
 
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
-
     def position_of_ptr(self) -> Rank:
         return PosInOrderRank(self.sys.ptr, self.sys.le)
 
