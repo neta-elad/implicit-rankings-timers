@@ -258,6 +258,17 @@ class Rel[*Ts](Fun[*Ts, Bool]):
 
 
 class WFRel[T: Expr](Rel[T, T]):
+    @classmethod
+    def __class_getitem__(cls, item: Sort | Signature) -> "type[Rel[T, T]]":
+        if not isinstance(item, tuple):
+            item = (item,)
+
+        return super().__class_getitem__(item + item)
+
+    @classmethod
+    def _subclass_name(cls, signature: Signature) -> str:
+        return f"WFRel[{", ".join(str(sort) for sort in signature[0:-1])}]"
+
     def well_founded(self) -> bool:
         return True
 
