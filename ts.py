@@ -345,11 +345,11 @@ class IntersectionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSys
 
     @cached_property
     def inits(self) -> dict[str, z3.BoolRef]:
-        return self.left.inits | self.right.inits
+        return _disjoint_merge(self.left.inits, self.right.inits)
 
     @cached_property
     def axioms(self) -> dict[str, z3.BoolRef]:
-        return self.left.axioms | self.right.axioms
+        return _disjoint_merge(self.left.axioms, self.right.axioms)
 
     @cached_property
     def transitions(self) -> dict[str, z3.BoolRef]:
@@ -383,15 +383,15 @@ class UnionTransitionSystem[L: BaseTransitionSystem, R: BaseTransitionSystem](
 
     @cached_property
     def inits(self) -> dict[str, z3.BoolRef]:
-        return self.left.inits | self.right.inits
+        return _disjoint_merge(self.left.inits, self.right.inits)
 
     @cached_property
     def axioms(self) -> dict[str, z3.BoolRef]:
-        return self.left.axioms | self.right.axioms
+        return _disjoint_merge(self.left.axioms, self.right.axioms)
 
     @cached_property
     def transitions(self) -> dict[str, z3.BoolRef]:
-        return self.left.transitions | self.right.transitions
+        return _disjoint_merge(self.left.transitions, self.right.transitions)
 
 
 @overload
@@ -587,3 +587,11 @@ def substitute[T: z3.ExprRef](
         return decl(*children)
 
     return cast(T, do_substitute(expr))
+
+
+def _rename_dict[T](dictionary: dict[str, T], prefix: str) -> dict[str, T]:
+    return {f"{prefix}{key}": value for key, value in dictionary.items()}
+
+
+def _disjoint_merge[T](dict1: dict[str, T], dict2: dict[str, T]) -> dict[str, T]:
+    return _rename_dict(dict1, "left-") | _rename_dict(dict2, "right-")
