@@ -106,7 +106,15 @@ class WellFoundedSC(SoundnessCondition):
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
         rel = self.order(ts)
         sort, *_ = rel.signature
-        return sort.finite() or rel.well_founded()
+        print(f"Checking {rel.fun} well-founded: ", end="", flush=True)
+        if sort.finite():
+            print(f"{sort.ref()} finite")
+            return True
+        if rel.well_founded():
+            print(f"{rel.fun} well-founded")
+            return True
+        print(f"{sort.ref()} not finite and {rel.fun} not well-founded")
+        return False
 
 
 @dataclass(frozen=True)
