@@ -1,0 +1,20 @@
+import inspect
+from collections.abc import Iterator
+from typing import Any
+
+_METADATA = "__irt_metadata__"
+
+
+def add_marker[T](obj: T, marker: object) -> T:
+    if not hasattr(obj, _METADATA):
+        setattr(obj, _METADATA, set())
+
+    markers: set[object] = getattr(obj, _METADATA)
+    markers.add(marker)
+    return obj
+
+
+def get_methods(obj: object, marker: object) -> Iterator[tuple[str, Any]]:
+    for name, member in inspect.getmembers(obj.__class__):
+        if hasattr(member, _METADATA) and marker in getattr(member, _METADATA):
+            yield name, member

@@ -1,7 +1,6 @@
 import io
 from collections.abc import Iterable
 from dataclasses import dataclass
-from enum import Flag, auto
 from functools import cached_property
 from pathlib import Path
 from typing import cast, Literal

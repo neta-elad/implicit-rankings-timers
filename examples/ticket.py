@@ -256,6 +256,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         return G(F(self.sys.scheduled(T)))
 
     @temporal_invariant
+    @track
     def timer_invariant(self, K: Ticket) -> BoolRef:
         return Or(
             F(
@@ -267,12 +268,9 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
             And(
                 G(Not(self.sys.pc3(self.skolem_thread))),
                 self.sys.pc2(self.skolem_thread),
-                ForAll(
-                    K,
-                    Implies(
-                        self.sys.m(self.skolem_thread, K),
-                        self.sys.le(self.sys.service, K),
-                    ),
+                Implies(
+                    self.sys.m(self.skolem_thread, K),
+                    self.sys.le(self.sys.service, K),
                 ),
             ),
         )

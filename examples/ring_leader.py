@@ -194,12 +194,14 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
         )
 
     @temporal_invariant
+    @track
     def scheduling(self, N: Node) -> BoolRef:
-        return ForAll(N, G(F(self.sys.scheduled(N))))
+        return G(F(self.sys.scheduled(N)))
 
     @temporal_invariant
+    @track
     def no_leader(self, N: Node) -> BoolRef:
-        return G(ForAll(N, Not(self.sys.leader(N))))
+        return G(Not(self.sys.leader(N)))
 
     # the ranking we had before is kind of problematic because it uses DomLex with 2 parameters, which we don't have
     # but it was also not so intuitive, we can find something more intuitive with DomPerm or DomPW

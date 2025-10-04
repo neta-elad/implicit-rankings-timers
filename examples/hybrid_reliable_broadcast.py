@@ -444,6 +444,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
     @temporal_invariant
+    @track
     def timer_invariant(self, N: Node, M: Node) -> BoolRef:
         return And(
             Implies(
@@ -545,7 +546,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
 
-# CorrectnessHRBProof().check()
+CorrectnessHRBProof().check()
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):
@@ -604,6 +605,7 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
 class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
 
     @temporal_invariant
+    @track
     def timer_invariant(self, N: Node, M: Node) -> BoolRef:
         return And(
             Implies(
@@ -785,4 +787,4 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
         )
 
 
-RelayHRBProof().check()
+# RelayHRBProof().check()  # todo

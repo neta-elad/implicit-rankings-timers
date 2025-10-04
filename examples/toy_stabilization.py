@@ -13,6 +13,7 @@ class ToyStabilizationSystem(TransitionSystem):
     top: Immutable[Node]
     leq: Immutable[Rel[Node, Node]]
     next_node: Immutable[Fun[Node, Node]]
+    sched: Node
 
     token: Rel[Node]
     scheduled: Rel[Node]
@@ -44,6 +45,7 @@ class ToyStabilizationSystem(TransitionSystem):
     def wakeup(self, n: Node) -> BoolRef:
         N = Node("N")
         return And(
+            n == self.sched,
             ForAll(N, self.scheduled(N) == (N == n)),
             If(
                 self.token(n),
@@ -64,11 +66,13 @@ class ToyStabilizationProperty(Prop[ToyStabilizationSystem]):
                 F(
                     Implies(
                         Exists(X, self.sys.token(X)),
-                        ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+                        # ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+                        self.sys.token(self.sys.sched),
                     )
                 )
             ),
-            F(self.sys.scheduled(self.sys.top)),
+            # F(self.sys.scheduled(self.sys.top)),
+            F(self.sys.sched == self.sys.top),
         )
 
 
@@ -82,14 +86,16 @@ class ToyStabilizationProof(
             F(
                 Implies(
                     Exists(X, self.sys.token(X)),
-                    ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+                    # ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+                    self.sys.token(self.sys.sched),
                 )
             )
         )
 
     @temporal_invariant
     def top_unscheduled(self) -> BoolRef:
-        return G(Not(self.sys.scheduled(self.sys.top)))
+        # return G(Not(self.sys.scheduled(self.sys.top)))
+        return G(self.sys.sched != self.sys.top)  # todo: better nnf
 
     @invariant
     def exists_token(self) -> BoolRef:
@@ -97,39 +103,63 @@ class ToyStabilizationProof(
         return Exists(X, self.sys.token(X))
 
     def j_counts_towards_i(self, i: Node, j: Node) -> BoolRef:
-        return And(self.sys.token(i), self.sys.leq(i, j))
+        return And(self.sys.token(i), self.sys.leq(i, j), i != j)
 
     def binary_rank_ij(self) -> Rank:
         return BinRank(self.j_counts_towards_i)
 
+    def i(self, i: Node) -> Node:
+        return i
+
     # hint should be j=i (not sure)
     def sum_over_j(self) -> Rank:
-        return DomainPointwiseRank(self.binary_rank_ij(), ParamSpec(j=Node), None)
+        hints = [{"j": self.sys.sched}]
+        return DomainPointwiseRank(
+            self.binary_rank_ij(),
+            ParamSpec(j=Node),
+            None,
+            hints,
+        )
 
-    @witness
+    # @witness
     def sched(self, T: Node) -> BoolRef:
         return self.sys.scheduled(T)
 
     # hint should be i = sched (not sure)
     def sum_over_i(self) -> Rank:
-        conserved_hint = [([{"i": self.sched}], [{"i": self.sched}])]
+        conserved_hint = [
+            ([{"i": self.sys.sched}], [{"i": self.sys.next_node(self.sys.sched)}])
+        ]
+        decreases_hint = [
+            (
+                [{"i": self.sys.sched}],
+                [{"i": self.sys.next_node(self.sys.sched)}],
+                {"i": self.sys.sched},
+            )
+        ]
         return DomainPermutedRank(
-            self.sum_over_j(), ParamSpec(i=Node), 1, None, conserved_hint
+            self.sum_over_j(),
+            ParamSpec(i=Node),
+            1,
+            None,
+            conserved_hint,
+            decreases_hint,
         )
 
     def scheduling_of_token(self) -> BoolRef:
         X = Node("X")
         return Implies(
             Exists(X, self.sys.token(X)),
-            ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+            # ForAll(X, Implies(self.sys.scheduled(X), self.sys.token(X))),
+            self.sys.token(self.sys.sched),
         )
 
     def scheduling_of_token_timer_rank(self) -> Rank:
         return self.timer_rank(self.scheduling_of_token, None, None)
 
     def rank(self) -> Rank:
-        return self.sum_over_i()
         # return LexRank(self.sum_over_i(), self.scheduling_of_token_timer_rank())
+        return self.sum_over_i()
 
 
 ToyStabilizationProof().check()

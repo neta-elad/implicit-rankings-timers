@@ -28,11 +28,25 @@
   
 For a simple example, check out the `examples/trivial_termination.py` file.
 
+## Timers mode
+Timers can be implemented either as uninterpreted sort, or by using integers.
+Default mode is defined in `timers.py` (`_DEFAULT_TIMERS_MODE` variable).
+Mode can be changed on the fly when running an example, 
+by using the `TIMERS` environment variable with value `int` or `unint`:
+```shell
+TIMERS=int make examples/ticket.py
+```
+
+```shell
+TIMERS=unint make examples/ticket.py
+```
+
+
 ## TODOs
 - [ ] prove all examples.
 - [ ] Figure out how to use Pos - see below.
 - [ ] More informative soundness failures, if a relation is not declared WF it just says "Checking soundness: failed", for Pos the sort being finite should also suffice.
-- [ ] Implementing hints for existentially quantified constructors, including soundness conditions. 
+- [x] Implementing hints for existentially quantified constructors, including soundness conditions. 
   - DomPW
   - [{}, {}, {}] - options for exists y disjunctively 
   - DomPermPW

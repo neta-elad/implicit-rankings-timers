@@ -62,22 +62,22 @@ def nnf(formula: z3.ExprRef, negated: bool = False) -> z3.BoolRef:
             return z3.Not(formula)
         else:
             return formula
-    elif z3.is_eq(formula):  # todo: optimize?
+    elif (z3.is_eq(formula) and not negated) or (z3.is_distinct(formula) and negated):
         left, right = formula.children()
         if z3.is_bool(left) and z3.is_bool(right):  # iff construction
             return nnf(
                 z3.And(z3.Implies(left, right), z3.Implies(right, left)), negated
             )
         else:
-            return formula
-    elif z3.is_distinct(formula):
+            return left == right
+    elif (z3.is_distinct(formula) and not negated) or (z3.is_eq(formula) and negated):
         left, right = formula.children()
         if z3.is_bool(left) and z3.is_bool(right):  # not-iff construction
             return nnf(
                 z3.And(z3.Implies(left, right), z3.Implies(right, left)), not negated
             )
         else:
-            return formula
+            return left != right
     elif z3.is_not(formula):
         (child,) = formula.children()
         return nnf(child, not negated)

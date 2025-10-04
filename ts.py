@@ -27,6 +27,7 @@ from helpers import (
     print_unsat_core,
     unpack_quantifier,
 )
+from metadata import get_methods, add_marker
 from typed_z3 import Fun, Expr, Sort
 
 
@@ -111,12 +112,13 @@ class BaseTransitionSystem(ABC):
         name: str,
         *args: z3.BoolRef,
         with_next: bool = False,
+        print_calls: bool = False,
     ) -> bool:
         print(f"Checking {name}: ", end="", flush=True)
         args += (self.axiom,)
         if with_next:
             args += (self.next.axiom,)
-        result = unsat_check(args, minimize_sorts=self.sorts)
+        result = unsat_check(args, minimize_sorts=self.sorts, print_calls=print_calls)
         if result.unsat:
             print("passed")
             return True
@@ -418,15 +420,9 @@ def ts_term[E: z3.ExprRef](term: E, spec: ParamSpec, /) -> TSTerm[E]: ...
 def ts_term[E: z3.ExprRef](term: E, /, *args: Expr) -> TSTerm[E]: ...
 
 
-# @overload
-# def ts_term2[*Ts, E: Expr](term: Fun[*Ts, E], /, *args: *Ts) -> TSTerm[E]: ...
-
-
 def ts_term(term: Any, /, *args: Any, **kwargs: Any) -> TSTerm[Any]:
     if isinstance(term, TSTerm):
         return term
-    # elif isinstance(term, Fun):
-    #     return _ts_term_from_fun(term, _spec_for_term(args, kwargs))
     elif callable(term) and not isinstance(term, MethodType):
         return _ts_term_from_unbound(term)
     elif callable(term):
@@ -490,22 +486,19 @@ def unbind[T: BaseTransitionSystem, *Ts, R](
 def init[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
-    setattr(fun, _TS_METADATA, _TS_INIT)
-    return fun
+    return add_marker(fun, _TS_INIT)
 
 
 def axiom[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
-    setattr(fun, _TS_METADATA, _TS_AXIOM)
-    return fun
+    return add_marker(fun, _TS_AXIOM)
 
 
 def transition[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
-    setattr(fun, _TS_METADATA, _TS_TRANSITION)
-    return fun
+    return add_marker(fun, _TS_TRANSITION)
 
 
 def get_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
@@ -552,33 +545,16 @@ def compile_with_spec[T: BaseTransitionSystem, *Ts, R: z3.ExprRef](
     return compiled
 
 
-_TS_METADATA = "__ts_metadata__"
 _TS_INIT = object()
 _TS_AXIOM = object()
 _TS_TRANSITION = object()
-_TS_SPECIALS = {
-    "init",
-    "inits",
-    "axiom",
-    "axioms",
-    "transition",
-    "transitions",
-}
 
 
 def _get_methods(
     ts: BaseTransitionSystem, marker: object
 ) -> Iterable[tuple[str, TSFormula]]:
-    for name in dir(ts.__class__):
-        if name in _TS_SPECIALS:
-            continue
-        attr: TypedFormula[Any] = getattr(ts.__class__, name)
-        if (
-            callable(attr)
-            and hasattr(attr, _TS_METADATA)
-            and getattr(attr, _TS_METADATA) is marker
-        ):
-            yield name, ts_term(attr)
+    for name, member in get_methods(ts, marker):
+        yield name, ts_term(member)
 
 
 def _resolve_type(t: Any) -> type:

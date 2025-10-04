@@ -2,7 +2,8 @@ import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import Any, cast, Self, Protocol
+from os import getenv
+from typing import Any, cast, Self, Protocol, TYPE_CHECKING
 
 import z3
 
@@ -11,45 +12,102 @@ from temporal import is_G, is_F, nnf
 from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
-type Time = Int
+_DEFAULT_TIMERS_MODE = "unint"  # change to "int" for integer / interpreted timers
+_UNINTERPRETED_TIMERS = getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower() in {
+    "unint",
+    "uninterp",
+    "uninterpreted",
+}
+
+if not TYPE_CHECKING:
+    if _UNINTERPRETED_TIMERS:
+
+        class Time(Expr): ...  # uninterpreted time
+
+        _zero = Time("zero")
+        _inf = Time("inf")
+    else:  # integer time
+        Time = Int
+        _zero = z3.IntVal(0)
+        _inf = z3.IntVal(-1)
+else:
+    type Time = Int
+    TimeSort: z3.SortRef
+    _zero: Time
+    _inf: Time
 
 
 class TimeFun(Protocol):
     def __call__(self, *args: z3.ExprRef) -> Time: ...
 
 
-def timer_order() -> Rel[Time, Time]:
-    return Int.lt()
+def timer_order_axioms() -> z3.BoolRef:
+    if _UNINTERPRETED_TIMERS:
+        x, y, z = Time.consts("x y z")  # type: ignore
+        return z3.And(
+            z3.ForAll(
+                [x, y, z],
+                z3.Implies(
+                    z3.And(timer_order(x, y), timer_order(y, z)), timer_order(x, z)
+                ),
+            ),
+            z3.ForAll(x, z3.Not(timer_order(x, x))),
+            z3.ForAll(x, z3.Or(x == _zero, timer_order(_zero, x))),
+            z3.ForAll(x, z3.Or(x == _inf, timer_order(x, _inf))),
+        )
+
+    return z3.BoolVal(True)
+
+
+_timer_order = Rel[Time, Time]("timer_order")
+
+
+def timer_order(t1: Time, t2: Time) -> z3.BoolRef:
+    if _UNINTERPRETED_TIMERS:
+        return _timer_order(t1, t2)
+
+    return z3.Or(
+        z3.And(timer_finite(t1), timer_infinite(t2)),
+        z3.And(timer_finite(t1), timer_finite(t2), t1 < t2),
+    )
 
 
 def timer_valid(timer_expr: Time) -> z3.BoolRef:
-    return timer_expr >= -1
+    if _UNINTERPRETED_TIMERS:
+        return z3.BoolVal(True)
+    return timer_expr >= _inf
 
 
 def timer_zero(timer_expr: Time) -> z3.BoolRef:
-    # todo: configurable lia/uninterpreted
-    return timer_expr == 0
+    return timer_expr == _zero
 
 
 def timer_nonzero(timer_expr: Time) -> z3.BoolRef:
-    return timer_expr != 0
+    return timer_expr != _zero
 
 
 def timer_finite(timer_expr: Time) -> z3.BoolRef:
-    # todo configurable
+    if _UNINTERPRETED_TIMERS:
+        return timer_expr != _inf
+
     return timer_expr >= 0
 
 
 def timer_infinite(timer_expr: Time) -> z3.BoolRef:
-    # todo configurable
-    return timer_expr == -1
+    return timer_expr == _inf
 
 
 def timer_decreasable(timer_expr: Time) -> z3.BoolRef:
+    if _UNINTERPRETED_TIMERS:
+        return z3.And(timer_expr != _zero, timer_expr != _inf)
+
     return timer_expr > 0
 
 
 def timer_decrease(pre_timer_expr: Time, post_timer_expr: Time) -> z3.BoolRef:
+    if _UNINTERPRETED_TIMERS:
+        return timer_order(post_timer_expr, pre_timer_expr)
+
     return post_timer_expr == pre_timer_expr - 1
 
 
@@ -88,8 +146,10 @@ class Timer(ABC):
         return tuple(self.params.keys())
 
     def to_fun(self, suffix: str) -> z3.FuncDeclRef:
+        signature = self.signature + (cast(Sort, Time),)
         return cast(
-            z3.FuncDeclRef, Fun.declare(self.signature + (Int,))(self.name + suffix).fun
+            z3.FuncDeclRef,
+            Fun.declare(signature)(self.name + suffix).fun,
         )
 
     def term(self, sym: "TimerTransitionSystem", params: Params) -> Time:
@@ -248,20 +308,24 @@ class TimerTransitionSystem(BaseTransitionSystem):
 
     @cached_property
     def symbols(self) -> dict[str, z3.FuncDeclRef]:
-        return self.ts.symbols | {
-            timer.name: timer.to_fun(self.suffix) for timer in self.timers.values()
-        }
+        return (
+            self.ts.symbols
+            | {timer.name: timer.to_fun(self.suffix) for timer in self.timers.values()}
+            | {"zero": _zero.decl(), "inf": _inf.decl()}
+        )
 
     def clone(self, suffix: str) -> Self:
         return self.__class__(self.ts.clone(suffix), self.timers, self.root, suffix)
 
     def t(self, name: str) -> TimeFun:
-        assert name in self.symbols, f"No timer for formula {name}"
+        assert (
+            name in self.symbols
+        ), f"No timer for formula {name}; has {self.symbols.keys()}"
         return cast(TimeFun, self.symbols[name])
 
     @property
     def axioms(self) -> dict[str, z3.BoolRef]:
-        axioms = {}
+        axioms = {"order_axioms": timer_order_axioms()}
 
         for timer in self.timers.values():
             params = {param: sort.const(param) for param, sort in timer.params.items()}
@@ -394,7 +458,7 @@ def create_timers[T: BaseTransitionSystem](
             return add(NegationTimer(formula, child_timer.params, child_timer))
         elif is_G(formula):
             (child,) = formula.children()
-            negated_child = normalized_not(child)
+            negated_child = nnf(z3.Not(cast(z3.BoolRef, child)))
 
             child_timer = create_timer(child)
             negated_child_timer = create_timer(negated_child)
@@ -439,15 +503,6 @@ def get_params(root_expr: z3.ExprRef, excluded: set[str]) -> ParamSpec:
 
     find_params(root_expr)
     return ParamSpec(params)
-
-
-def normalized_not(formula: z3.ExprRef) -> z3.BoolRef:
-    assert isinstance(formula, z3.BoolRef)
-    if z3.is_not(formula):
-        (child,) = formula.children()
-        return cast(z3.BoolRef, child)
-    else:
-        return z3.Not(formula)
 
 
 def _replace_symbols_in_formula(

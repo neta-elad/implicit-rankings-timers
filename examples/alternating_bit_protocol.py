@@ -497,6 +497,7 @@ class AlternatingBitProtocolProof(
         )
 
     @temporal_invariant
+    @track
     def timer_invariant(self) -> BoolRef:
         return And(
             G(F(self.sys.sender_scheduled)),

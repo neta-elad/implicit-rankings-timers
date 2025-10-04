@@ -7,6 +7,7 @@ from typing import ClassVar, cast, Any, Self
 import z3
 
 from helpers import unpack_quantifier
+from metadata import add_marker, get_methods
 from ranks import Rank, FiniteLemma, timer_rank
 from temporal import Prop, nnf, is_F, F, is_G, G
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
@@ -160,7 +161,6 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return create_timers(
             self.reset.sys_with_witnesses,
             self.reset.instantiated_prop,
-            *self.reset.temporal_invariant_formulas.values(),
             *self.reset.tracked_temporal_formulas.values(),
         ).clone(self.suffix)
 
@@ -207,11 +207,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @cached_property
     def tracked_temporal_formulas(self) -> dict[str, z3.BoolRef]:
-        tracked = {}
-        for name, method in _get_methods(self, _PROOF_TRACK_TEMPORAL):
-            tracked[name] = method(self)
-
-        return tracked
+        return {
+            name: universal_closure(method, self.reset)
+            for name, method in _get_methods(self, _PROOF_TRACK_TEMPORAL)
+        }
 
     @cached_property
     def intersection(
@@ -372,7 +371,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                     f"decreases in {name}",
                     self.invariant,
                     trans,
-                    z3.Not(self.rank().decreased(self)),
+                    z3.Not(self.rank().decreases(self)),
                     with_next=True,
                 )
             )
@@ -393,61 +392,36 @@ type TypedProofFormula[T: Proof[Any], *Ts] = Callable[[T, *Ts], z3.BoolRef]
 def invariant[T: Proof[Any], *Ts](
     fun: TypedProofFormula[T, *Ts],
 ) -> TypedProofFormula[T, *Ts]:
-    setattr(fun, _PROOF_METADATA, _PROOF_INVARIANT)
-    return fun
+    return add_marker(fun, _PROOF_INVARIANT)
 
 
 def temporal_invariant[T: Proof[Any], *Ts](
     fun: TypedProofFormula[T, *Ts],
 ) -> TypedProofFormula[T, *Ts]:
-    setattr(fun, _PROOF_METADATA, _PROOF_TEMPORAL_INVARIANT)
-    return fun
+    return add_marker(fun, _PROOF_TEMPORAL_INVARIANT)
 
 
 def track[T: Proof[Any], *Ts](
     fun: TypedProofFormula[T, *Ts],
 ) -> TypedProofFormula[T, *Ts]:
-    setattr(fun, _PROOF_METADATA, _PROOF_TRACK_TEMPORAL)
-    return fun
+    return add_marker(fun, _PROOF_TRACK_TEMPORAL)
 
 
 def witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
-    setattr(fun, _PROOF_METADATA, _PROOF_WITNESS)
-    return fun  # type: ignore
+    return add_marker(fun, _PROOF_WITNESS)  # type: ignore
 
 
 def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
-    setattr(fun, _PROOF_METADATA, _PROOF_TEMPORAL_WITNESS)
-    return fun  # type: ignore
+    return add_marker(fun, _PROOF_TEMPORAL_WITNESS)  # type: ignore
 
 
-_PROOF_METADATA = "__proof_metadata__"
 _PROOF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
 _PROOF_WITNESS = object()
 _PROOF_TEMPORAL_WITNESS = object()
 _PROOF_TRACK_TEMPORAL = object()
-_PROOF_WITNESS_METADATA = "__proof_witness_metadata__"
-
-_PROOF_SPECIALS = {
-    "invariant",
-    "invariants",
-    "temporal_invariants",
-    "temporal_invariant_formulas",
-    "witnesses",
-    "temporal_witnesses",
-    "tracked_temporal_formulas",
-}
 
 
 def _get_methods(ts: Proof[Any], marker: object) -> Iterable[tuple[str, TSFormula]]:
-    for name in dir(ts.__class__):
-        if name in _PROOF_SPECIALS:
-            continue
-        attr: TypedProofFormula[Any] = getattr(ts.__class__, name)
-        if (
-            callable(attr)
-            and hasattr(attr, _PROOF_METADATA)
-            and getattr(attr, _PROOF_METADATA) is marker
-        ):
-            yield name, ts_term(attr)
+    for name, member in get_methods(ts, marker):
+        yield name, ts_term(member)
