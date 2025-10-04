@@ -13,11 +13,9 @@ from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
 _DEFAULT_TIMERS_MODE = "unint"  # change to "int" for integer / interpreted timers
-_UNINTERPRETED_TIMERS = getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower() in {
-    "unint",
-    "uninterp",
-    "uninterpreted",
-}
+_UNINTERPRETED_TIMERS = "uninterpreted".startswith(
+    getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower()
+)
 
 if not TYPE_CHECKING:
     if _UNINTERPRETED_TIMERS:
