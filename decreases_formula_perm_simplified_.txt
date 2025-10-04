@@ -1,0 +1,87 @@
+# exists sigma forall y phi(y,ysigma)
+And(ForAll(j,
+            Implies(Not(And(token(next_node(sched)),
+                            leq(next_node(sched),j),
+                            j != next_node(sched))),
+                    Not(And(token'(next_node(sched)),
+                            leq(next_node(sched),j),
+                            j != next_node(sched))))),
+    # exists sigma forall y phi(y,ysigma)
+    And(ForAll(j,
+                Implies(Not(And(token(next_node(sched)),
+                            leq(next_node(sched),j),
+                            j != next_node(sched))),
+                        Not(And(token'(next_node(sched)),
+                            leq(next_node(sched),j),
+                            j != next_node(sched)))))),
+        And(And(token(next_node(sched)),
+                    leq(next_node(sched),sched),
+                    sched != next_node(sched)),
+            Not(And(token'(next_node(sched)),
+                leq(next_node(sched),sched),
+                sched != next_node(sched))),
+            Implies(Not(And(token(next_node(sched)),
+                    leq(next_node(sched),sched),
+                    sched != next_node(sched))),
+                    Not(And(token'(next_node(sched)),
+                    leq(next_node(sched),sched),
+                    sched != next_node(sched)))))
+)
+
+hint used ileft = sched, iright= next_node(sched), ireduced = sched
+j = sched
+
+
+Model that violates it
+
+Small model of size 2
+[Time!val!1, Time!val!0]
+[Node!val!1, Node!val!0]
+top : Node!val!0
+leq : [else ->
+ Not(And(Var(0) == Node!val!0, Not(Var(1) == Node!val!0)))]
+next_node : [Node!val!0 -> Node!val!1, else -> Node!val!0]
+sched : Node!val!1
+token : [else -> True]
+scheduled : [else -> Var(0) == Node!val!1]
+sched' : Node!val!0
+token' : [else -> Var(0) == Node!val!0]
+Missing scheduled' in model
+
+
+t_<token(X)> : [else -> Time!val!0]
+t_<Not(token(X))> : [else -> Time!val!1]
+t_<ForAll(X, Not(token(X)))> : Time!val!1
+t_<token(sched)> : Time!val!0
+t_<Or(ForAll(X, Not(token(X))), token(sched))> : Time!val!0
+t_<F(Or(ForAll(X, Not(token(X))), token(sched)))> : Time!val!0
+t_<Exists(X, token(X))> : Time!val!0
+t_<Not(token(sched))> : Time!val!1
+t_<And(Exists(X, token(X)), Not(token(sched)))> : Time!val!1
+t_<G(And(Exists(X, token(X)), Not(token(sched))))> : Time!val!1
+t_<G(F(Or(ForAll(X, Not(token(X))), token(sched))))> : Time!val!0
+t_<sched != top> : Time!val!0
+t_<sched == top> : Time!val!1
+t_<G(sched != top)> : Time!val!0
+t_<And(G(F(Or(ForAll(X, Not(token(X))), token(sched)))),
+    G(sched != top))> : Time!val!0
+zero : Time!val!0
+inf : Time!val!1
+
+t_<token(X)>' : [Node!val!0 -> Time!val!0, else -> Time!val!1]
+t_<Not(token(X))>' : [Node!val!0 -> Time!val!1, else -> Time!val!0]
+t_<ForAll(X, Not(token(X)))>' : Time!val!1
+t_<token(sched)>' : Time!val!0
+t_<Or(ForAll(X, Not(token(X))), token(sched))>' : Time!val!0
+t_<F(Or(ForAll(X, Not(token(X))), token(sched)))>' : Time!val!0
+t_<Exists(X, token(X))>' : Time!val!0
+t_<Not(token(sched))>' : Time!val!1
+t_<And(Exists(X, token(X)), Not(token(sched)))>' : Time!val!1
+t_<G(And(Exists(X, token(X)), Not(token(sched))))>' : Time!val!1
+t_<G(F(Or(ForAll(X, Not(token(X))), token(sched))))>' : Time!val!0
+t_<sched != top>' : Time!val!0
+t_<sched == top>' : Time!val!1
+t_<G(sched != top)>' : Time!val!0
+t_<And(G(F(Or(ForAll(X, Not(token(X))), token(sched)))),
+    G(sched != top))>' : Time!val!0
+

@@ -108,10 +108,9 @@ class ToyStabilizationProof(
     def binary_rank_ij(self) -> Rank:
         return BinRank(self.j_counts_towards_i)
 
-    def i(self, i: Node) -> Node:
-        return i
+    # def i(self, i: Node) -> Node:
+    #     return i
 
-    # hint should be j=i (not sure)
     def sum_over_j(self) -> Rank:
         hints = [{"j": self.sys.sched}]
         return DomainPointwiseRank(
@@ -122,12 +121,12 @@ class ToyStabilizationProof(
         )
 
     # @witness
-    def sched(self, T: Node) -> BoolRef:
-        return self.sys.scheduled(T)
+    # def sched(self, T: Node) -> BoolRef:
+    #     return self.sys.scheduled(T)
 
-    # hint should be i = sched (not sure)
     def sum_over_i(self) -> Rank:
         conserved_hint = [
+            ([{"i": self.sys.sched}], [{"i": self.sys.sched}]),
             ([{"i": self.sys.sched}], [{"i": self.sys.next_node(self.sys.sched)}])
         ]
         decreases_hint = [
