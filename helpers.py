@@ -1,5 +1,5 @@
 import io
-from collections.abc import Iterable
+from collections.abc import Iterable, Container
 from dataclasses import dataclass
 from functools import cached_property
 from os import getenv
@@ -308,3 +308,61 @@ def instantiate[T: z3.ExprRef](
         return decl(*children)
 
     return cast(T, do_instantiate(expr, instantiations))
+
+
+type Substitution = dict[str, z3.ExprRef]
+
+
+def find_substitution(
+    phi: z3.ExprRef, subbed_phi: z3.ExprRef, excluded: Container[str] = frozenset()
+) -> Substitution | None:
+    if z3.is_quantifier(phi) != z3.is_quantifier(subbed_phi):
+        return None
+    if z3.is_quantifier(phi):
+        variables, body = unpack_quantifier(phi)
+        assert z3.is_quantifier(subbed_phi)
+        subbed_variables, subbed_body = unpack_quantifier(subbed_phi)
+        if any(
+            not var.eq(subbed_var)
+            for var, subbed_var in zip(variables, subbed_variables)
+        ):
+            return None
+        return find_substitution(body, subbed_body, excluded)
+
+    decl = phi.decl()
+    subbed_decl = subbed_phi.decl()
+    if (
+        decl.kind() != subbed_decl.kind()
+        or decl.arity() != subbed_decl.arity()
+        or decl.range() != subbed_decl.range()
+        or any(decl.domain(i) != subbed_decl.domain(i) for i in range(decl.arity()))
+    ):
+        return None
+
+    if z3.is_const(phi) and decl.kind() == z3.Z3_OP_UNINTERPRETED:
+        if str(phi) == str(subbed_phi):
+            return {}
+        if str(phi) in excluded:
+            return None
+        return {str(phi): subbed_phi}
+
+    if decl != subbed_decl:
+        return None
+
+    return _merge_subs(
+        [
+            find_substitution(child, subbed_child, excluded)
+            for child, subbed_child in zip(phi.children(), subbed_phi.children())
+        ]
+    )
+
+
+def _merge_subs(subs: list[Substitution | None]) -> Substitution | None:
+    merged: Substitution = {}
+    for sub in subs:
+        if sub is None:
+            return None
+        if any(key in merged and merged[key] != value for key, value in sub.items()):
+            return None
+        merged |= sub
+    return merged

@@ -7,12 +7,12 @@ from typing import Any, cast, Self, Protocol, TYPE_CHECKING
 
 import z3
 
-from helpers import unpack_quantifier
+from helpers import unpack_quantifier, find_substitution, quantify
 from temporal import is_G, is_F, nnf
 from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
-_DEFAULT_TIMERS_MODE = "unint"  # change to "int" for integer / interpreted timers
+_DEFAULT_TIMERS_MODE = "int"  # change to "int" for integer / interpreted timers
 _UNINTERPRETED_TIMERS = "uninterpreted".startswith(
     getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower()
 )
@@ -122,6 +122,12 @@ class TimerId:
     def __hash__(self) -> int:
         return hash(self.formula)
 
+    def __str__(self) -> str:
+        return str(self.formula)
+
+    def __repr__(self) -> str:
+        return str(self.formula)
+
 
 @dataclass(frozen=True)
 class Timer(ABC):
@@ -169,9 +175,7 @@ class Timer(ABC):
             z3.Implies(
                 timer_decreasable(pre_timer), timer_decrease(pre_timer, post_timer)
             ),
-            z3.Implies(
-                timer_infinite(pre_timer), timer_infinite(post_timer)
-            )
+            z3.Implies(timer_infinite(pre_timer), timer_infinite(post_timer)),
         )
 
     def transition(
@@ -349,6 +353,29 @@ class TimerTransitionSystem(BaseTransitionSystem):
                 body = z3.ForAll(list(params.values()), body)
             axioms[timer.name] = body
 
+        return axioms | self.refinement_axioms
+
+    @property
+    def refinement_axioms(self) -> dict[str, z3.BoolRef]:
+        not_free_variables = set(self.ts.symbols.keys())
+
+        axioms = {}
+
+        for phi1, t1 in self.timers.items():
+            for phi2, t2 in self.timers.items():
+                if phi1 == phi2:
+                    continue
+                sub = find_substitution(phi1.formula, phi2.formula, not_free_variables)
+                if sub is not None:
+                    spec = get_params(phi2.formula, not_free_variables)
+                    params = spec.params() | sub
+                    axiom = quantify(
+                        True,
+                        spec.consts(),
+                        t1.term(self, params) == t2.term(self, spec.params()),
+                    )
+                    axioms[f"{phi1} => {phi2}"] = axiom
+
         return axioms
 
     @property
@@ -384,6 +411,7 @@ def create_timers[T: BaseTransitionSystem](
     root_formula = nnf(root_formula)
     formulas = tuple(nnf(formula) for formula in formulas)
 
+    # symbols that are not free variables
     def add(timer: Timer) -> Timer:
         timers[timer.id] = timer
         return timer
