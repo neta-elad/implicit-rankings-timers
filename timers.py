@@ -165,8 +165,13 @@ class Timer(ABC):
     ) -> z3.BoolRef:
         pre_timer = self.term(pre_sym, params)
         post_timer = self.term(post_sym, params)
-        return z3.Implies(
-            timer_decreasable(pre_timer), timer_decrease(pre_timer, post_timer)
+        return z3.And(
+            z3.Implies(
+                timer_decreasable(pre_timer), timer_decrease(pre_timer, post_timer)
+            ),
+            z3.Implies(
+                timer_infinite(pre_timer), timer_infinite(post_timer)
+            )
         )
 
     def transition(

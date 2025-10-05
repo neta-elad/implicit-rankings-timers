@@ -54,7 +54,8 @@ TIMERS=unint make examples/ticket.py
 - [ ] prove all examples.
 - [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
-- [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0
+- [x] Timer Semantics: add that always transitions of inf->inf 
+- [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
 - [ ] In readme, write list of all features
 - [ ] (optional) differentiate timeouts and violations in printing
 - [ ] (optional) improve formatter
