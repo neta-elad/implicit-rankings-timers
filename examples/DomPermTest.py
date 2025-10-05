@@ -1,7 +1,6 @@
 from prelude import *
 
 
-
 class Node(Finite): ...
 
 
@@ -18,24 +17,21 @@ class TestSystem(TransitionSystem):
         return Exists(N, self.token(N))
 
     @transition
-    def wakeup(self, n: Node, m:Node ) -> BoolRef:
+    def wakeup(self, n: Node, m: Node) -> BoolRef:
         N = Node("N")
         return And(
             self.token(n),
             # self.token.update({(n,):false,(m,):true})
-            self.token.unchanged()
+            self.token.unchanged(),
         )
 
 
 class TestProperty(Prop[TestSystem]):
     def prop(self) -> BoolRef:
-        return F(self.sys.token(self.sys.node1)) 
+        return F(self.sys.token(self.sys.node1))
 
 
-
-class TestProof(
-    Proof[TestSystem], prop=TestProperty
-):
+class TestProof(Proof[TestSystem], prop=TestProperty):
 
     def token_pred(self, i: Node) -> BoolRef:
         return self.sys.token(i)
@@ -66,8 +62,8 @@ class TestProof(
             # decrease_hints
         )
 
-
     def rank(self) -> Rank:
         return self.dom_perm_token()
+
 
 TestProof().check()
