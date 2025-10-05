@@ -52,11 +52,9 @@ TIMERS=unint make examples/ticket.py
 
 ## TODOs
 - [ ] prove all examples.
-- [ ] test out hints
 - [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
 - [ ] Timer Semantics: add that always transitions of inf->inf, F(p) > 0 implies F(p) = 0
-- [x] Add method for counting the number of constructors in a rank - timerRank should be +1.
 - [ ] In readme, write list of all features
 - [ ] (optional) differentiate timeouts and violations in printing
 - [ ] (optional) improve formatter
