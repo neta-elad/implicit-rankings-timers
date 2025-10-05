@@ -200,12 +200,14 @@ class ParamSpec(dict[str, Sort]):
         primed = dict(params.items())
         for param in self:
             primed[param + "'"] = primed[param]
+            del primed[param]
         return primed
 
     def unprime(self, params: Params) -> Params:
         unprimed = dict(params.items())
         for param in self:
             unprimed[param] = unprimed[param + "'"]
+            del unprimed[param + "'"]
         return unprimed
 
     def params(
