@@ -362,7 +362,9 @@ def _merge_subs(subs: list[Substitution | None]) -> Substitution | None:
     for sub in subs:
         if sub is None:
             return None
-        if any(key in merged and merged[key] != value for key, value in sub.items()):
+        if any(
+            key in merged and not merged[key].eq(value) for key, value in sub.items()
+        ):
             return None
         merged |= sub
     return merged

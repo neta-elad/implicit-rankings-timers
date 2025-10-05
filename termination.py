@@ -85,11 +85,13 @@ class TemporalWitness:
         return self.sort(self.name, False)  # type: ignore
 
     def source(self, sys: BaseTransitionSystem) -> z3.BoolRef:
-        ts_formula = self.formula
-        return existential_closure(ts_formula, sys)
+        return existential_closure(self.formula, sys)
 
     def instantiated(self, sys: BaseTransitionSystem) -> z3.BoolRef:
         return self.formula(sys, {self.param: self.symbol})
+
+    def implication(self, sys: BaseTransitionSystem) -> z3.BoolRef:
+        return z3.Implies(self.source(sys), self.instantiated(sys))
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -160,50 +162,18 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def timers(self) -> TimerTransitionSystem:
         return create_timers(
             self.reset.sys_with_witnesses,
-            self.reset.instantiated_prop,
+            self.reset.negated_prop,
             *self.reset.tracked_temporal_formulas.values(),
         ).clone(self.suffix)
 
     @cached_property
-    def instantiated_prop(self) -> z3.BoolRef:
-        negated_prop = nnf(z3.Not(self.prop.prop()))
-
-        pending = {
-            name: (nnf(w.source(self)), nnf(w.instantiated(self)))
-            for name, w in self.temporal_witnesses.items()
-        }
-
-        def instantiate(formula: z3.BoolRef) -> z3.BoolRef:
-            for name, (source, replacement) in pending.items():
-                if formula.eq(source):
-                    del pending[name]
-                    return replacement
-
-            if is_F(formula):
-                (child,) = formula.children()
-                return F(instantiate(cast(z3.BoolRef, child)))
-            elif is_G(formula):
-                (child,) = formula.children()
-                return G(instantiate(cast(z3.BoolRef, child)))
-            elif z3.is_quantifier(formula) and formula.is_exists():
-                variables, body = unpack_quantifier(formula)
-                return z3.Exists(variables, instantiate(body))
-            elif z3.is_and(formula) or z3.is_or(formula):
-                children = [
-                    instantiate(cast(z3.BoolRef, child)) for child in formula.children()
-                ]
-                if z3.is_or(formula):
-                    return z3.Or(*children)
-                else:
-                    return z3.And(*children)
-            else:
-                return formula
-
-        instantiated_negated_prop = instantiate(negated_prop)
-        assert (
-            not pending
-        ), f"Some temporal witnesses could not be instantiated: {", ".join(pending.keys())}"
-        return instantiated_negated_prop
+    def negated_prop(self) -> z3.BoolRef:
+        return nnf(
+            z3.And(
+                z3.Not(self.prop.prop()),
+                *(w.implication(self) for w in self.temporal_witnesses.values()),
+            )
+        )
 
     @cached_property
     def tracked_temporal_formulas(self) -> dict[str, z3.BoolRef]:
