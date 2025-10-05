@@ -51,19 +51,20 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] prove all examples.
+- [ ] prove all examples
 - [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
-- [x] Timer Semantics: add that always transitions of inf->inf 
-- [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
+- [ ] Refine timer reduction semantics (e.g., when doing skolemization in temporal witnesses) 
 - [ ] In readme, write list of all features
-- [ ] (optional) differentiate timeouts and violations in printing
+- [ ] (optional) differentiate timeouts and violations in printing: 
+      timeout should say timeout, not fail
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
 - [ ] (?) splitting checks for different cases 
 - [ ] (?) add modified argument and check to see everything is modified
 - [ ] (?) reusing invariants and ranks between proofs
 - [ ] (?) sometimes a rank decreases for some transition only if it decreases for all transitions - annoying conceptually
+- [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
 - [ ] (stretch) ability to write unit tests for a spec
 - [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces
