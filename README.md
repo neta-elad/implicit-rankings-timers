@@ -54,7 +54,6 @@ TIMERS=unint make examples/ticket.py
 - [ ] prove all examples
 - [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
-- [x] Refine timer reduction semantics (e.g., when doing skolemization in temporal witnesses) 
 - [ ] In readme, write list of all features
 - [ ] (optional) differentiate timeouts and violations in printing: 
       timeout should say timeout, not fail
