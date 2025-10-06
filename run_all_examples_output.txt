@@ -1,0 +1,324 @@
+===========================================
+SUMMARY
+===========================================
+make check: PASS
+
+ackermann.py: FAIL: inv
+alternating_bit_protocol.py: PASS
+binary_counter.py: PASS
+DomPermTest.py: FAIL: decreases
+hybrid_reliable_broadcast.py: PASS
+mutex_ring.py: PASS
+paxos.py: FAIL: inv
+ring_leader.py: FAIL: inv
+ticket.py: PASS
+toy_stabilization.py: PASS
+trivial_termination.py: PASS
+
+Total: 11 examples
+Passed: 7
+Failed: 4
+
+===========================================
+DETAILED OUTPUT
+===========================================
+
+Starting run_all_examples.sh at Sun Oct  5 19:56:08 IDT 2025
+Output will be saved to: run_all_examples_output.txt
+===========================================
+
+Running: make check
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+make check completed successfully
+
+Found Python files to run:
+examples/ackermann.py
+examples/alternating_bit_protocol.py
+examples/binary_counter.py
+examples/DomPermTest.py
+examples/hybrid_reliable_broadcast.py
+examples/mutex_ring.py
+examples/paxos.py
+examples/ring_leader.py
+examples/ticket.py
+examples/toy_stabilization.py
+examples/trivial_termination.py
+===========================================
+
+Running: make examples/ackermann.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/ackermann.py
+Checking sat init: passed
+Checking sat step1: passed
+Checking sat step2: passed
+Checking sat step3: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in step1_X_timers: passed
+Checking inv in step2_X_timers: passed
+Checking inv in step3_X_timers: failed
+Model written to /Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/models/1-inv-in-step3_X_timers.txt
+fail: inv
+
+Running: make examples/alternating_bit_protocol.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/alternating_bit_protocol.py
+Checking sat init: passed
+Checking sat ack_msg_drop: passed
+Checking sat data_msg_drop: passed
+Checking sat gen_data: passed
+Checking sat receiver_receive_data: passed
+Checking sat receiver_send_ack: passed
+Checking sat sender_receive_ack: passed
+Checking sat sender_send_data: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in ack_msg_drop_X_timers: passed
+Checking inv in data_msg_drop_X_timers: passed
+Checking inv in gen_data_X_timers: passed
+Checking inv in receiver_receive_data_X_timers: passed
+Checking inv in receiver_send_ack_X_timers: passed
+Checking inv in sender_receive_ack_X_timers: passed
+Checking inv in sender_send_data_X_timers: passed
+Checking conserved in ack_msg_drop_X_timers: passed
+Checking conserved in data_msg_drop_X_timers: passed
+Checking conserved in gen_data_X_timers: passed
+Checking conserved in receiver_receive_data_X_timers: passed
+Checking conserved in receiver_send_ack_X_timers: passed
+Checking conserved in sender_receive_ack_X_timers: passed
+Checking conserved in sender_send_data_X_timers: passed
+Checking decreases in ack_msg_drop_X_timers: passed
+Checking decreases in data_msg_drop_X_timers: passed
+Checking decreases in gen_data_X_timers: passed
+Checking decreases in receiver_receive_data_X_timers: passed
+Checking decreases in receiver_send_ack_X_timers: passed
+Checking decreases in sender_receive_ack_X_timers: passed
+Checking decreases in sender_send_data_X_timers: passed
+Checking beta->alpha_<Bin(bad_in_ack_queue)>: passed
+Checking init->at most 1 alpha_<Bin(bad_in_ack_queue)>: passed
+Checking ack_msg_drop_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking data_msg_drop_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking gen_data_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking receiver_receive_data_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking receiver_send_ack_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking sender_receive_ack_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking sender_send_data_X_timers->at most 1 alpha added_<Bin(bad_in_ack_queue)>: passed
+Checking beta->alpha_<Bin(bad_in_data_queue)>: passed
+Checking init->at most 1 alpha_<Bin(bad_in_data_queue)>: passed
+Checking ack_msg_drop_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking data_msg_drop_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking gen_data_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking receiver_receive_data_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking receiver_send_ack_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking sender_receive_ack_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking sender_send_data_X_timers->at most 1 alpha added_<Bin(bad_in_data_queue)>: passed
+Checking soundness: passed
+All passed!
+Rank size: 33
+
+Running: make examples/binary_counter.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/binary_counter.py
+Checking sat init: passed
+Checking sat decrease: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in decrease_X_timers: passed
+Checking conserved in decrease_X_timers: passed
+Checking decreases in decrease_X_timers: passed
+Checking lt well-founded: Index finite
+Checking soundness: passed
+All passed!
+Rank size: 4
+
+Running: make examples/DomPermTest.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/DomPermTest.py
+Checking sat init: passed
+Checking sat wakeup: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in wakeup_X_timers: passed
+Checking conserved in wakeup_X_timers: passed
+Checking decreases in wakeup_X_timers: failed
+Model written to /Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/models/1-decreases-in-wakeup_X_timers.txt
+fail: decreases
+
+Running: make examples/hybrid_reliable_broadcast.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/hybrid_reliable_broadcast.py
+Checking sat init: passed
+Checking sat receive_init: passed
+Checking sat receive_init_i: passed
+Checking sat receive_msg: passed
+Checking sat receive_msg_c: passed
+Checking sat trans_faulty_send_a: passed
+Checking sat trans_faulty_send_s: passed
+Checking sat trans_faulty_state_sa: passed
+Checking sat trans_receive_msg_i: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in receive_init_X_timers: passed
+Checking inv in receive_init_i_X_timers: passed
+Checking inv in receive_msg_X_timers: passed
+Checking inv in receive_msg_c_X_timers: passed
+Checking inv in trans_faulty_send_a_X_timers: passed
+Checking inv in trans_faulty_send_s_X_timers: passed
+Checking inv in trans_faulty_state_sa_X_timers: passed
+Checking inv in trans_receive_msg_i_X_timers: passed
+Checking conserved in receive_init_X_timers: passed
+Checking conserved in receive_init_i_X_timers: passed
+Checking conserved in receive_msg_X_timers: passed
+Checking conserved in receive_msg_c_X_timers: passed
+Checking conserved in trans_faulty_send_a_X_timers: passed
+Checking conserved in trans_faulty_send_s_X_timers: passed
+Checking conserved in trans_faulty_state_sa_X_timers: passed
+Checking conserved in trans_receive_msg_i_X_timers: passed
+Checking decreases in receive_init_X_timers: passed
+Checking decreases in receive_init_i_X_timers: passed
+Checking decreases in receive_msg_X_timers: passed
+Checking decreases in receive_msg_c_X_timers: passed
+Checking decreases in trans_faulty_send_a_X_timers: passed
+Checking decreases in trans_faulty_send_s_X_timers: passed
+Checking decreases in trans_faulty_state_sa_X_timers: passed
+Checking decreases in trans_receive_msg_i_X_timers: passed
+Checking soundness: passed
+All passed!
+Rank size: 7
+
+Running: make examples/mutex_ring.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/mutex_ring.py
+Checking sat init: passed
+Checking sat wakeup: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in wakeup_X_timers: passed
+Checking conserved in wakeup_X_timers: passed
+Checking decreases in wakeup_X_timers: passed
+Checking soundness: passed
+All passed!
+Rank size: 8
+
+Running: make examples/paxos.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/paxos.py
+Checking sat init: passed
+Checking sat cast_vote: passed
+Checking sat join_round: passed
+Checking sat propose: passed
+Checking sat receive_one_b: passed
+Checking sat send_1a: passed
+Checking sat init and tr: passed
+Checking inv in init: failed
+Checking inv in cast_vote_X_timers: passed
+Checking inv in join_round_X_timers: passed
+Checking inv in propose_X_timers: failed
+Checking inv in receive_one_b_X_timers: passed
+Checking inv in send_1a_X_timers: passed
+fail: inv
+
+Running: make examples/ring_leader.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/ring_leader.py
+Checking sat init: passed
+Checking sat wakeup: passed
+Checking sat init and tr: passed
+Checking inv in init: failed
+Model written to /Users/razlotan/Desktop/research/implicit-rankings-timers/implicit-rankings-timers/models/1-inv-in-init.txt
+Checking inv in wakeup_X_timers: passed
+fail: inv
+
+Running: make examples/ticket.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/ticket.py
+Checking sat init: passed
+Checking sat step12: passed
+Checking sat step22: passed
+Checking sat step23: passed
+Checking sat step31: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in step12_X_timers: passed
+Checking inv in step22_X_timers: passed
+Checking inv in step23_X_timers: passed
+Checking inv in step31_X_timers: passed
+Checking conserved in step12_X_timers: passed
+Checking conserved in step22_X_timers: passed
+Checking conserved in step23_X_timers: passed
+Checking conserved in step31_X_timers: passed
+Checking decreases in step12_X_timers: passed
+Checking decreases in step22_X_timers: passed
+Checking decreases in step23_X_timers: passed
+Checking decreases in step31_X_timers: passed
+Checking beta->alpha_<Bin(rk2_body)>: passed
+Checking init->at most 1 alpha_<Bin(rk2_body)>: passed
+Checking step12_X_timers->at most 1 alpha added_<Bin(rk2_body)>: passed
+Checking step22_X_timers->at most 1 alpha added_<Bin(rk2_body)>: passed
+Checking step23_X_timers->at most 1 alpha added_<Bin(rk2_body)>: passed
+Checking step31_X_timers->at most 1 alpha added_<Bin(rk2_body)>: passed
+Checking beta->alpha_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking init->at most 1 alpha_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking step12_X_timers->at most 1 alpha added_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking step22_X_timers->at most 1 alpha added_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking step23_X_timers->at most 1 alpha added_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking step31_X_timers->at most 1 alpha added_<Cond(TimerPos(t_<scheduled(T)>), non_pc1_serviced)>: passed
+Checking soundness: passed
+All passed!
+Rank size: 6
+
+Running: make examples/toy_stabilization.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/toy_stabilization.py
+Checking sat init: passed
+Checking sat wakeup: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in wakeup_X_timers: passed
+Checking conserved in wakeup_X_timers: passed
+Checking decreases in wakeup_X_timers: passed
+Checking soundness: passed
+All passed!
+Rank size: 5
+
+Running: make examples/trivial_termination.py
+-------------------------------------------
+PYTHONPATH=. .venv/bin/python -m mypy --strict . --exclude .venv
+Success: no issues found in 34 source files
+PYTHONPATH=. .venv/bin/python examples/trivial_termination.py
+Checking sat init: passed
+Checking sat turn_off: passed
+Checking sat init and tr: passed
+Checking inv in init: passed
+Checking inv in turn_off_X_timers: passed
+Checking conserved in turn_off_X_timers: passed
+Checking decreases in turn_off_X_timers: passed
+Checking soundness: passed
+All passed!
+Rank size: 4
+
+===========================================
+All examples completed at Sun Oct  5 20:07:03 IDT 2025
+Output saved to: run_all_examples_output.txt
