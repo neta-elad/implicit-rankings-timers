@@ -259,7 +259,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
     def stack_appearances_lexicographically(self) -> Rank:
         return DomainLexRank(
-            self.num_appearances_of_value_or_ghost(), (self.sys.lt, "Y", Nat)
+            self.num_appearances_of_value_or_ghost(), (self.sys.lt, Nat("Y"))
         )
 
     def rank(self) -> Rank:

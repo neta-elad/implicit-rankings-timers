@@ -747,7 +747,7 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.spec.keys())}])"
 
 
-type DomLexOrder[T: Expr] = tuple[RelLike[T, T], str, type[T]]
+type DomLexOrder[T: Expr] = tuple[RelLike[T, T], T]
 
 
 @dataclass(frozen=True)
@@ -762,11 +762,11 @@ class DomainLexRank[T: Expr](Rank):
 
     @cached_property
     def param_sort(self) -> type[T]:
-        return self.order_like[2]
+        return self.order_like[1].__class__
 
     @cached_property
     def param_name(self) -> str:
-        return self.order_like[1]
+        return str(self.order_like[1])
 
     @property
     def quant_spec(self) -> ParamSpec:
