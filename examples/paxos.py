@@ -79,7 +79,6 @@ class PaxosSystem(TransitionSystem):
             Not(self.proposal_received(N, R, V)),
             Not(self.proposed(R)),
             Not(self.one_b_received(R, N)),
-            # Fairness variables remain non-deterministic (no initialization constraints)
         )
 
     @transition
@@ -179,22 +178,29 @@ class PaxosSystem(TransitionSystem):
             self.proposed.unchanged(),
         )
 
-    # reviewed up to here
-
     @transition
     def propose(self, r: Round, v: Value, q: Quorum, maxr: Round) -> BoolRef:
         N = Node("N")
         MAXR = Round("MAXR")
         V = Value("V")
+        Q = Quorum("Q")  # Add Q for the missing assumption
         return And(
             # guard
             r != self.none,
-            # have received 1b messages from all members of quorum q
-            ForAll(
-                N,
-                Implies(
-                    self.member(N, q),
-                    Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
+            Implies(
+                ForAll(
+                    [N, Q],
+                    Implies(
+                        self.member(N, Q),
+                        Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
+                    ),
+                ),
+                ForAll(
+                    N,
+                    Implies(
+                        self.member(N, q),
+                        Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
+                    ),
                 ),
             ),
             If(
@@ -323,7 +329,6 @@ class PaxosProperty(Prop[PaxosSystem]):
         fairness_conditions = And(
             # Fairness 1: F. one_a(r0) - Eventually a phase 1a message is sent in round r0
             F(self.sys.one_a(self.sys.r0)),
-            # "Eventually a phase 1a message is sent in round r0 (i.e. the owner of r0 starts round r0)"
             # Fairness 2: forall N:node. member(N,q0) ->
             #   G. one_a(r0) -> F. one_a_received(N,r0)
             #   forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
@@ -395,40 +400,103 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         return Implies(self.sys.vote(N, R, V), self.sys.proposal(R, V))
 
     @invariant
-    def no_activity_after_r0(
-        self, R: Round, N: Node, R1: Round, R2: Round, V: Value
+    def no_one_a_after_r0(self, R: Round) -> BoolRef:
+        return Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0))
+
+    @invariant
+    def no_one_b_max_vote_after_r0(
+        self, N: Node, R1: Round, R2: Round, V: Value
     ) -> BoolRef:
-        return And(
-            Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0)),
-            Implies(
-                self.sys.one_b_max_vote(N, R1, R2, V), self.sys.le(R1, self.sys.r0)
-            ),
-            Implies(
-                self.sys.one_b_max_vote_received(R, N, R2, V),
-                self.sys.le(R, self.sys.r0),
-            ),
-            Implies(self.sys.proposal(R, V), self.sys.le(R, self.sys.r0)),
-            Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0)),
+        return Implies(
+            self.sys.one_b_max_vote(N, R1, R2, V), self.sys.le(R1, self.sys.r0)
         )
 
-    # @temporal_invariant
-    def temporal_invariant(self) -> BoolRef:
-        return And(
-            F(self.sys.one_a(self.sys.r0)),
-            F(self.sys.proposed(self.sys.r0)),
+    @invariant
+    def no_one_b_max_vote_received_after_r0(
+        self, R: Round, N: Node, R2: Round, V: Value
+    ) -> BoolRef:
+        return Implies(
+            self.sys.one_b_max_vote_received(R, N, R2, V),
+            self.sys.le(R, self.sys.r0),
         )
 
-    def one_a_r0_formula(self) -> BoolRef:
-        return self.sys.one_a(self.sys.r0)
+    @invariant
+    def no_proposal_after_r0(self, R: Round, V: Value) -> BoolRef:
+        return Implies(self.sys.proposal(R, V), self.sys.le(R, self.sys.r0))
+
+    @invariant
+    def no_vote_after_r0(self, N: Node, R: Round, V: Value) -> BoolRef:
+        return Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0))
+
+    @temporal_invariant
+    def eventulaly_one_a_r0(self) -> BoolRef:
+        return F(self.sys.one_a(self.sys.r0))
+
+    @temporal_invariant
+    def fairness2(self) -> BoolRef:
+        V = Value("V")
+        Q = Quorum("Q")
+        N = Node("N")
+        R = Round("R")
+        return ForAll(
+            N,
+            Implies(
+                self.sys.member(N, self.sys.q0),
+                And(
+                    # G. one_a(r0) -> F. one_a_received(N,r0)
+                    G(
+                        Implies(
+                            self.sys.one_a(self.sys.r0),
+                            F(self.sys.one_a_received(N, self.sys.r0)),
+                        )
+                    ),
+                    # forall. R,V. G. one_b_max_vote(N,r0,R,V) -> F. one_b_received(r0,N)
+                    ForAll(
+                        [R, V],
+                        G(
+                            Implies(
+                                self.sys.one_b_max_vote(N, self.sys.r0, R, V),
+                                F(self.sys.one_b_received(self.sys.r0, N)),
+                            )
+                        ),
+                    ),
+                    # forall. V. G proposal(r0,V) -> F. proposal_received(N,r0,V)
+                    ForAll(
+                        V,
+                        G(
+                            Implies(
+                                self.sys.proposal(self.sys.r0, V),
+                                F(self.sys.proposal_received(N, self.sys.r0, V)),
+                            )
+                        ),
+                    ),
+                ),
+            ),
+        )
+
+    @temporal_invariant
+    def eventually_proposed_r0(self) -> BoolRef:
+        return F(self.sys.proposed(self.sys.r0))
+
+    @temporal_invariant
+    def violation(self) -> BoolRef:
+        V = Value("V")
+        Q = Quorum("Q")
+        N = Node("N")
+        return Not(Exists(
+            [V, Q],
+            F(
+                ForAll(
+                    N, Implies(self.sys.member(N, Q), self.sys.vote(N, self.sys.r0, V))
+                )
+            ),
+        ))
 
     def one_a_r0_timer_rank(self) -> Rank:
-        return self.timer_rank(self.one_a_r0_formula, None, None)
-
-    def proposed_r0_formula(self) -> BoolRef:
-        return self.sys.proposed(self.sys.r0)
+        return self.timer_rank(self.sys.one_a(self.sys.r0), None, None)
 
     def proposed_r0_timer_rank(self) -> Rank:
-        return self.timer_rank(self.proposed_r0_formula, None, None)
+        return self.timer_rank(self.sys.proposed(self.sys.r0), None, None)
 
     def rank(self) -> Rank:
         return PointwiseRank(self.one_a_r0_timer_rank(), self.proposed_r0_timer_rank())

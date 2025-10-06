@@ -54,6 +54,7 @@ TIMERS=unint make examples/ticket.py
 - [ ] prove all examples
 - [ ] make sure DomPerm is not buggy
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
+- [ ] hints in DomLex
 - [ ] In readme, write list of all features
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
 - [ ] (optional) differentiate timeouts and violations in printing: 
