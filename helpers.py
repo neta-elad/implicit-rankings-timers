@@ -4,7 +4,7 @@ from dataclasses import dataclass
 from functools import cached_property
 from os import getenv
 from pathlib import Path
-from typing import cast, Literal
+from typing import cast, Literal, Protocol
 
 import z3
 
@@ -238,6 +238,14 @@ def order_lt[T1: Expr, T2: Expr](order_rel: EvenRel[T1, T2]) -> z3.BoolRef:
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
 
+    return order_lt_axioms(order, sorts)
+
+
+class Relation(Protocol):
+    def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
+
+
+def order_lt_axioms(order: Relation, sorts: list[z3.SortRef]) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]

@@ -66,16 +66,6 @@ class BinaryCounterProp(Prop[BinaryCounter]):
 
 class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
     def position_of_ptr(self) -> Rank:
-        from typing import Any
-
-        def foo[*Ts](rel: Rel[*Ts]) -> int:
-            return 0
-
-        foo(self.sys.lt)
-
-        # t = ts_term((self.sys.lt, Index("i"), Index("j")))
-        # print(t(self.sys, {"i": Index("i0"), "j": Index("j0")}))
-
         return PosInOrderRank(self.sys.ptr, self.sys.lt)
 
     def x_was_last_1(self, i: Index) -> BoolRef:
