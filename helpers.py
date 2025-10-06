@@ -21,6 +21,10 @@ class UnsatResult:
     def unsat(self) -> bool:
         return self.result == z3.unsat
 
+    @cached_property
+    def timeout(self) -> bool:
+        return self.result == z3.unknown
+
 
 def unsat_check(
     constraints: Iterable[z3.BoolRef],

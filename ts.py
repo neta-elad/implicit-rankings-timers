@@ -128,6 +128,9 @@ class BaseTransitionSystem(ABC):
         if result.unsat:
             print("passed")
             return True
+        elif result.timeout:
+            print("timeout")
+            return False
         else:
             symbols = {symbol: None for symbol in self.symbols.values()}
             if with_next:

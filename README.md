@@ -57,7 +57,7 @@ TIMERS=unint make examples/ticket.py
 - [ ] hints in DomLex
 - [ ] In readme, write list of all features
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
-- [ ] (optional) differentiate timeouts and violations in printing: 
+- [x] (optional) differentiate timeouts and violations in printing: 
       timeout should say timeout, not fail
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
