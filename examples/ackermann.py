@@ -29,17 +29,19 @@ class AckermannSystem(TransitionSystem):
 
     # Mutable state variables
     len: Nat
+    len_minus_1:Nat ##added ghost 
     m: Nat  # initiated arbitrarily
     n: Nat  # initiated arbitrarily
     stack: Rel[Nat, Nat]  # one of these is stack variables and the other is data
 
     @axiom
-    def le_axioms(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
+    def lt_axioms(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
         return And(
             Implies(And(self.lt(X, Y), self.lt(Y, Z)), self.lt(X, Z)),
             Implies(And(self.lt(X, Y), self.lt(Y, X)), false),
             Or(self.lt(X, Y), self.lt(Y, X), X == Y),
             Or(self.lt(self.zero, X), X == self.zero),
+            Or(self.succ(self.len_minus_1,self.len),self.len==self.zero) # added ghost definition
         )
 
     def succ(self, n1: Nat, n2: Nat) -> BoolRef:
@@ -101,9 +103,7 @@ class AckermannSystem(TransitionSystem):
 
 class AckermannProp(Prop[AckermannSystem]):
     def prop(self) -> BoolRef:
-        return Not(
-            G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
-        )
+        return F(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero))
 
 
 class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
@@ -122,21 +122,57 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def stack_decreasing(self, X: Nat, Y: Nat, Z: Nat, W: Nat) -> BoolRef:
         # The stack is always decreasing
         return Implies(
-            And(self.sys.stack(X, Y), self.sys.stack(Z, W), self.sys.lt(X, Z)),
-            self.sys.lt(W, Y),
+            And(
+                self.sys.stack(X, Y),
+                self.sys.stack(Z, W),
+                Or(self.sys.lt(X, Z), X == Z),
+            ),
+            Or(self.sys.lt(W, Y), W == Y),
         )
 
     @invariant
-    def m_bounded_by_stack(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
+    def m_bounded_by_stack(self, I: Nat, M: Nat, X: Nat) -> BoolRef:
         # m is at most the greatest value in the stack + 1
         return Implies(
-            And(self.sys.stack(X, Y), self.sys.lt(Y, Z)),
-            Or(self.sys.lt(self.sys.m, Z), self.sys.m == Z),
+            And(self.sys.stack(I, M), self.sys.lt(M, X)),
+            Or(self.sys.lt(self.sys.m, X), self.sys.m == X),
         )
 
     @temporal_invariant
     def never_terminate(self) -> BoolRef:
         return G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
+
+    # rank
+
+    # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
+    # lexicographic order with the more significant being the higher values (otherwise not well-founded)
+    # the intuition to use this is step1 which will "in the future" add unbounded number of values smaller than largest m
+
+    # number of appearances in stack lexicographically, including n+1 copies of m-1. then m, then n (alternative that might also work: n copies of m and 1 copy of m-1)
+    # A(0, n) = n + 1 -- step 1 decreases stack
+    # A(m, 0) = A(m - 1, 1) -- step 2 decreases stack, m.
+    # A(m, n) = A(m - 1, A(m, n - 1)) -- step 3 decreases n, doesn't change m or stack
+    
+    # examples:
+    # stack=[3,3,3,2,1] m=0 n=2
+    # step1
+    # stack=[3,3,3,2] m=1 n=3 ghost stack = [3,3,3,2]+[0,0,0,0]
+    # decreases in the stack is witness by the decrease in value 1 (increase in value 0)
+    # the decrease is witnessed pointwise (i think) - no permutations needed.
+    #   
+    # stack=[3,3,3,2] m=1 n=3 ghost stack = [3,3,3,2]+[0,0,0,0]
+    # step3 
+    # stack=[3,3,3,2,0] m=1 n=2 ghost stack = [3,3,3,2,0]+[0,0,0]
+    # stack is conserved 
+    # witnessed by conserved in all values
+    # in the value 0, there is a permutation between a ghost value n=3 and concrete value x=len-1
+    #
+    # stack=[3,3,3,2] m=3 n=0 ghost stack = [3,3,3,2]+[2]
+    # step2
+    # stack=[3,3,3,2] m=2 n=1 ghost stack = [3,3,3,2]+[1,1]
+    # decrease in stack (and in m)
+    # the decrease is witnessed in value 2 pointwise
+
 
     def position_of_m(self) -> Rank:
         return PosInOrderRank(self.sys.m, self.sys.lt)
@@ -144,14 +180,19 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def position_of_n(self) -> Rank:
         return PosInOrderRank(self.sys.n, self.sys.lt)
 
-    # this is a way more complicated one that also works? why?
     def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
-        m_minus_1 = Nat("m_minus_1")
+        # m_minus_1 = Nat("m_minus_1")
         return Or(
             # usual stack values
             And(
                 self.sys.stack(X, Y),
                 T == StackType.concrete,
+            ),
+            # n+1 copies of Y == m - 1
+            And(
+                Or(self.sys.lt(X, self.sys.n), X == self.sys.n),
+                self.sys.succ(Y, self.sys.m),
+                T == StackType.ghost,
             ),
             # # n copies of Y == m - 1
             # And(
@@ -171,12 +212,6 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             #     X == self.sys.zero,
             #     T == StackType.ghost,
             # ),
-            # n+1 copies of Y == m - 1
-            And(
-                Or(self.sys.lt(X, self.sys.n), X == self.sys.n),
-                self.sys.succ(Y, self.sys.m),
-                T == StackType.ghost,
-            ),
         )
 
     def finite_lemma_for_stack_value_or_ghost(
@@ -194,27 +229,32 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         return BinRank(self.stack_value_or_ghost)
 
     def num_appearances_of_value_or_ghost(self) -> Rank:
+        conserved_hints = [
+            (   
+                #permute discussed above
+                [{"X": self.sys.n,"T":StackType.ghost}],
+                [{"X": self.sys.len_minus_1,"T":StackType.concrete}],
+            ),
+            (
+                #no permute
+                [{"X": self.sys.n,"T":StackType.concrete}],
+                [{"X": self.sys.n,"T":StackType.concrete}],
+            ),
+        ]
+        # decrease_hints = [
+        #     (
+        #         [{"i": self.sys.node1}],
+        #         [{"i": self.sys.node2}],
+        #         {"i": self.sys.node3},
+        #     )
+        # ]
         return DomainPermutedRank(
             self.stack_value_or_ghost_binary(),
             ParamSpec(X=Nat, T=StackType),
             k=1,
             finite_lemma=None,
+            conserved_hints=conserved_hints
         )
-
-    # def stack_value(self, X: Nat, Y: Nat) -> BoolRef:
-    #     return self.sys.stack(X, Y)
-
-    # def stack_value_binary(self) -> Rank:
-    #     return BinRank(self.stack_value)
-
-    # # this was verified as decreasing but this was a bug with DomPerm
-    # def num_appearances_of_value(self) -> Rank:
-    #     return DomainPermutedRank(
-    #         self.stack_value_binary(),
-    #         ParamSpec(X=Nat),
-    #         k=1,
-    #         finite_lemma=None,
-    #     )
 
     def stack_appearances_lexicographically(self) -> Rank:
         return DomainLexRank(
@@ -228,69 +268,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             self.position_of_n(),
         )
 
-    # this is intuitively close
-    # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
-
-    # lexicographic order with the more significant being the higher values (otherwise not well-founded)
-    # the intuition to use this is step1 which will "in the future" add unbounded number of values smaller than largest m
-    # still why does this decrease?
-
-    # idea: when m!=0 and n!=0 the next thing we will do is step3, pushing m-1 to stack and n=n-1
-    # so we can think of the stack as having n copies of m-1 (because that's what's going to happen)
-    # then implcilty step 3 doesn't do anything, but decreases n so good.
-    # should we also include the current m in position len?
-
-    # step 2 is simple, it just decreases m and increases n and doesn't touch the stack,
-    # but it will implicitly change the stack because of the above, adding one copy of (new) m-1 -- increasing rank.
-
-    # step 1
-
-    # if we consider a rank that is based only on m,n and the number of times each value appears in the stack *including* m itself then it can't capture this.
-    # because the second and fourth state are equivalent based on those measures. -> m itself shouldn't be in the stack
-
-    # consider this sequence of steps:
-
-    # stack = [4, 3, 2, 1, 0] m=0 n=2 ghost: [4,3,2,1,0]
-    # step1
-    # stack = [4, 3, 2, 1] m=0 n=2 ghost: [4,3,2,1]
-    # step1
-    # stack = [4, 3, 2] m=1 n=3 ghost: [4,3,2,0,0,0]
-    # step3
-    # stack = [4, 3, 2, 0] m=1 n=2 ghost: [4,3,2,0,0,0]
-    # step3
-    # stack = [4, 3, 2, 0, 0] m=1 n=1 ghost: [4,3,2,0,0,0]
-    # step 3
-    # stack = [4, 3, 2, 0, 0, 0] m=1 n=0 ghost: [4,3,2,0,0,0]
-    # step 2
-    # stack = [4, 3, 2, 0, 0, 0] m=0 n=1 ghost: [4,3,2,0,0,0]
-
-    # what happens in a case of step 2 with m!=1
-    #
-    # stack = [5, 5, 5, 5, 5] m=6 n=0: [5, 5, 5, 5, 5]
-    # step2
-    # stack = [5, 5, 5, 5, 5] m=5 n=1 ghost: [5, 5, 5, 5, 5, 4]
-    # problematic
-    # but maybe this is why oded wanted n+1
-    # becuase then its
-    # stack = [5, 5, 5, 5, 5] m=6 n=0: [5, 5, 5, 5, 5, 5]
-    # step2
-    # stack = [5, 5, 5, 5, 5] m=5 n=1 ghost: [5, 5, 5, 5, 5, 4, 4]
-
-    # idea: n copies of m and 1 copy of m-1??
-    # then its
-    # stack = [5, 5, 5, 5, 5] m=6 n=0: ghost: [5, 5, 5, 5, 5, 4]
-    # step2
-    # stack = [5, 5, 5, 5, 5] m=5 n=1 ghost: [5, 5, 5, 5, 5, 4]
-
-    # so my final idea currently
-    # number of appearances in stack lexicographically, including n+1 copies of m-1. then m, then n
-    # step 3 decreases n, doesn't change m or stack
-    # step 2 decreases stack, m.
-    # step 1 decreases stack
-    # a bit strange because most clean would be step 3 decreases n, step 2 decreases m, step 1 decreases stack
-
-    # how to implement this n+1 copies of m:
-    # probably need DomPerm with the enum like we did for the complex dijkstra ones.
+    # for an alternative idea - see the paper Proving Termination with Multiset Orderings  by Manna and Dershovitz.
 
 
 AckermannProof().check()
