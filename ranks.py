@@ -772,15 +772,21 @@ type DomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = (
 
 
 @dataclass(frozen=True)
-class DomainLexRank[T1: Expr, T2: Expr](Rank):
+class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
     rank: Rank
-    order_like: (
-        BinaryDomLexOrder[T1] | QuaternaryDomLexOrder[T1, T2] | TermLike[z3.BoolRef]
-    )
+    order_like: DomLexOrder[T1, T2, T3, T4] | TermLike[z3.BoolRef]
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
-    def order_as_ts_rel(self) -> TSRel[T1, T1] | TSRel[T1, T2, T1, T2] | None:
+    def order_as_ts_rel(
+        self,
+    ) -> (
+        None
+        | TSRel[T1, T1]
+        | TSRel[T1, T2, T1, T2]
+        | TSRel[T1, T2, T3, T1, T2, T3]
+        | TSRel[T1, T2, T3, T4, T1, T2, T3, T4]
+    ):
         if isinstance(self.order_like, tuple):
             return ts_rel(self.order_like[0])  # type ignore
         return None

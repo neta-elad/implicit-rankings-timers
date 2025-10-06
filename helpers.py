@@ -226,22 +226,7 @@ def order_leq[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
     )
 
 
-type EvenRel[T1: Expr, T2: Expr] = (Rel[T1, T1] | Rel[T1, T2, T1, T2])
-
-
-def order_lt[T1: Expr, T2: Expr](order_rel: EvenRel[T1, T2]) -> z3.BoolRef:
-    order, sorts = parse_even_rel(order_rel)
-
-    return order_lt_axioms(order, sorts)
-
-
-class Predicate(Protocol):
-    def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
-
-
-def parse_even_rel[T1: Expr, T2: Expr](
-    order_rel: EvenRel[T1, T2],
-) -> tuple[Predicate, list[z3.SortRef]]:
+def order_lt[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     order_fun = order_rel.fun
 
     def order(*args: z3.ExprRef) -> z3.BoolRef:
@@ -249,7 +234,12 @@ def parse_even_rel[T1: Expr, T2: Expr](
 
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
-    return order, sorts
+
+    return order_lt_axioms(order, sorts)
+
+
+class Predicate(Protocol):
+    def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
 
 
 def order_lt_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
