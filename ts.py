@@ -87,8 +87,14 @@ class BaseTransitionSystem(ABC):
         ) - {z3.IntSort(), z3.BoolSort()}
 
     def check_inductiveness(
-        self, inv: Callable[[Self], z3.BoolRef], inv_name: str = "?"
+        self,
+        inv: Callable[[Self], z3.BoolRef],
+        inv_name: str = "?",
+        assumption: Callable[[Self], z3.BoolRef] | None = None,
     ) -> bool:
+        if assumption is None:
+            assumption = inv
+
         results = []
         results.append(
             self.check_and_print(f"{inv_name} in init", self.init, z3.Not(inv(self)))
@@ -98,7 +104,7 @@ class BaseTransitionSystem(ABC):
             results.append(
                 self.check_and_print(
                     f"{inv_name} in {name}",
-                    inv(self),
+                    assumption(self),
                     trans,
                     z3.Not(inv(self.next)),
                     with_next=True,

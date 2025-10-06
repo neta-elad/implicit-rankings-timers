@@ -197,7 +197,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return self.timers.t(f"t_<{str(name).replace("'", "")}>")
 
     @cached_property
-    def invariants(self) -> dict[str, z3.BoolRef]:
+    def system_invariants(self) -> dict[str, z3.BoolRef]:
         return {
             name: universal_closure(method, self)
             for name, method in _get_methods(self, _PROOF_INVARIANT)
@@ -218,8 +218,12 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         }
 
     @cached_property
+    def invariants(self) -> dict[str, z3.BoolRef]:
+        return self.system_invariants | self.temporal_invariants
+
+    @cached_property
     def invariant(self) -> z3.BoolRef:
-        return z3.And(*self.invariants.values(), *self.temporal_invariants.values())
+        return z3.And(*self.invariants.values())
 
     @cached_property
     def witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
@@ -318,7 +322,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return True
 
     def _check_inv(self) -> bool:
-        return self.check_inductiveness(lambda this: this.invariant, "inv")
+        return all(
+            self.check_inductiveness(
+                lambda this: this.invariants[name],
+                f"inv {name}",
+                lambda this: this.invariant,
+            )
+            for name in self.invariants
+        )
 
     def _check_conserved(self) -> bool:
         results = []
