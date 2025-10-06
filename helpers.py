@@ -230,6 +230,18 @@ type EvenRel[T1: Expr, T2: Expr] = (Rel[T1, T1] | Rel[T1, T2, T1, T2])
 
 
 def order_lt[T1: Expr, T2: Expr](order_rel: EvenRel[T1, T2]) -> z3.BoolRef:
+    order, sorts = parse_even_rel(order_rel)
+
+    return order_lt_axioms(order, sorts)
+
+
+class Predicate(Protocol):
+    def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
+
+
+def parse_even_rel[T1: Expr, T2: Expr](
+    order_rel: EvenRel[T1, T2],
+) -> tuple[Predicate, list[z3.SortRef]]:
     order_fun = order_rel.fun
 
     def order(*args: z3.ExprRef) -> z3.BoolRef:
@@ -237,15 +249,10 @@ def order_lt[T1: Expr, T2: Expr](order_rel: EvenRel[T1, T2]) -> z3.BoolRef:
 
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
-
-    return order_lt_axioms(order, sorts)
-
-
-class Relation(Protocol):
-    def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
+    return order, sorts
 
 
-def order_lt_axioms(order: Relation, sorts: list[z3.SortRef]) -> z3.BoolRef:
+def order_lt_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]

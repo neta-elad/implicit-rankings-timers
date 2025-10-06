@@ -7,7 +7,14 @@ from typing import cast, Any, overload
 
 import z3
 
-from helpers import order_lt, minimal_in_order_lt, quantify, instantiate
+from helpers import (
+    order_lt,
+    minimal_in_order_lt,
+    quantify,
+    instantiate,
+    Predicate,
+    order_lt_axioms,
+)
 from timers import Time, timer_zero, timer_order
 from ts import (
     BaseTransitionSystem,
@@ -771,8 +778,21 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
-    def order(self) -> TSRel[T1, T1] | TSRel[T1, T2, T1, T2]:
-        return ts_rel(self.order_like[0])  # type ignore
+    def order_as_ts_rel(self) -> TSRel[T1, T1] | TSRel[T1, T2, T1, T2] | None:
+        if isinstance(self.order_like, tuple):
+            return ts_rel(self.order_like[0])  # type ignore
+        return None
+
+    def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
+        if self.order_as_ts_rel is not None:
+            return cast(Predicate, self.order_as_ts_rel(ts))
+        raise NotImplementedError
+
+    @cached_property
+    def order_name(self) -> str:
+        if self.order_as_ts_rel is not None:
+            return self.order_as_ts_rel.name
+        raise NotImplementedError
 
     @cached_property
     def sorts(self) -> list[Sort]:
@@ -780,6 +800,10 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
             cast(Sort, self.order_like[i].__class__)
             for i in range(1, len(self.order_like))
         ]
+
+    @cached_property
+    def sort_refs(self) -> list[z3.SortRef]:
+        return [sort.ref() for sort in self.sorts]
 
     @cached_property
     def names(self) -> list[str]:
@@ -811,7 +835,7 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                order_lt(self.order(ts)),
+                order_lt_axioms(self.order_pred(ts), self.sort_refs),
                 z3.ForAll(
                     ys,
                     z3.Or(
@@ -824,7 +848,7 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
                         z3.Exists(
                             y0s,
                             z3.And(
-                                self.order(ts)(*y0s, *ys),  # type: ignore
+                                self.order_pred(ts)(*y0s, *ys),
                                 self.rank.decreases(
                                     ts,
                                     params
@@ -883,7 +907,7 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
         return 1 + self.rank.size
 
     def __str__(self) -> str:
-        return f"DomLex({self.rank}, {self.order}, {", ".join(self.names)})"
+        return f"DomLex({self.rank}, {self.order_name}, {", ".join(self.names)})"
 
 
 @dataclass(frozen=True)
