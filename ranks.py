@@ -747,13 +747,27 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.spec.keys())}])"
 
 
-type DomLexOrder[T: Expr] = tuple[RelLike[T, T], T]
+type BinaryDomLexOrder[T: Expr] = tuple[RelLike[T, T], T]
+type QuaternaryDomLexOrder[T1: Expr, T2: Expr] = tuple[RelLike[T1, T2, T1, T2], T1, T2]
+type SenaryDomLexOrder[T1: Expr, T2: Expr, T3: Expr] = tuple[
+    RelLike[T1, T2, T3, T1, T2, T3], T1, T2, T3
+]
+type OctonaryDomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = tuple[
+    RelLike[T1, T2, T3, T4, T1, T2, T3, T4], T1, T2, T3, T4
+]
+
+type DomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = (
+    BinaryDomLexOrder[T1]
+    | QuaternaryDomLexOrder[T1, T2]
+    | SenaryDomLexOrder[T1, T2, T3]
+    | OctonaryDomLexOrder[T1, T2, T3, T4]
+)
 
 
 @dataclass(frozen=True)
 class DomainLexRank[T: Expr](Rank):
     rank: Rank
-    order_like: DomLexOrder[T]
+    order_like: BinaryDomLexOrder[T]
     finite_lemma: FiniteLemma | None = None
 
     @cached_property

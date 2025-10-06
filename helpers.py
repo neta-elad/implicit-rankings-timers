@@ -226,19 +226,34 @@ def order_leq[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
     )
 
 
-def order_lt[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
-    sort = order.fun.domain(0)
-    X = cast(T, z3.Const("X", sort))
-    Y = cast(T, z3.Const("Y", sort))
-    Z = cast(T, z3.Const("Z", sort))
+type EvenRel[T1: Expr, T2: Expr] = (Rel[T1, T1] | Rel[T1, T2, T1, T2])
+
+
+def order_lt[T1: Expr, T2: Expr](order_rel: EvenRel[T1, T2]) -> z3.BoolRef:
+    order_fun = order_rel.fun
+
+    def order(*args: z3.ExprRef) -> z3.BoolRef:
+        return cast(z3.BoolRef, order_fun(*args))
+
+    half_arity = order_fun.arity() // 2
+    sorts = [order_fun.domain(i) for i in range(half_arity)]
+
+    X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
+    Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
+    Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]
     return z3.And(
         # transitive, antisymmetric z3.and total
         z3.ForAll(
-            [X, Y, Z],
-            z3.Implies(z3.And(order(X, Y), order(Y, Z)), order(X, Z)),
+            X + Y + Z,
+            z3.Implies(z3.And(order(*X, *Y), order(*Y, *Z)), order(*X, *Z)),
         ),
-        z3.ForAll([X], z3.Not(order(X, X))),
-        z3.ForAll([X, Y], z3.Or(X == Y, order(X, Y), order(Y, X))),
+        z3.ForAll(X, z3.Not(order(*X, *X))),
+        z3.ForAll(
+            X + Y,
+            z3.Or(
+                z3.And(*(x == y for x, y in zip(X, Y))), order(*X, *Y), order(*Y, *X)
+            ),
+        ),
     )
 
 
