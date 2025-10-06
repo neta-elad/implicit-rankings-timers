@@ -29,7 +29,7 @@ class AckermannSystem(TransitionSystem):
 
     # Mutable state variables
     len: Nat
-    len_minus_1:Nat ##added ghost 
+    len_minus_1: Nat  ##added ghost
     m: Nat  # initiated arbitrarily
     n: Nat  # initiated arbitrarily
     stack: Rel[Nat, Nat]  # one of these is stack variables and the other is data
@@ -41,7 +41,9 @@ class AckermannSystem(TransitionSystem):
             Implies(And(self.lt(X, Y), self.lt(Y, X)), false),
             Or(self.lt(X, Y), self.lt(Y, X), X == Y),
             Or(self.lt(self.zero, X), X == self.zero),
-            Or(self.succ(self.len_minus_1,self.len),self.len==self.zero) # added ghost definition
+            Or(
+                self.succ(self.len_minus_1, self.len), self.len == self.zero
+            ),  # added ghost definition
         )
 
     def succ(self, n1: Nat, n2: Nat) -> BoolRef:
@@ -152,18 +154,18 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     # A(0, n) = n + 1 -- step 1 decreases stack
     # A(m, 0) = A(m - 1, 1) -- step 2 decreases stack, m.
     # A(m, n) = A(m - 1, A(m, n - 1)) -- step 3 decreases n, doesn't change m or stack
-    
+
     # examples:
     # stack=[3,3,3,2,1] m=0 n=2
     # step1
     # stack=[3,3,3,2] m=1 n=3 ghost stack = [3,3,3,2]+[0,0,0,0]
     # decreases in the stack is witness by the decrease in value 1 (increase in value 0)
     # the decrease is witnessed pointwise (i think) - no permutations needed.
-    #   
+    #
     # stack=[3,3,3,2] m=1 n=3 ghost stack = [3,3,3,2]+[0,0,0,0]
-    # step3 
+    # step3
     # stack=[3,3,3,2,0] m=1 n=2 ghost stack = [3,3,3,2,0]+[0,0,0]
-    # stack is conserved 
+    # stack is conserved
     # witnessed by conserved in all values
     # in the value 0, there is a permutation between a ghost value n=3 and concrete value x=len-1
     #
@@ -172,7 +174,6 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     # stack=[3,3,3,2] m=2 n=1 ghost stack = [3,3,3,2]+[1,1]
     # decrease in stack (and in m)
     # the decrease is witnessed in value 2 pointwise
-
 
     def position_of_m(self) -> Rank:
         return PosInOrderRank(self.sys.m, self.sys.lt)
@@ -230,15 +231,15 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
     def num_appearances_of_value_or_ghost(self) -> Rank:
         conserved_hints = [
-            (   
-                #permute discussed above
-                [{"X": self.sys.n,"T":StackType.ghost}],
-                [{"X": self.sys.len_minus_1,"T":StackType.concrete}],
+            (
+                # permute discussed above
+                [{"X": self.sys.n, "T": StackType.ghost}],
+                [{"X": self.sys.len_minus_1, "T": StackType.concrete}],
             ),
             (
-                #no permute
-                [{"X": self.sys.n,"T":StackType.concrete}],
-                [{"X": self.sys.n,"T":StackType.concrete}],
+                # no permute
+                [{"X": self.sys.n, "T": StackType.concrete}],
+                [{"X": self.sys.n, "T": StackType.concrete}],
             ),
         ]
         # decrease_hints = [
@@ -253,7 +254,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             ParamSpec(X=Nat, T=StackType),
             k=1,
             finite_lemma=None,
-            conserved_hints=conserved_hints
+            conserved_hints=conserved_hints,
         )
 
     def stack_appearances_lexicographically(self) -> Rank:
