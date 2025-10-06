@@ -33,32 +33,32 @@ type DomainPermutedDecreasesHints = Sequence[DomainPermutedDecreasesHint]
 type FiniteSCHint = Sequence[Hint]
 type FiniteSCHints = Sequence[FiniteSCHint]
 
-type _RawTSRel[T: Expr] = Callable[[BaseTransitionSystem], Rel[T, T]]
+type _RawTSRel[*Ts] = Callable[[BaseTransitionSystem], Rel[*Ts]]
 
 
 @dataclass(frozen=True)
-class TSRel[T: Expr]:
-    fun: _RawTSRel[T]
+class TSRel[*Ts]:
+    fun: _RawTSRel[*Ts]
 
-    def __call__(self, ts: BaseTransitionSystem) -> Rel[T, T]:
+    def __call__(self, ts: BaseTransitionSystem) -> Rel[*Ts]:
         return self.fun(ts)
 
 
 @overload
-def ts_rel[T: Expr](rel: TSRel[T]) -> TSRel[T]: ...
+def ts_rel[*Ts](rel: TSRel[*Ts]) -> TSRel[*Ts]: ...
 
 
 @overload
-def ts_rel[T: Expr](rel: Rel[T, T]) -> TSRel[T]: ...
+def ts_rel[*Ts](rel: Rel[*Ts]) -> TSRel[*Ts]: ...
 
 
 @overload
-def ts_rel[TR: BaseTransitionSystem, T: Expr](
-    rel: Callable[[TR], Rel[T, T]],
-) -> TSRel[T]: ...
+def ts_rel[TR: BaseTransitionSystem, *Ts](
+    rel: Callable[[TR], Rel[*Ts]],
+) -> TSRel[*Ts]: ...
 
 
-def ts_rel(rel: Any) -> TSRel[Any]:
+def ts_rel(rel: Any) -> Any:
     if isinstance(rel, TSRel):
         return rel
     elif isinstance(rel, Rel):
@@ -67,10 +67,10 @@ def ts_rel(rel: Any) -> TSRel[Any]:
         return _ts_rel_from_callable(rel)
 
 
-def _ts_rel_from_rel[T: Expr](rel: Rel[T, T]) -> TSRel[T]:
+def _ts_rel_from_rel[*Ts](rel: Rel[*Ts]) -> TSRel[*Ts]:
     name = str(rel)
 
-    def fun(ts: BaseTransitionSystem) -> Rel[T, T]:
+    def fun(ts: BaseTransitionSystem) -> Rel[*Ts]:
         if name in ts.symbols:
             return Rel(name, rel.mutable, ts.symbols[name])
         return rel
@@ -78,14 +78,14 @@ def _ts_rel_from_rel[T: Expr](rel: Rel[T, T]) -> TSRel[T]:
     return TSRel(fun)
 
 
-def _ts_rel_from_callable[T: Expr](
-    rel: Callable[[BaseTransitionSystem], Rel[T, T]],
-) -> TSRel[T]:
+def _ts_rel_from_callable[*Ts](
+    rel: Callable[[BaseTransitionSystem], Rel[*Ts]],
+) -> TSRel[*Ts]:
     return TSRel(rel)
 
 
-type RelLike[T: Expr] = TSRel[T] | Rel[T, T] | _RawTSRel[T] | Callable[
-    [BaseTransitionSystem], Rel[T, T]
+type RelLike[*Ts] = TSRel[*Ts] | Rel[*Ts] | _RawTSRel[*Ts] | Callable[
+    [BaseTransitionSystem], Rel[*Ts]
 ]
 
 
@@ -100,8 +100,8 @@ class TrueSC(SoundnessCondition):
 
 
 @dataclass(frozen=True)
-class WellFoundedSC(SoundnessCondition):
-    order: TSRel[Any]
+class WellFoundedSC[T: Expr](SoundnessCondition):
+    order: TSRel[T, T]
 
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
         rel = self.order(ts)
@@ -384,14 +384,14 @@ class BinRank(Rank):
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
     term_src: TermLike[T]
-    order_like: RelLike[T]
+    order_like: RelLike[T, T]
 
     @cached_property
     def term(self) -> TSTerm[T]:
         return ts_term(self.term_src)
 
     @cached_property
-    def order(self) -> TSRel[T]:
+    def order(self) -> TSRel[T, T]:
         return ts_rel(self.order_like)
 
     @property
@@ -744,14 +744,14 @@ class DomainPointwiseRank(Rank):
 
 
 @dataclass(frozen=True)
-class DomainLexRank(Rank):
+class DomainLexRank[T: Expr](Rank):
     rank: Rank
-    order_like: RelLike[Any]
-    param: tuple[str, Sort]
+    order_like: RelLike[T, T]
+    param: tuple[str, type[T]]
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
-    def order(self) -> TSRel[Any]:
+    def order(self) -> TSRel[T, T]:
         return ts_rel(self.order_like)
 
     @property

@@ -163,7 +163,7 @@ type Sort = type[Expr]
 type Signature = tuple[Sort, ...]
 
 
-class Fun[*Ts, T: Expr]:
+class Fun[*Ts, T: z3.ExprRef]:
     name: str
     mutable: bool
     fun: z3.FuncDeclRef
