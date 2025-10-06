@@ -127,9 +127,9 @@ class RingLeaderProp(Prop[RingLeader]):
     def prop(self) -> BoolRef:
         N = Node("N")
         return Implies(
-                ForAll(N, G(F(self.sys.scheduled(N)))),
-                F(Exists(N, self.sys.leader(N))),
-            )
+            ForAll(N, G(F(self.sys.scheduled(N)))),
+            F(Exists(N, self.sys.leader(N))),
+        )
 
 
 class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
@@ -197,7 +197,7 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
 
     @temporal_invariant
     def no_leader(self) -> BoolRef:
-        N = Node('N')
+        N = Node("N")
         return G(ForAll(N, Not(self.sys.leader(N))))
 
     # the ranking we had before is kind of problematic because it uses DomLex with 2 parameters, which we don't have
@@ -226,9 +226,8 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
             X, And(self.sys.pending(self.sys.id(M), X), self.sys.btw(X, N, M))
         )
 
-
     def all_distances(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.node_might_process_id),None)
+        return DomainPointwiseRank.close(BinRank(self.node_might_process_id), None)
 
     # scheduling timers
 
@@ -245,7 +244,7 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
         return self.timer_rank(self.scheduled, self.scheduling_helpful, None)
 
     # final rank
-    # currently seems to be too complex to work, and the hints are complex as well. 
+    # currently seems to be too complex to work, and the hints are complex as well.
     def rank(self) -> Rank:
         return LexRank(
             self.set_not_sent_own(),

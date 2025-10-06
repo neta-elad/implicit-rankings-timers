@@ -765,26 +765,33 @@ type DomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = (
 
 
 @dataclass(frozen=True)
-class DomainLexRank[T: Expr](Rank):
+class DomainLexRank[T1: Expr, T2: Expr](Rank):
     rank: Rank
-    order_like: BinaryDomLexOrder[T]
+    order_like: BinaryDomLexOrder[T1] | QuaternaryDomLexOrder[T1, T2]
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
-    def order(self) -> TSRel[T, T]:
-        return ts_rel(self.order_like[0])
+    def order(self) -> TSRel[T1, T1] | TSRel[T1, T2, T1, T2]:
+        return ts_rel(self.order_like[0])  # type ignore
 
     @cached_property
-    def param_sort(self) -> type[T]:
-        return self.order_like[1].__class__
+    def sorts(self) -> list[Sort]:
+        return [
+            cast(Sort, self.order_like[i].__class__)
+            for i in range(1, len(self.order_like))
+        ]
 
     @cached_property
-    def param_name(self) -> str:
-        return str(self.order_like[1])
+    def names(self) -> list[str]:
+        return [str(self.order_like[i]) for i in range(1, len(self.order_like))]
+
+    @cached_property
+    def primed_names(self) -> list[str]:
+        return [name + "'" for name in self.names]
 
     @property
     def quant_spec(self) -> ParamSpec:
-        return ParamSpec({self.param_name: self.param_sort})
+        return ParamSpec({name: sort for name, sort in zip(self.names, self.sorts)})
 
     @property
     def spec(self) -> ParamSpec:
@@ -798,28 +805,31 @@ class DomainLexRank[T: Expr](Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        y0 = self.param_sort("y0")
-        y = self.param_sort("y")
+        y0s = [z3.Const(f"y0_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+        ys = [z3.Const(f"y_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
                 order_lt(self.order(ts)),
                 z3.ForAll(
-                    y,
+                    ys,
                     z3.Or(
                         self.rank.conserved(
                             ts,
-                            params | {self.param_name: y} | {self.param_name + "'": y},
+                            params
+                            | dict(zip(self.names, ys))
+                            | dict(zip(self.primed_names, ys)),
                         ),
                         z3.Exists(
-                            y0,
+                            y0s,
                             z3.And(
-                                self.order(ts)(y0, y),
+                                self.order(ts)(*y0s, *ys),  # type: ignore
                                 self.rank.decreases(
                                     ts,
                                     params
-                                    | {self.param_name: y0}
-                                    | {self.param_name + "'": y0},
+                                    | dict(zip(self.names, y0s))
+                                    | dict(zip(self.primed_names, y0s)),
                                 ),
                             ),
                         ),
@@ -873,7 +883,7 @@ class DomainLexRank[T: Expr](Rank):
         return 1 + self.rank.size
 
     def __str__(self) -> str:
-        return f"DomLex({self.rank}, {self.order}, {self.param_name})"
+        return f"DomLex({self.rank}, {self.order}, {", ".join(self.names)})"
 
 
 @dataclass(frozen=True)
