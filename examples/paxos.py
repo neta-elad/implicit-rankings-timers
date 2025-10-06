@@ -1,5 +1,4 @@
 from prelude import *
-from typing import List
 
 # @ status - timeout of inv in init
 
@@ -483,14 +482,19 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         V = Value("V")
         Q = Quorum("Q")
         N = Node("N")
-        return Not(Exists(
-            [V, Q],
-            F(
-                ForAll(
-                    N, Implies(self.sys.member(N, Q), self.sys.vote(N, self.sys.r0, V))
-                )
-            ),
-        ))
+        return Not(
+            Exists(
+                [V, Q],
+                F(
+                    ForAll(
+                        N,
+                        Implies(
+                            self.sys.member(N, Q), self.sys.vote(N, self.sys.r0, V)
+                        ),
+                    )
+                ),
+            )
+        )
 
     def one_a_r0_timer_rank(self) -> Rank:
         return self.timer_rank(self.sys.one_a(self.sys.r0), None, None)

@@ -76,6 +76,15 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
             BinRank(self.x_was_last_1), (self.sys.lt, Index("i")), None
         )
 
+    # alternative (generalized) way of defining order formula:
+    # def lt(self, i1: Index, i2: Index) -> BoolRef:
+    #     return self.sys.lt(i1, i2)
+
+    # def ghost_array_lex(self) -> Rank:
+    # return DomainLexRank(
+    #     BinRank(self.x_was_last_1), self.lt, None
+    # )
+
     def rank(self) -> Rank:
         return LexRank(self.ghost_array_lex(), self.position_of_ptr())
 

@@ -774,7 +774,9 @@ type DomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = (
 @dataclass(frozen=True)
 class DomainLexRank[T1: Expr, T2: Expr](Rank):
     rank: Rank
-    order_like: BinaryDomLexOrder[T1] | QuaternaryDomLexOrder[T1, T2]
+    order_like: (
+        BinaryDomLexOrder[T1] | QuaternaryDomLexOrder[T1, T2] | TermLike[z3.BoolRef]
+    )
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
@@ -783,23 +785,64 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
             return ts_rel(self.order_like[0])  # type ignore
         return None
 
+    @cached_property
+    def order_as_ts_formula(self) -> TSFormula | None:
+        if isinstance(self.order_like, tuple):
+            return None
+        return ts_term(self.order_like)
+
     def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
         if self.order_as_ts_rel is not None:
             return cast(Predicate, self.order_as_ts_rel(ts))
-        raise NotImplementedError
+
+        formula = self.order_as_ts_formula
+        assert formula is not None, f"Unsupported order like {self.order_like}"
+
+        def predicate(*args: z3.ExprRef) -> z3.BoolRef:
+            params = {name: arg for name, arg in zip(formula.spec.keys(), args)}
+            return formula(ts, params)
+
+        return predicate
 
     @cached_property
     def order_name(self) -> str:
         if self.order_as_ts_rel is not None:
             return self.order_as_ts_rel.name
-        raise NotImplementedError
+
+        assert (
+            self.order_as_ts_formula is not None
+        ), f"Unsupported order like {self.order_like}"
+        return self.order_as_ts_formula.name
 
     @cached_property
     def sorts(self) -> list[Sort]:
-        return [
-            cast(Sort, self.order_like[i].__class__)
-            for i in range(1, len(self.order_like))
-        ]
+        if isinstance(self.order_like, tuple):
+            return [
+                cast(Sort, self.order_like[i].__class__)
+                for i in range(1, len(self.order_like))
+            ]
+
+        assert (
+            self.order_as_ts_formula is not None
+        ), f"Unsupported order like {self.order_like}"
+        name = self.order_as_ts_formula.name
+        spec = self.order_as_ts_formula.spec
+        spec_values = list(spec.values())
+        assert len(spec_values) % 2 == 0, f"Non-even order formula {name}"
+        half_len = len(spec_values) // 2
+
+        sorts = []
+        for i in range(half_len):
+            sort1 = spec_values[i]
+            sort2 = spec_values[i + half_len]
+            assert sort1 is sort2, (
+                f"Mismatched sorts in order formula {name}, "
+                f"{sort1.ref()} at {i} but {sort2.ref()} at {i + half_len}"
+            )
+
+            sorts.append(sort1)
+
+        return sorts
 
     @cached_property
     def sort_refs(self) -> list[z3.SortRef]:
@@ -807,7 +850,31 @@ class DomainLexRank[T1: Expr, T2: Expr](Rank):
 
     @cached_property
     def names(self) -> list[str]:
-        return [str(self.order_like[i]) for i in range(1, len(self.order_like))]
+        if isinstance(self.order_like, tuple):
+            return [str(self.order_like[i]) for i in range(1, len(self.order_like))]
+
+        assert (
+            self.order_as_ts_formula is not None
+        ), f"Unsupported order like {self.order_like}"
+        name = self.order_as_ts_formula.name
+        spec = self.order_as_ts_formula.spec
+        spec_keys = list(spec.keys())
+        assert len(spec_keys) % 2 == 0, f"Non-even order formula {name}"
+        half_len = len(spec_keys) // 2
+
+        names = []
+        for i in range(half_len):
+            name1 = spec_keys[i]
+            name2 = spec_keys[i + half_len]
+            assert (
+                name1.endswith("1") and name2.endswith("2") and name1[:-1] == name2[:-1]
+            ), (
+                f"Mismatched names in order formula {name}, "
+                f"{name1} at {i} but {name2} at {i + half_len}"
+            )
+
+            names.append(name1[:-1])
+        return names
 
     @cached_property
     def primed_names(self) -> list[str]:
