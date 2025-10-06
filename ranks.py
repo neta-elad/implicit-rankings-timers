@@ -39,9 +39,13 @@ type _RawTSRel[*Ts] = Callable[[BaseTransitionSystem], Rel[*Ts]]
 @dataclass(frozen=True)
 class TSRel[*Ts]:
     fun: _RawTSRel[*Ts]
+    name: str
 
     def __call__(self, ts: BaseTransitionSystem) -> Rel[*Ts]:
         return self.fun(ts)
+
+    def __str__(self) -> str:
+        return self.name
 
 
 @overload
@@ -68,20 +72,20 @@ def ts_rel(rel: Any) -> Any:
 
 
 def _ts_rel_from_rel[*Ts](rel: Rel[*Ts]) -> TSRel[*Ts]:
-    name = str(rel)
+    name = str(rel.fun)
 
     def fun(ts: BaseTransitionSystem) -> Rel[*Ts]:
         if name in ts.symbols:
-            return Rel(name, rel.mutable, ts.symbols[name])
+            return rel.__class__(name, rel.mutable, ts.symbols[name])
         return rel
 
-    return TSRel(fun)
+    return TSRel(fun, name)
 
 
 def _ts_rel_from_callable[*Ts](
     rel: Callable[[BaseTransitionSystem], Rel[*Ts]],
 ) -> TSRel[*Ts]:
-    return TSRel(rel)
+    return TSRel(rel, rel.__name__)
 
 
 type RelLike[*Ts] = TSRel[*Ts] | Rel[*Ts] | _RawTSRel[*Ts] | Callable[
@@ -743,20 +747,30 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.spec.keys())}])"
 
 
+type DomLexOrder[T: Expr] = tuple[RelLike[T, T], str, type[T]]
+
+
 @dataclass(frozen=True)
 class DomainLexRank[T: Expr](Rank):
     rank: Rank
-    order_like: RelLike[T, T]
-    param: tuple[str, type[T]]
+    order_like: DomLexOrder[T]
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
     def order(self) -> TSRel[T, T]:
-        return ts_rel(self.order_like)
+        return ts_rel(self.order_like[0])
+
+    @cached_property
+    def param_sort(self) -> type[T]:
+        return self.order_like[2]
+
+    @cached_property
+    def param_name(self) -> str:
+        return self.order_like[1]
 
     @property
     def quant_spec(self) -> ParamSpec:
-        return ParamSpec({self.param[0]: self.param[1]})
+        return ParamSpec({self.param_name: self.param_sort})
 
     @property
     def spec(self) -> ParamSpec:
@@ -770,8 +784,8 @@ class DomainLexRank[T: Expr](Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        y0 = self.param[1]("y0")
-        y = self.param[1]("y")
+        y0 = self.param_sort("y0")
+        y = self.param_sort("y")
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
@@ -781,7 +795,7 @@ class DomainLexRank[T: Expr](Rank):
                     z3.Or(
                         self.rank.conserved(
                             ts,
-                            params | {self.param[0]: y} | {self.param[0] + "'": y},
+                            params | {self.param_name: y} | {self.param_name + "'": y},
                         ),
                         z3.Exists(
                             y0,
@@ -790,8 +804,8 @@ class DomainLexRank[T: Expr](Rank):
                                 self.rank.decreases(
                                     ts,
                                     params
-                                    | {self.param[0]: y0}
-                                    | {self.param[0] + "'": y0},
+                                    | {self.param_name: y0}
+                                    | {self.param_name + "'": y0},
                                 ),
                             ),
                         ),
@@ -845,7 +859,7 @@ class DomainLexRank[T: Expr](Rank):
         return 1 + self.rank.size
 
     def __str__(self) -> str:
-        return f"DomLex({self.rank}, {self.param[0]})"
+        return f"DomLex({self.rank}, {self.order}, {self.param_name})"
 
 
 @dataclass(frozen=True)
