@@ -19,10 +19,10 @@ class Id(Expr): ...
 
 
 class RingLeader(TransitionSystem):
-
     btw: Immutable[Rel[Node, Node, Node]]
     le: Immutable[Rel[Id, Id]]
     id: Immutable[Fun[Node, Id]]
+    max: Immutable[Node]
 
     leader: Rel[Node]
     pending: Rel[Id, Node]
@@ -50,6 +50,10 @@ class RingLeader(TransitionSystem):
     @axiom
     def unique_ids(self, X: Node, Y: Node) -> BoolRef:
         return And(Implies(self.id(X) == self.id(Y), X == Y))
+
+    @axiom
+    def max_node(self, X: Node) -> BoolRef:
+        return self.le(self.id(X), self.id(self.max))
 
     @init
     def initial(self, A: Id, X: Node) -> BoolRef:
@@ -128,7 +132,7 @@ class RingLeaderProp(Prop[RingLeader]):
         N = Node("N")
         return Implies(
             ForAll(N, G(F(self.sys.scheduled(N)))),
-            F(Exists(N, self.sys.leader(N))),
+            Exists(N, F(self.sys.leader(N))),
         )
 
 
@@ -196,43 +200,14 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
         return G(F(self.sys.scheduled(N)))
 
     @temporal_invariant
-    def no_leader(self) -> BoolRef:
-        N = Node("N")
-        return G(ForAll(N, Not(self.sys.leader(N))))
+    def no_leader(self, N: Node) -> BoolRef:
+        return G(Not(self.sys.leader(N)))
 
-    # the ranking we had before is kind of problematic because it uses DomLex with 2 parameters, which we don't have
-    # but it was also not so intuitive, we can find something more intuitive with DomPerm or DomPW
-    # for every Id how many nodes does it have to go through
-    # but also we need total number of ids in the ring i think maybe not?
+    def pending(self, n1: Node, n2: Node) -> BoolRef:
+        return self.sys.pending(self.sys.id(n1), n2)
 
-    def not_sent_own(self, N: Node) -> BoolRef:
-        return Not(self.sys.sent_own(N))
-
-    def set_not_sent_own(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.not_sent_own), None)
-
-    # def id_of_node_in_ring(self, N: Node) -> BoolRef:
-    #     X = Node("X")
-    #     return Exists(X, self.sys.pending(self.sys.id(N), X))
-    # def set_of_ids(self) -> Rank:
-    #     return DomainPointwiseRank.close(BinRank(self.id_of_node_in_ring), None)
-
-    # when we further aggregate over this, it will count the total distance all messages would need to go
-    # assuming no messages are ever dropped (even rightfully) which is just an upper bound
-    def node_might_process_id(self, M: Node, N: Node) -> BoolRef:
-        # Node N is between a node X that holds node M's id and M
-        X = Node("X")
-        return Exists(
-            X, And(self.sys.pending(self.sys.id(M), X), self.sys.btw(X, N, M))
-        )
-
-    def all_distances(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.node_might_process_id), None)
-
-    # scheduling timers
-
-    def scheduled(self, N: Node) -> BoolRef:
-        return self.sys.scheduled(N)
+    def bin_pending(self) -> Rank:
+        return BinRank(self.pending)
 
     def scheduling_helpful(self, N: Node) -> BoolRef:
         X = Node("X")
@@ -240,18 +215,76 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
             Not(self.sys.sent_own(N)), Exists(X, self.sys.pending(self.sys.id(X), N))
         )
 
+    def scheduled(self, N: Node) -> BoolRef:
+        return self.sys.scheduled(N)
+
     def scheduling_rank(self) -> Rank:
         return self.timer_rank(self.scheduled, self.scheduling_helpful, None)
 
+    def less_btw_n2_by_max(self, n11: Node, n21: Node, n12: Node, n22: Node) -> BoolRef:
+        return Or(
+            self.sys.btw(n21, n22, self.sys.max),
+            And(n22 == self.sys.max, n21 != self.sys.max),
+        )
+
+    def agg_pending_both(self) -> Rank:
+        return DomainLexRank(self.bin_pending(), self.less_btw_n2_by_max)
+
+    def sent_n2(self, n2: Node) -> BoolRef:
+        return Not(self.sys.sent_own(n2))
+
+    def bin_sent_n2(self) -> Rank:
+        return BinRank(self.sent_n2)
+
+    def agg_sent(self) -> Rank:
+        return DomainPointwiseRank(self.bin_sent_n2(), ParamSpec(n2=Node), None)
+
+    def rank(self) -> Rank:
+        return LexRank(self.agg_sent(), self.agg_pending_both(), self.scheduling_rank())
+
+    # the ranking we had before is kind of problematic because it uses DomLex with 2 parameters, which we don't have
+    # but it was also not so intuitive, we can find something more intuitive with DomPerm or DomPW
+    # for every Id how many nodes does it have to go through
+    # but also we need total number of ids in the ring i think maybe not?
+
+    # def not_sent_own(self, N: Node) -> BoolRef:
+    #     return Not(self.sys.sent_own(N))
+    #
+    # def set_not_sent_own(self) -> Rank:
+    #     return DomainPointwiseRank.close(BinRank(self.not_sent_own), None)
+    #
+    # # def id_of_node_in_ring(self, N: Node) -> BoolRef:
+    # #     X = Node("X")
+    # #     return Exists(X, self.sys.pending(self.sys.id(N), X))
+    # # def set_of_ids(self) -> Rank:
+    # #     return DomainPointwiseRank.close(BinRank(self.id_of_node_in_ring), None)
+    #
+    # # when we further aggregate over this, it will count the total distance all messages would need to go
+    # # assuming no messages are ever dropped (even rightfully) which is just an upper bound
+    # def node_might_process_id(self, M: Node, N: Node) -> BoolRef:
+    #     # Node N is between a node X that holds node M's id and M
+    #     X = Node("X")
+    #     return Exists(
+    #         X, And(self.sys.pending(self.sys.id(M), X), self.sys.btw(X, N, M))
+    #     )
+    #
+    # def all_distances(self) -> Rank:
+    #     return DomainPointwiseRank.close(BinRank(self.node_might_process_id), None)
+
+    # scheduling timers
+
+    # def scheduled(self, N: Node) -> BoolRef:
+    #     return self.sys.scheduled(N)
+
     # final rank
     # currently seems to be too complex to work, and the hints are complex as well.
-    def rank(self) -> Rank:
-        return LexRank(
-            self.set_not_sent_own(),
-            self.all_distances(),
-            # self.set_of_ids(),
-            # self.scheduling_rank(),
-        )
+    # def rank(self) -> Rank:
+    #     return LexRank(
+    #         self.set_not_sent_own(),
+    #         self.all_distances(),
+    #         # self.set_of_ids(),
+    #         # self.scheduling_rank(),
+    #     )
 
     # extracting an order from the ring structure, such that max is maximal.
     # less_btw_n2_by_max = lambda sym, param1, param2: Or(

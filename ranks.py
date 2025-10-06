@@ -751,7 +751,7 @@ class DomainPointwiseRank(Rank):
         return z3.Or(*(hinted_exists(hint) for hint in self.decreases_hints))
 
     def __str__(self) -> str:
-        return f"DomPW({self.rank}, [{", ".join(self.spec.keys())}])"
+        return f"DomPW({self.rank}, [{", ".join(self.quant_spec.keys())}])"
 
 
 type BinaryDomLexOrder[T: Expr] = tuple[RelLike[T, T], T]
@@ -980,7 +980,7 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
         return 1 + self.rank.size
 
     def __str__(self) -> str:
-        return f"DomLex({self.rank}, {self.order_name}, {", ".join(self.names)})"
+        return f"DomLex({self.rank}, {self.order_name}, [{", ".join(self.names)}])"
 
 
 @dataclass(frozen=True)
@@ -1303,6 +1303,11 @@ class TimerRank(Rank):
     @property
     def size(self) -> int:
         return 1
+
+    def __str__(self) -> str:
+        if self.alpha is None:
+            return f"TimerRank({self.term.name})"
+        return f"TimerRank({self.term.name}, {self.alpha.name})"
 
 
 def _hint_to_params(
