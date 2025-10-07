@@ -60,14 +60,9 @@ class SatBacktracking(TransitionSystem):
     def decrease_curr_var(self) -> BoolRef:
         return self.succ(self.next.curr_var, self.curr_var)
 
-    def bnot(self, value: Bool) -> Bool:
-        if value.eq(true):
-            return false
-        return true
-
     def update_curr_assignment(self, var: Variable, value: Bool) -> BoolRef:
         return self.curr_assignment.update(
-            {(var, value): true, (var, self.bnot(value)): false}
+            {(var, value): true, (var, value.neg()): false}
         )
 
     def remove_assignment_var(self, var: Variable) -> BoolRef:
@@ -110,7 +105,7 @@ class SatBacktracking(TransitionSystem):
         return And(
             ForAll(
                 [X, b],
-                Implies(self.appears(c, X, b), self.curr_assignment(X, self.bnot(b))),
+                Implies(self.appears(c, X, b), self.curr_assignment(X, b.neg())),
             ),
             self.decrease_curr_var(),
             self.remove_assignment_var(self.curr_var),

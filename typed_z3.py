@@ -28,11 +28,10 @@ if not TYPE_CHECKING:
         _cache: ClassVar[dict[str, type["Expr"]]] = {}
 
         def __init__(
-            self,
-            name: str,
-            mutable: bool = True,  # *, #const: z3.ExprRef | None = None
+            self, name: str, mutable: bool = True, *, const: z3.ExprRef | None = None
         ) -> None:
-            const = z3.Const(name, self.__class__.ref())
+            if const is None:
+                const = z3.Const(name, self.__class__.ref())
             super(Expr, self).__init__(const.ast, const.ctx)
             self.const_name = name
             self.mutable = mutable
@@ -90,6 +89,14 @@ if not TYPE_CHECKING:
         def ref(cls) -> z3.SortRef:
             return z3.BoolSort()
 
+        def neg(self) -> Self:
+            if self is false:
+                return true
+            elif self is true:
+                return false
+            else:
+                return cast(Self, z3.Not(self))
+
     class Int(Expr):
         @classmethod
         def ref(cls) -> z3.SortRef:
@@ -105,7 +112,9 @@ if TYPE_CHECKING:
     class Expr(z3.Const, ABC):
         const_name: str
 
-        def __init__(self, name: str) -> None: ...
+        def __init__(
+            self, name: str, mutable: bool = True, *, const: z3.ExprRef | None = None
+        ) -> None: ...
 
         @classmethod
         def ref(cls) -> z3.SortRef: ...
@@ -135,9 +144,10 @@ if TYPE_CHECKING:
 
         def update(self, val: Self) -> z3.BoolRef: ...
 
-    class Bool(z3.Bool, Expr): ...
+    class Bool(Expr, z3.Bool):
+        def neg(self) -> Self: ...
 
-    class Int(z3.Int, Expr):
+    class Int(Expr, z3.Int):
         @classmethod
         def lt(cls) -> "Rel[Int, Int]": ...
 
@@ -304,5 +314,5 @@ class WFRel[T: Expr](Rel[T, T]):
         return True
 
 
-false = cast(Bool, z3.BoolVal(False))
-true = cast(Bool, z3.BoolVal(True))
+false = Bool("__false__", False, const=z3.BoolVal(False))
+true = Bool("__true__", False, const=z3.BoolVal(True))

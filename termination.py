@@ -82,7 +82,7 @@ class TemporalWitness:
 
     @cached_property
     def symbol(self) -> Expr:
-        return self.sort(self.name, False)  # type: ignore
+        return self.sort(self.name, False)
 
     def source(self, sys: BaseTransitionSystem) -> z3.BoolRef:
         return existential_closure(self.formula, sys)
@@ -255,7 +255,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 len(method.spec) == 1
             ), f"Witness method {method_name} must except exactly one argument"
             ((param, sort),) = method.spec.items()
-            symbol = sort(witness_name + self.suffix, True)  # type: ignore
+            symbol = sort(witness_name + self.suffix, True)
             axiom = z3.Implies(
                 existential_closure(method, self), method(self, {param: symbol})
             )
