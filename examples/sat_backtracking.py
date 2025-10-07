@@ -85,78 +85,79 @@ class SatBacktracking(TransitionSystem):
         )
 
     @transition
-    def tr(self) -> BoolRef:
-        curr_assignment = self.curr_assignment
-        curr_var = self.curr_var
-        appears = self.appears
+    def assign_true(self) -> BoolRef:
+        return And(
+            self.curr_var_not_dummy(),
+            Not(self.curr_assignment(self.curr_var, true)),
+            Not(self.curr_assignment(self.curr_var, false)),
+            self.update_curr_assignment(self.curr_var, true),
+            self.increase_curr_var(),
+            self.result_unchanged(),
+        )
+
+    @transition
+    def assign_false(self) -> BoolRef:
+        return And(
+            self.curr_var_not_dummy(),
+            self.curr_assignment(self.curr_var, true),
+            self.update_curr_assignment(self.curr_var, false),
+            self.increase_curr_var(),
+            self.result_unchanged(),
+        )
+
+    @transition
+    def backprop_from_unsat_clause(self, c: Clause) -> BoolRef:
+        X = Variable("X")
         b = Bool("b")
+        return And(
+            ForAll(
+                [X, b],
+                Implies(self.appears(c, X, b), self.curr_assignment(X, self.bnot(b))),
+            ),
+            self.decrease_curr_var(),
+            self.remove_assignment_var(self.curr_var),
+            self.result_unchanged(),
+        )
+
+    @transition
+    def backprop_from_false_var(self) -> BoolRef:
+        return And(
+            self.curr_assignment(self.curr_var, false),
+            self.decrease_curr_var(),
+            self.remove_assignment_var(self.curr_var),
+            self.result_unchanged(),
+        )
+
+    @transition
+    def reached_sat(self) -> BoolRef:
         C = Clause("C")
         X = Variable("X")
+        b = Bool("b")
         return And(
-            Not(self.sat),
-            Not(self.unsat),
-            Or(
-                And(
-                    # current variable is not assigned - assign true
-                    self.curr_var_not_dummy(),
-                    ForAll(b, Not(curr_assignment(curr_var, b))),
-                    self.update_curr_assignment(curr_var, true),
-                    self.increase_curr_var(),
-                    self.result_unchanged(),
-                ),
-                And(
-                    # variable was assigned true - assign false
-                    self.curr_var_not_dummy(),
-                    curr_assignment(curr_var, true),
-                    self.update_curr_assignment(curr_var, false),
-                    self.increase_curr_var(),
-                    self.result_unchanged(),
-                ),
-                And(
-                    # Found a clause where for every literal the corresponding var is assigned to the negated literal - backprop
-                    Exists(
-                        C,
-                        ForAll(
-                            [X, b],
-                            Implies(appears(C, X, b), curr_assignment(X, self.bnot(b))),
-                        ),
-                    ),
-                    self.decrease_curr_var(),
-                    self.remove_assignment_var(curr_var),
-                    self.result_unchanged(),
-                ),
-                And(
-                    # variable was assigned false - backprop and remove assignment
-                    curr_assignment(curr_var, false),
-                    self.decrease_curr_var(),
-                    self.remove_assignment_var(curr_var),
-                    self.result_unchanged(),
-                ),
-                And(
-                    # all clauses have a satisfying assignment - return sat
-                    ForAll(
-                        C, Exists([X, b], And(appears(C, X, b), curr_assignment(X, b)))
-                    ),
-                    self.curr_var.unchanged(),
-                    self.curr_assignment.unchanged(),
-                    self.next.sat,
-                    self.unsat.unchanged(),
-                ),
-                And(
-                    # current var backtracked to root - return unsat
-                    curr_var == self.dummy_root,
-                    self.curr_var.unchanged(),
-                    self.curr_assignment.unchanged(),
-                    self.next.unsat,
-                    self.sat.unchanged(),
-                ),
+            ForAll(
+                C,
+                Exists([X, b], And(self.appears(C, X, b), self.curr_assignment(X, b))),
             ),
+            self.curr_var.unchanged(),
+            self.curr_assignment.unchanged(),
+            self.next.sat,
+            self.unsat.unchanged(),
+        )
+
+    @transition
+    def reached_unsat(self) -> BoolRef:
+        return And(
+            self.curr_var == self.dummy_root,
+            self.curr_var.unchanged(),
+            self.curr_assignment.unchanged(),
+            self.next.unsat,
+            self.sat.unchanged(),
         )
 
 
 class SatBacktrackingProp(Prop[SatBacktracking]):
     def prop(self) -> z3.BoolRef:
-        return false
+        return F(Or(self.sys.sat, self.sys.unsat))
 
 
 class SatBacktrackingProof(Proof[SatBacktracking], prop=SatBacktrackingProp):
@@ -215,6 +216,10 @@ class SatBacktrackingProof(Proof[SatBacktracking], prop=SatBacktrackingProp):
     def consistent_result(self) -> BoolRef:
         return Not(And(self.sys.sat, self.sys.unsat))
 
+    @temporal_invariant
+    def not_terminated(self) -> BoolRef:
+        return G(Not(Or(self.sys.sat, self.sys.unsat)))
+
     def ghost_assignment(self, v: Variable) -> BoolRef:
         return And(
             v != self.sys.dummy_leaf,
@@ -260,14 +265,12 @@ class SatBacktrackingProof(Proof[SatBacktracking], prop=SatBacktrackingProp):
     def rank3(self) -> Rank:
         return BinRank(self.curr_is_leaf)
 
-    def not_terminated(self) -> BoolRef:
-        return Not(Or(self.sys.sat, self.sys.unsat))
-
-    def rank4(self) -> Rank:
-        return BinRank(self.not_terminated)
-
     def rank(self) -> Rank:
-        return LexRank(self.rank1(), self.rank2(), self.rank3(), self.rank4())
+        return LexRank(
+            self.rank1(),
+            self.rank2(),
+            self.rank3(),
+        )
 
 
 SatBacktrackingProof().check()
