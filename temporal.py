@@ -2,8 +2,9 @@ from abc import ABC, abstractmethod
 
 import z3
 
+from helpers import unpack_quantifier
 from ts import TransitionSystem
-from helpers import true, false, unpack_quantifier
+from typed_z3 import true, false
 
 _G = z3.Function("G", z3.BoolSort(), z3.BoolSort())
 _F = z3.Function("F", z3.BoolSort(), z3.BoolSort())

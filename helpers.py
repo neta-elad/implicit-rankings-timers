@@ -272,10 +272,6 @@ def minimal_in_order_lt[T: Expr](term: T, order: Rel[T, T]) -> z3.BoolRef:
     return z3.ForAll(Y, z3.Not(order(Y, term)))
 
 
-true = z3.BoolVal(True)
-false = z3.BoolVal(False)
-
-
 def clone_vars(quantifier: z3.QuantifierRef) -> list[z3.Const]:
     return [
         z3.Const(quantifier.var_name(i), quantifier.var_sort(i))

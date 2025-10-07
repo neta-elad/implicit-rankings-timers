@@ -25,7 +25,7 @@ from ts import (
     TermLike,
     ts_term,
 )
-from typed_z3 import Expr, Sort
+from typed_z3 import Expr, Sort, true
 
 
 class WitnessSystem(BaseTransitionSystem):
@@ -331,13 +331,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             for name in self.invariants
         )
 
-    def _check_conserved(self) -> bool:
+    def _check_conserved(self, assumption: z3.BoolRef = true) -> bool:
         results = []
         for name, trans in self.transitions.items():
             results.append(
                 self.check_and_print(
                     f"conserved in {name}",
                     self.invariant,
+                    assumption,
                     trans,
                     z3.Not(self.rank().conserved(self)),
                     with_next=True,
@@ -345,13 +346,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             )
         return all(results)
 
-    def _check_decreases(self) -> bool:
+    def _check_decreases(self, assumption: z3.BoolRef = true) -> bool:
         results = []
         for name, trans in self.transitions.items():
             results.append(
                 self.check_and_print(
                     f"decreases in {name}",
                     self.invariant,
+                    assumption,
                     trans,
                     z3.Not(self.rank().decreases(self)),
                     with_next=True,
