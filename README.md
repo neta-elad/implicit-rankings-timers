@@ -53,7 +53,7 @@ TIMERS=unint make examples/ticket.py
 ## TODOs
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper 
   - review this in connection to what raz noted about soundness.
-- [ ] hints in DomLex
+- [x] hints in DomLex
 - [ ] In readme, write list of all features
 - [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
 - [ ] (optional) improve formatter

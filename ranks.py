@@ -14,6 +14,7 @@ from helpers import (
     instantiate,
     Predicate,
     total_order_axioms,
+    Instances,
 )
 from timers import Time, timer_zero, timer_order
 from ts import (
@@ -33,6 +34,8 @@ type Hint = Mapping[str, TermLike[z3.ExprRef]]
 type DomainPointwiseHints = Sequence[Hint]
 type LeftHint = Sequence[Hint]
 type RightHint = Sequence[Hint]
+type DomainLexConservedHints = Sequence[Hint]
+type DomainLexDecreasesHints = tuple[DomainLexConservedHints, Sequence[Hint]]
 type DomainPermutedConservedHint = tuple[LeftHint, RightHint]
 type DomainPermutedConservedHints = Sequence[DomainPermutedConservedHint]
 type DomainPermutedDecreasesHint = tuple[LeftHint, RightHint, Hint]
@@ -202,15 +205,14 @@ class FiniteSCByAlpha(SoundnessCondition):
             return formula
 
         def one_instantiation(hint_set: FiniteSCHint) -> z3.BoolRef:
-            instantiation_params = reduce(
+            instantiation = reduce(
                 operator.or_,
                 (
                     _hint_to_params(ts, cast(Params, {}), hint, f"_{i}")
                     for i, hint in enumerate(hint_set)
                 ),
             )
-            instantiations = {name: var for name, var in instantiation_params.items()}
-            return instantiate(formula, instantiations)
+            return instantiate(formula, instantiation)
 
         return z3.Or(*(one_instantiation(hint_set) for hint_set in hints))
 
@@ -743,12 +745,12 @@ class DomainPointwiseRank(Rank):
         if self.decreases_hints is None:
             return formula
 
-        def hinted_exists(hint: Hint) -> z3.BoolRef:
-            instantiation_params = _hint_to_params(ts, params, hint)
-            instantiations = {name: var for name, var in instantiation_params.items()}
-            return instantiate(formula, instantiations)
-
-        return z3.Or(*(hinted_exists(hint) for hint in self.decreases_hints))
+        return z3.Or(
+            *(
+                instantiate(formula, _hint_to_params(ts, params, hint))
+                for hint in self.decreases_hints
+            )
+        )
 
     def __str__(self) -> str:
         return f"DomPW({self.rank}, [{", ".join(self.quant_spec.keys())}])"
@@ -776,6 +778,8 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
     rank: Rank
     order_like: DomLexOrder[T1, T2, T3, T4] | TermLike[z3.BoolRef]
     finite_lemma: FiniteLemma | None = None
+    conserved_hints: DomainLexConservedHints | None = None
+    decreases_hints: DomainLexDecreasesHints | None = None
 
     @cached_property
     def order_as_ts_rel(
@@ -902,38 +906,64 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
 
     @property
     def conserved(self) -> TSFormula:
+        return TSTerm(
+            self.spec.doubled(),
+            lambda ts, params: self.conserved_formula(ts, params, self.conserved_hints),
+            f"{self}_<conserved>",
+        )
+
+    def conserved_formula(
+        self,
+        ts: BaseTransitionSystem,
+        params: Params,
+        y0s_hints: DomainLexConservedHints | None,
+    ) -> z3.BoolRef:
         y0s = [z3.Const(f"_y0_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
         ys = [z3.Const(f"_y_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
 
-        return TSTerm(
-            self.spec.doubled(),
-            lambda ts, params: z3.And(
-                total_order_axioms(self.order_pred(ts), self.sort_refs),
-                z3.ForAll(
-                    ys,
-                    z3.Or(
-                        self.rank.conserved(
-                            ts,
-                            params
-                            | dict(zip(self.names, ys))
-                            | dict(zip(self.primed_names, ys)),
-                        ),
-                        z3.Exists(
-                            y0s,
-                            z3.And(
-                                self.order_pred(ts)(*ys, *y0s),
-                                self.rank.decreases(
-                                    ts,
-                                    params
-                                    | dict(zip(self.names, y0s))
-                                    | dict(zip(self.primed_names, y0s)),
-                                ),
-                            ),
-                        ),
-                    ),
+        exists: z3.BoolRef = z3.Exists(
+            y0s,
+            z3.And(
+                self.order_pred(ts)(*ys, *y0s),
+                self.rank.decreases(
+                    ts,
+                    params
+                    | dict(zip(self.names, y0s))
+                    | dict(zip(self.primed_names, y0s)),
                 ),
             ),
-            f"{self}_<conserved>",
+        )
+
+        if y0s_hints is not None:
+            exists = z3.Or(
+                *(
+                    instantiate(
+                        exists,
+                        {
+                            f"_y0_{i}": expr
+                            for i, (_name, expr) in enumerate(
+                                _hint_to_params(ts, params, hint).items()
+                            )
+                        },
+                    )
+                    for hint in y0s_hints
+                )
+            )
+
+        return z3.And(
+            total_order_axioms(self.order_pred(ts), self.sort_refs),
+            z3.ForAll(
+                ys,
+                z3.Or(
+                    self.rank.conserved(
+                        ts,
+                        params
+                        | dict(zip(self.names, ys))
+                        | dict(zip(self.primed_names, ys)),
+                    ),
+                    exists,
+                ),
+            ),
         )
 
     @property
@@ -959,22 +989,39 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
             # todo: add soundness condition of WF of order as well
             return FiniteSCByAlpha(self.quant_spec, self.rank, self.finite_lemma)
 
+    @cached_property
+    def decreases_conserved_hints(self) -> DomainLexConservedHints | None:
+        if self.decreases_hints is None:
+            return None
+        return self.decreases_hints[0]
+
     @property
     def decreases(self) -> TSFormula:
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                self.conserved(ts, params),
-                z3.Exists(
-                    self.quant_spec.consts(),
-                    self.rank.decreases(
-                        ts,
-                        params | self.quant_spec.params() | self.quant_spec.params("'"),
-                    ),
-                ),
+                self.conserved_formula(ts, params, self.decreases_conserved_hints),
+                self.decreases_formula(ts, params),
             ),
             f"{self}_<decreases>",
         )
+
+    def decreases_formula(self, ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
+        formula: z3.BoolRef = z3.Exists(
+            self.quant_spec.consts(),
+            self.rank.decreases(
+                ts,
+                params | self.quant_spec.params() | self.quant_spec.params("'"),
+            ),
+        )
+        if self.decreases_hints is not None:
+            formula = z3.Or(
+                *(
+                    instantiate(formula, _hint_to_params(ts, params, hint))
+                    for hint in self.decreases_hints[1]
+                )
+            )
+        return formula
 
     @property
     def size(self) -> int:
@@ -1046,7 +1093,7 @@ class DomainPermutedRank(Rank):
                     for j, (left_j, right_j) in enumerate(self.ys_left_right)
                     if i < j
                 ),
-                alpha(ts, params | self.ys.prime(self.ys_sigma)),
+                alpha(ts, (params) | self.ys.prime(self.ys_sigma)),
             ),
         )
 
@@ -1067,24 +1114,21 @@ class DomainPermutedRank(Rank):
                 hint: DomainPermutedConservedHint,
             ) -> z3.BoolRef:
                 left_hint, right_hint = hint
-                left_params = reduce(
+                left_instantiation = reduce(
                     operator.or_,
                     (
                         _hint_to_params(ts, params, hint, f"-left-{i + 1}")
                         for i, hint in enumerate(left_hint)
                     ),
                 )
-                right_params = reduce(
+                right_instantiation = reduce(
                     operator.or_,
                     (
                         _hint_to_params(ts, params, hint, f"-right-{i + 1}")
                         for i, hint in enumerate(right_hint)
                     ),
                 )
-                instantiations = {
-                    name: var for name, var in (left_params | right_params).items()
-                }
-                return instantiate(result, instantiations)
+                return instantiate(result, left_instantiation | right_instantiation)
 
             return z3.Or(
                 *(
@@ -1120,26 +1164,24 @@ class DomainPermutedRank(Rank):
                 hint: DomainPermutedDecreasesHint,
             ) -> z3.BoolRef:
                 left_hint, right_hint, ys_hint = hint
-                left_params = reduce(
+                left_instantiation = reduce(
                     operator.or_,
                     (
                         _hint_to_params(ts, params, hint, f"-left-{i + 1}")
                         for i, hint in enumerate(left_hint)
                     ),
                 )
-                right_params = reduce(
+                right_instantiation = reduce(
                     operator.or_,
                     (
                         _hint_to_params(ts, params, hint, f"-right-{i + 1}")
                         for i, hint in enumerate(right_hint)
                     ),
                 )
-                ys_params = _hint_to_params(ts, params, ys_hint)
-                instantiations = {
-                    name: var
-                    for name, var in (left_params | right_params | ys_params).items()
-                }
-                return instantiate(result, instantiations)
+                ys_instantiation = _hint_to_params(ts, params, ys_hint)
+                return instantiate(
+                    result, left_instantiation | right_instantiation | ys_instantiation
+                )
 
             return z3.Or(
                 *(hinted_exists_permutation(hint) for hint in self.decreases_hints)
