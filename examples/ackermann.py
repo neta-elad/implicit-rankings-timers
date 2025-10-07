@@ -26,6 +26,7 @@ class AckermannSystem(TransitionSystem):
     # Immutable constants and relations
     zero: Immutable[Nat]
     lt: Immutable[Rel[Nat, Nat]]  # changed from leq to lt
+    lt_rev: Immutable[Rel[Nat, Nat]]
 
     # Mutable state variables
     len: Nat
@@ -44,6 +45,7 @@ class AckermannSystem(TransitionSystem):
             Or(
                 self.succ(self.len_minus_1, self.len), self.len == self.zero
             ),  # added ghost definition
+            self.lt(X, Y) == self.lt_rev(X, Y),
         )
 
     def succ(self, n1: Nat, n2: Nat) -> BoolRef:
@@ -105,6 +107,7 @@ class AckermannSystem(TransitionSystem):
 
 class AckermannProp(Prop[AckermannSystem]):
     def prop(self) -> BoolRef:
+        return false
         return F(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero))
 
 
@@ -140,11 +143,50 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             Or(self.sys.lt(self.sys.m, X), self.sys.m == X),
         )
 
-    @temporal_invariant
-    def never_terminate(self) -> BoolRef:
-        return G(Not(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero)))
+    # for an alternative idea - see the paper Proving Termination with Multiset Orderings  by Manna and Dershovitz.
 
-    # rank
+    # rank = {(s_k + 1, 0), (s_k-1 + 1, 0) ..... (S_2 + 1, 0), (y,z)} multiset
+    # equivalently: {stack_values x {0} union (m-1,n)}
+
+    def stack_value_and_zero_pair(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
+        return And(self.sys.stack(index, a), b == self.sys.zero)
+
+    def m_minus_one_and_n_pair(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
+        return And(
+            index
+            == self.sys.len,  # appears once, so we counts it only for len (which can't be a stack index)
+            self.sys.succ(a, self.sys.m),  # a is m-1
+            b == self.sys.n,  # b is n
+        )
+
+    def any_pair(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
+        return Or(
+            self.stack_value_and_zero_pair(index, a, b),
+            self.m_minus_one_and_n_pair(index, a, b),
+        )
+
+    def number_of_pairs(self) -> Rank:
+        return DomainPointwiseRank(
+            BinRank(self.any_pair),
+            ParamSpec(i=Nat),
+            None,  # we need one - TODO
+            None,  # maybe need hints
+        )
+
+    def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
+        return Or(
+            self.sys.lt(a1, a2),
+            And(Or(self.sys.lt(a1, a2), a1 == a2), self.sys.lt(b1, b2)),
+        )
+
+    def multiset_rank(self) -> Rank:
+        return DomainLexRank(
+            self.number_of_pairs(),
+            self.nat_times_nat_lex_order,
+        )
+
+    def rank(self) -> Rank:
+        return self.multiset_rank()
 
     # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
     # lexicographic order with the more significant being the higher values (otherwise not well-founded)
@@ -259,17 +301,18 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
     def stack_appearances_lexicographically(self) -> Rank:
         return DomainLexRank(
-            self.num_appearances_of_value_or_ghost(), (self.sys.lt, Nat("Y"))
+            # maybe we need here the reverse ordering?
+            self.num_appearances_of_value_or_ghost(),
+            (self.sys.lt_rev, Nat("Y")),
         )
 
-    def rank(self) -> Rank:
-        return LexRank(
-            self.stack_appearances_lexicographically(),
-            self.position_of_m(),
-            self.position_of_n(),
-        )
-
-    # for an alternative idea - see the paper Proving Termination with Multiset Orderings  by Manna and Dershovitz.
+    # def rank(self) -> Rank:
+    #     return self.stack_appearances_lexicographically()
+    #     LexRank(
+    #         self.stack_appearances_lexicographically(),
+    #         # self.position_of_m(),
+    #         # self.position_of_n(),
+    #     )
 
 
 AckermannProof().check()
