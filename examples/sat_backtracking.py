@@ -1,5 +1,3 @@
-import z3
-
 from prelude import *
 
 
@@ -156,7 +154,7 @@ class SatBacktracking(TransitionSystem):
 
 
 class SatBacktrackingProp(Prop[SatBacktracking]):
-    def prop(self) -> z3.BoolRef:
+    def prop(self) -> BoolRef:
         return F(Or(self.sys.sat, self.sys.unsat))
 
 
