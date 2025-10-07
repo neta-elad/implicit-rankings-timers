@@ -55,6 +55,7 @@ TIMERS=unint make examples/ticket.py
   - review this in connection to what raz noted about soundness.
 - [x] hints in DomLex
 - [ ] In readme, write list of all features
+- [ ] (optional) toggle between stopping at first failure and continuing after first failure.
 - [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls

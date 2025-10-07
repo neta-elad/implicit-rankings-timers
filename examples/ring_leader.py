@@ -1,3 +1,4 @@
+from re import S
 from prelude import *
 
 # @status - rank too complex to work, maybe go back to DomLex rank
@@ -138,63 +139,6 @@ class RingLeaderProp(Prop[RingLeader]):
 
 class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
 
-    # @invariant
-    def safety(self, X: Node, Y: Node) -> BoolRef:
-        return Implies(And(self.sys.leader(X), self.sys.leader(Y)), X == Y)
-
-    # @invariant
-    def leader_max(self, X: Node, Y: Node) -> BoolRef:
-        return Implies(self.sys.leader(X), self.sys.le(self.sys.id(Y), self.sys.id(X)))
-
-    # @invariant
-    def self_pending_highest_id(self, X: Node, Y: Node) -> BoolRef:
-        return Implies(
-            self.sys.pending(self.sys.id(X), X),
-            self.sys.le(self.sys.id(Y), self.sys.id(X)),
-        )
-
-    # @invariant
-    def no_bypass(self, X: Node, Y: Node, Z: Node) -> BoolRef:
-        return Implies(
-            And(self.sys.pending(self.sys.id(X), Y), self.sys.btw(X, Z, Y)),
-            self.sys.le(self.sys.id(Z), self.sys.id(X)),
-        )
-
-    @invariant
-    def pending_sent_own(self, X: Node, Y: Node) -> BoolRef:
-        return Implies(self.sys.pending(self.sys.id(X), Y), self.sys.sent_own(X))
-
-    @invariant
-    def pending_ids(self, A: Id, X: Node) -> BoolRef:
-        Y = Node("Y")
-        return ForAll(
-            [A, X], Implies(self.sys.pending(A, X), Exists(Y, self.sys.id(Y) == A))
-        )
-
-    def no_leader_then_to_send(self) -> BoolRef:
-        X = Node("X")
-        Y = Node("Y")
-        return Or(
-            Exists(X, self.sys.leader(X)),
-            Exists(X, Not(self.sys.sent_own(X))),
-            Exists([X, Y], self.sys.pending(self.sys.id(Y), X)),
-        )
-
-    @invariant
-    def not_leader_then_pending(self, X: Node) -> BoolRef:
-        Y = Node("Y")
-        return Implies(
-            And(self.sys.sent_own(X), Not(self.sys.leader(X))),
-            # quantifier alteration that is hard
-            Exists(
-                Y,
-                Or(
-                    Not(self.sys.le(self.sys.id(Y), self.sys.id(X))),
-                    self.sys.pending(self.sys.id(X), Y),
-                ),
-            ),
-        )
-
     @temporal_invariant
     def scheduling(self, N: Node) -> BoolRef:
         return G(F(self.sys.scheduled(N)))
@@ -203,16 +147,69 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
     def no_leader(self, N: Node) -> BoolRef:
         return G(Not(self.sys.leader(N)))
 
-    def pending(self, n1: Node, n2: Node) -> BoolRef:
-        return self.sys.pending(self.sys.id(n1), n2)
+    @invariant
+    # simpler way to say whats needed for conserved of rank
+    def pending_ids_less_than_max(self, A:Id, N:Node) -> BoolRef:
+        return Implies(self.sys.pending(A,N),self.sys.le(A,self.sys.id(self.sys.max)))
 
-    def bin_pending(self) -> Rank:
-        return BinRank(self.pending)
+    @invariant
+    def max_id_always_in_ring(self) -> BoolRef:
+        N = Node('N')
+        return Or(
+            self.sys.leader(self.sys.max),
+            Not(self.sys.sent_own(self.sys.max)),
+            Exists(N,self.sys.pending(self.sys.id(self.sys.max),N))
+        )
+
+    def not_sent_own(self, n: Node) -> BoolRef:
+        return Not(self.sys.sent_own(n))
+
+    def set_of_not_sent_own(self) -> Rank:
+        return DomainPointwiseRank(
+            BinRank(self.not_sent_own), 
+            ParamSpec(n=Node), 
+            None
+        )
+
+    def pending_id(self,A:Id,n:Node) -> BoolRef:
+        return self.sys.pending(A,n)
+
+    def finiteness_lemma_for_id(self, A:Id, n:Node) -> BoolRef: 
+        N = Node('N')
+        return Exists(N,self.sys.pending(A,N))
+
+
+    def set_of_pending_ids(self) -> Rank:
+        return DomainPointwiseRank(
+            BinRank(self.pending_id),
+            ParamSpec(A=Id),
+            FiniteLemma(self.finiteness_lemma_for_id)
+        )
+
+    def lt_max_minimal(self,n1:Node,n2:Node) -> BoolRef:
+        return Or(
+            And(
+                n1 == self.sys.max,
+                n2 != self.sys.max, 
+            ),
+            self.sys.btw(self.sys.max, n2, n1)
+        )    
+
+    def rank_agg_n2(self) -> Rank:
+        return DomainLexRank(
+            self.set_of_pending_ids(),
+            self.lt_max_minimal
+        )
+
+    def rank_bin_sent_max(self) -> Rank:
+        return BinRank(
+            Not(self.sys.sent_own(self.sys.max))
+        )
 
     def scheduling_helpful(self, N: Node) -> BoolRef:
-        X = Node("X")
+        A = Id('A')
         return Or(
-            Not(self.sys.sent_own(N)), Exists(X, self.sys.pending(self.sys.id(X), N))
+            Not(self.sys.sent_own(N)), Exists(A, self.sys.pending(A, N))
         )
 
     def scheduled(self, N: Node) -> BoolRef:
@@ -221,95 +218,12 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
     def scheduling_rank(self) -> Rank:
         return self.timer_rank(self.scheduled, self.scheduling_helpful, None)
 
-    def less_btw_n2_by_max(self, n11: Node, n21: Node, n12: Node, n22: Node) -> BoolRef:
-        return Not(
-            Or(
-                self.sys.btw(n21, n22, self.sys.max),
-                And(n22 == self.sys.max, n21 != self.sys.max),
-            )
-        )
-
-    def agg_pending_both(self) -> Rank:
-        return DomainLexRank(self.bin_pending(), self.less_btw_n2_by_max)
-
-    def sent_n2(self, n2: Node) -> BoolRef:
-        return Not(self.sys.sent_own(n2))
-
-    def bin_sent_n2(self) -> Rank:
-        return BinRank(self.sent_n2)
-
-    def agg_sent(self) -> Rank:
-        return DomainPointwiseRank(self.bin_sent_n2(), ParamSpec(n2=Node), None)
-
     def rank(self) -> Rank:
-        return LexRank(self.agg_sent(), self.agg_pending_both(), self.scheduling_rank())
-
-    # the ranking we had before is kind of problematic because it uses DomLex with 2 parameters, which we don't have
-    # but it was also not so intuitive, we can find something more intuitive with DomPerm or DomPW
-    # for every Id how many nodes does it have to go through
-    # but also we need total number of ids in the ring i think maybe not?
-
-    # def not_sent_own(self, N: Node) -> BoolRef:
-    #     return Not(self.sys.sent_own(N))
-    #
-    # def set_not_sent_own(self) -> Rank:
-    #     return DomainPointwiseRank.close(BinRank(self.not_sent_own), None)
-    #
-    # # def id_of_node_in_ring(self, N: Node) -> BoolRef:
-    # #     X = Node("X")
-    # #     return Exists(X, self.sys.pending(self.sys.id(N), X))
-    # # def set_of_ids(self) -> Rank:
-    # #     return DomainPointwiseRank.close(BinRank(self.id_of_node_in_ring), None)
-    #
-    # # when we further aggregate over this, it will count the total distance all messages would need to go
-    # # assuming no messages are ever dropped (even rightfully) which is just an upper bound
-    # def node_might_process_id(self, M: Node, N: Node) -> BoolRef:
-    #     # Node N is between a node X that holds node M's id and M
-    #     X = Node("X")
-    #     return Exists(
-    #         X, And(self.sys.pending(self.sys.id(M), X), self.sys.btw(X, N, M))
-    #     )
-    #
-    # def all_distances(self) -> Rank:
-    #     return DomainPointwiseRank.close(BinRank(self.node_might_process_id), None)
-
-    # scheduling timers
-
-    # def scheduled(self, N: Node) -> BoolRef:
-    #     return self.sys.scheduled(N)
-
-    # final rank
-    # currently seems to be too complex to work, and the hints are complex as well.
-    # def rank(self) -> Rank:
-    #     return LexRank(
-    #         self.set_not_sent_own(),
-    #         self.all_distances(),
-    #         # self.set_of_ids(),
-    #         # self.scheduling_rank(),
-    #     )
-
-    # extracting an order from the ring structure, such that max is maximal.
-    # less_btw_n2_by_max = lambda sym, param1, param2: Or(
-    #     sym["btw"](param1["n2"], param2["n2"], sym["max"]),
-    #     And(param2["n2"] == sym["max"], param1["n2"] != sym["max"]),
-    # )
-    # rank_bin_pending = BinaryFreeRank(pred_pending_n1n2, n1n2_dict)
-    # rank_agg_pending = ParPointwiseFreeRank(
-    #     rank_bin_pending, {"n1": Node}, n2_dict
-    # )  # n2 is still free
-    # rank_bin_sent_n2 = BinaryFreeRank(pred_sent_n2, n2_dict)
-    # rank_n2 = LexFreeRank([rank_bin_sent_n2, rank_agg_pending], n2_dict)
-    # rank_agg_n2 = ParLexFreeRank(rank_n2, n2_dict, less_btw_n2_by_max)
-    # rank_bin_sent_max = BinaryFreeRank(pred_sent_max)
-    # rank1 = LexFreeRank([rank_bin_sent_max, rank_agg_n2])
-
-    # Alternative ranking, a little nicer
-    # This is the one I use in the paper
-    # rank_agg_pending_both = ParLexFreeRank(
-    #     rank_bin_pending, n1n2_dict, less_btw_n2_by_max
-    # )
-    # rank_agg_sent = ParPointwiseFreeRank(rank_bin_sent_n2, n2_dict)
-    # rank2 = LexFreeRank([rank_agg_sent, rank_agg_pending_both])
-
+        return LexRank(
+            self.set_of_not_sent_own(),
+            self.rank_bin_sent_max(),
+            self.rank_agg_n2(),
+            self.scheduling_rank()
+        )
 
 RingLeaderProof().check()
