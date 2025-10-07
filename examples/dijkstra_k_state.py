@@ -159,25 +159,10 @@ class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
         Y = Node("Y")
         return Implies(
             G(F(Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd)))),
-            # F(
-            #     G(
-            #         ForAll(
-            #             [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
-            #         )
-            #     )
-            # ),
-            # P1
-            # G(F(self.sys.skd==self.sys.bot))
-            # P2
-            # G(F(ForAll(
-            #     X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
-            # )))
-            # P3
-            G(
-                F(
-                    And(
-                        self.sys.priv(self.sys.bot),
-                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
+            F(
+                G(
+                    ForAll(
+                        [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
                     )
                 )
             ),
@@ -203,84 +188,6 @@ class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
     def timer_scheduling(self) -> Rank:
         return self.timer_rank(self.privileged_node_scheduled, None, None)
 
-    # @temporal_invariant
-    def violation(self) -> BoolRef:
-        X = Node("X")
-        Y = Node("Y")
-        return Not(
-            F(
-                G(
-                    ForAll(
-                        [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
-                    )
-                )
-            )
-        )
-
-    # @temporal_invariant
-    # def violation_P1(self) -> BoolRef:
-    #     return F(G(self.sys.skd!=self.sys.bot))
-
-    # def violation_P1_timer(self) -> Rank:
-    #     return self.timer_rank(G(self.sys.skd!=self.sys.bot),None,None)
-
-    # @temporal_invariant
-    # def violation_P2(self) -> BoolRef:
-    #     X = Node("X")
-    #     return F(G(Not(ForAll(
-    #         X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
-    #     ))))
-
-    # def violation_P2_timer(self) -> Rank:
-    #     X = Node("X")
-    #     return self.timer_rank(G(Not(ForAll(
-    #         X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
-    #     ))), None, None)
-
-    @temporal_invariant
-    def violation_P3(self) -> BoolRef:
-        X = Node("X")
-        return F(
-            G(
-                Not(
-                    And(
-                        self.sys.priv(self.sys.bot),
-                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
-                    )
-                )
-            )
-        )
-
-    def violation_P3_timer(self) -> Rank:
-        X = Node("X")
-        return self.timer_rank(
-            G(
-                Not(
-                    And(
-                        self.sys.priv(self.sys.bot),
-                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
-                    )
-                )
-            ),
-            None,
-            None,
-        )
-
-    def stable(self) -> BoolRef:
-        X = Node("X")
-        Y = Node("Y")
-        return ForAll([X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y))
-
-    def unstable(self) -> BoolRef:
-        X = Node("X")
-        Y = Node("Y")
-        return Not(
-            ForAll([X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y))
-        )
-
-    def timer_violation_timer_after_stable(self) -> Rank:
-        return self.timer_rank(self.unstable, self.stable, None)
-
     def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
         return And(
             i1 != i2,
@@ -302,12 +209,9 @@ class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
     def all_values_bot_needs_to_pass(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.value_bot_needs_to_pass), None)
 
-    # this is close to good for the entire property.
+    # this works but im not sure why? why is it not using the violation of the property
     def rank(self) -> Rank:
         return LexRank(
-            # self.violation_P1_timer(),
-            # self.violation_P2_timer(),
-            self.violation_P3_timer(),
             self.all_values_bot_needs_to_pass(),
             self.lexicographic_privileges(),
             self.timer_scheduling(),
