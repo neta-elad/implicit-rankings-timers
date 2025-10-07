@@ -1,4 +1,15 @@
-from z3 import BoolRef, ExprRef, And, Implies, Or, Not, ForAll, If, Exists, EnumSort
+from z3 import (
+    BoolRef,
+    ExprRef,
+    And,
+    Implies,
+    Or,
+    Not,
+    ForAll,
+    If,
+    Exists,
+    EnumSort,
+)
 
 from ranks import (
     ClosedRank,
@@ -41,7 +52,18 @@ from ts import (
     TSTerm,
     ts_term,
 )
-from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum, false, true
+from typed_z3 import (
+    Expr,
+    Rel,
+    Fun,
+    Finite,
+    WFRel,
+    Bool,
+    Int,
+    Enum,
+    false,
+    true,
+)
 
 __all__ = [
     "BoolRef",
@@ -95,6 +117,7 @@ __all__ = [
     "Finite",
     "WFRel",
     "Bool",
+    "Int",
     "Enum",
     "false",
     "true",
