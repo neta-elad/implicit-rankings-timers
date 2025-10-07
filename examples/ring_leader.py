@@ -222,9 +222,11 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
         return self.timer_rank(self.scheduled, self.scheduling_helpful, None)
 
     def less_btw_n2_by_max(self, n11: Node, n21: Node, n12: Node, n22: Node) -> BoolRef:
-        return Or(
-            self.sys.btw(n21, n22, self.sys.max),
-            And(n22 == self.sys.max, n21 != self.sys.max),
+        return Not(
+            Or(
+                self.sys.btw(n21, n22, self.sys.max),
+                And(n22 == self.sys.max, n21 != self.sys.max),
+            )
         )
 
     def agg_pending_both(self) -> Rank:

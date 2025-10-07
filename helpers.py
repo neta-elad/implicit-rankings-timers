@@ -230,7 +230,7 @@ def order_leq[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
     )
 
 
-def order_lt[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
+def total_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     order_fun = order_rel.fun
 
     def order(*args: z3.ExprRef) -> z3.BoolRef:
@@ -239,14 +239,14 @@ def order_lt[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
 
-    return order_lt_axioms(order, sorts)
+    return total_order_axioms(order, sorts)
 
 
 class Predicate(Protocol):
     def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
 
 
-def order_lt_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
+def total_order_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]

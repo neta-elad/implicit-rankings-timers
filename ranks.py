@@ -8,12 +8,12 @@ from typing import cast, Any, overload
 import z3
 
 from helpers import (
-    order_lt,
+    total_order,
     minimal_in_order_lt,
     quantify,
     instantiate,
     Predicate,
-    order_lt_axioms,
+    total_order_axioms,
 )
 from timers import Time, timer_zero, timer_order
 from ts import (
@@ -414,7 +414,7 @@ class PosInOrderRank[T: Expr](Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                order_lt(self.order(ts)),
+                total_order(self.order(ts)),
                 z3.Or(
                     self.order(ts)(
                         self.term.next(ts, params),
@@ -445,7 +445,7 @@ class PosInOrderRank[T: Expr](Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                order_lt(self.order(ts)),
+                total_order(self.order(ts)),
                 self.order(ts)(self.term.next(ts, params), self.term(ts, params)),
             ),
             f"{self}_<decreases>",
@@ -902,13 +902,13 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
 
     @property
     def conserved(self) -> TSFormula:
-        y0s = [z3.Const(f"y0_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
-        ys = [z3.Const(f"y_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+        y0s = [z3.Const(f"_y0_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+        ys = [z3.Const(f"_y_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
 
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                order_lt_axioms(self.order_pred(ts), self.sort_refs),
+                total_order_axioms(self.order_pred(ts), self.sort_refs),
                 z3.ForAll(
                     ys,
                     z3.Or(
@@ -921,7 +921,7 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
                         z3.Exists(
                             y0s,
                             z3.And(
-                                self.order_pred(ts)(*y0s, *ys),
+                                self.order_pred(ts)(*ys, *y0s),
                                 self.rank.decreases(
                                     ts,
                                     params
@@ -956,6 +956,7 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
         if self.finite_lemma is None:
             return FiniteSCBySort(self.quant_spec)
         else:
+            # todo: add soundness condition of WF of order as well
             return FiniteSCByAlpha(self.quant_spec, self.rank, self.finite_lemma)
 
     @property

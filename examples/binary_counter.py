@@ -71,10 +71,11 @@ class BinaryCounterProof(Proof[BinaryCounter], prop=BinaryCounterProp):
     def x_was_last_1(self, i: Index) -> BoolRef:
         return And(self.sys.a(i), Or(self.sys.lt(i, self.sys.ptr), i == self.sys.ptr))
 
+    def gt(self, i1: Index, i2: Index) -> BoolRef:
+        return self.sys.lt(i2, i1)
+
     def ghost_array_lex(self) -> Rank:
-        return DomainLexRank(
-            BinRank(self.x_was_last_1), (self.sys.lt, Index("i")), None
-        )
+        return DomainLexRank(BinRank(self.x_was_last_1), self.gt, None)
 
     # alternative (generalized) way of defining order formula:
     # def lt(self, i1: Index, i2: Index) -> BoolRef:
