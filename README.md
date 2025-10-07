@@ -51,22 +51,18 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] prove all examples
-- [ ] make sure DomPerm is not buggy
-- [x] DomLex generalize to allow formulas that aren't necessarily relations, like last paper.
+- [] DomLex generalize to allow formulas that aren't necessarily relations, like last paper - review this in connection to what raz noted about soundness.
 - [ ] hints in DomLex
 - [ ] In readme, write list of all features
-- [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
-- [x] (optional) differentiate timeouts and violations in printing: 
-      timeout should say timeout, not fail
+- [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
 - [ ] (optional) improve formatter
 - [ ] (optional) option to compute quantifier structure for calls
+- [ ] (?) Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
 - [ ] (?) splitting checks for different cases 
 - [ ] (?) add modified argument and check to see everything is modified
 - [ ] (?) reusing invariants and ranks between proofs
 - [ ] (?) sometimes a rank decreases for some transition only if it decreases for all transitions - annoying conceptually
 - [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
-- [ ] (stretch) ability to write unit tests for a spec
 - [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces
 - [ ] (stretch) Automation for finding ranking
