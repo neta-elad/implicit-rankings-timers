@@ -2,12 +2,12 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, cast, Any, Self
+from typing import ClassVar, cast, Any, Self, overload
 
 import z3
 
 from helpers import unpack_quantifier
-from metadata import add_marker, get_methods
+from metadata import add_marker, get_methods, has_marker
 from ranks import Rank, FiniteLemma, TimerRank
 from temporal import Prop, nnf, is_F, F, is_G, G
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
@@ -92,6 +92,12 @@ class TemporalWitness:
 
     def implication(self, sys: BaseTransitionSystem) -> z3.BoolRef:
         return z3.Implies(self.source(sys), self.instantiated(sys))
+
+
+@dataclass(frozen=True)
+class Invariant:
+    formula: z3.BoolRef
+    leaf: bool
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -197,33 +203,48 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return self.timers.t(f"t_<{str(name).replace("'", "")}>")
 
     @cached_property
-    def system_invariants(self) -> dict[str, z3.BoolRef]:
+    def system_invariants(self) -> dict[str, Invariant]:
         return {
-            name: universal_closure(method, self)
+            name: Invariant(
+                universal_closure(method, self),
+                has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+            )
             for name, method in _get_methods(self, _PROOF_INVARIANT)
         }
 
     @cached_property
-    def temporal_invariant_formulas(self) -> dict[str, z3.BoolRef]:
+    def temporal_invariant_formulas(self) -> dict[str, Invariant]:
         return {
-            name: universal_closure(method, self.reset)
+            name: Invariant(
+                universal_closure(method, self.reset),
+                has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+            )
             for name, method in _get_methods(self, _PROOF_TEMPORAL_INVARIANT)
         }
 
     @cached_property
-    def temporal_invariants(self) -> dict[str, z3.BoolRef]:
+    def temporal_invariants(self) -> dict[str, Invariant]:
         return {
-            name: timer_zero(self._compile_timer(f"t_<{nnf(formula)}>")(self))
-            for name, formula in self.temporal_invariant_formulas.items()
+            name: Invariant(
+                timer_zero(self._compile_timer(f"t_<{nnf(inv.formula)}>")(self)),
+                inv.leaf,
+            )
+            for name, inv in self.temporal_invariant_formulas.items()
         }
 
     @cached_property
-    def invariants(self) -> dict[str, z3.BoolRef]:
+    def invariants(self) -> dict[str, Invariant]:
         return self.system_invariants | self.temporal_invariants
 
     @cached_property
     def invariant(self) -> z3.BoolRef:
-        return z3.And(*self.invariants.values())
+        return z3.And(*(inv.formula for inv in self.invariants.values()))
+
+    @cached_property
+    def no_leaf_invariant(self) -> z3.BoolRef:
+        return z3.And(
+            *(inv.formula for inv in self.invariants.values() if not inv.leaf)
+        )
 
     @cached_property
     def witnesses(self) -> dict[str, tuple[Expr, z3.BoolRef]]:
@@ -324,9 +345,11 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def _check_inv(self) -> bool:
         return all(
             self.check_inductiveness(
-                lambda this: this.invariants[name],
+                lambda this: this.invariants[name].formula,
                 f"inv {name}",
-                lambda this: this.invariant,
+                lambda this: z3.And(
+                    this.invariants[name].formula, this.no_leaf_invariant
+                ),
             )
             for name in self.invariants
         )
@@ -373,16 +396,55 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 type TypedProofFormula[T: Proof[Any], *Ts] = Callable[[T, *Ts], z3.BoolRef]
 
 
+@overload
 def invariant[T: Proof[Any], *Ts](
-    fun: TypedProofFormula[T, *Ts],
-) -> TypedProofFormula[T, *Ts]:
-    return add_marker(fun, _PROOF_INVARIANT)
+    *, leaf: bool = False
+) -> Callable[[TypedProofFormula[T, *Ts]], TypedProofFormula[T, *Ts]]: ...
+
+
+@overload
+def invariant[T: Proof[Any], *Ts](
+    fun: TypedProofFormula[T, *Ts], /
+) -> TypedProofFormula[T, *Ts]: ...
+
+
+def invariant[T: Proof[Any], *Ts](
+    fun: Any | None = None, /, *, leaf: bool = False
+) -> Any:
+    def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
+        if leaf:
+            add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
+        return add_marker(actual_fun, _PROOF_INVARIANT)
+
+    if fun is not None:
+        return wrapper(fun)
+    return wrapper
+
+
+@overload
+def temporal_invariant[T: Proof[Any], *Ts](
+    *, leaf: bool = False
+) -> Callable[[TypedProofFormula[T, *Ts]], TypedProofFormula[T, *Ts]]: ...
+
+
+@overload
+def temporal_invariant[T: Proof[Any], *Ts](
+    fun: TypedProofFormula[T, *Ts], /
+) -> TypedProofFormula[T, *Ts]: ...
 
 
 def temporal_invariant[T: Proof[Any], *Ts](
-    fun: TypedProofFormula[T, *Ts],
-) -> TypedProofFormula[T, *Ts]:
-    return add_marker(fun, _PROOF_TEMPORAL_INVARIANT)
+    fun: Any | None = None, /, *, leaf: bool = False
+) -> Any:
+    def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
+        if leaf:
+            add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
+
+        return add_marker(actual_fun, _PROOF_TEMPORAL_INVARIANT)
+
+    if fun is not None:
+        return wrapper(fun)
+    return wrapper
 
 
 def track[T: Proof[Any], *Ts](
@@ -400,6 +462,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
 
 
 _PROOF_INVARIANT = object()
+_PROOF_LEAF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
 _PROOF_WITNESS = object()
 _PROOF_TEMPORAL_WITNESS = object()

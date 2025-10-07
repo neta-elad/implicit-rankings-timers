@@ -86,7 +86,7 @@ def sat_check(
     constraints: Iterable[z3.BoolRef],
     *,
     unsat_core: bool = True,
-    print_calls: bool = True,
+    print_calls: bool = False,
 ) -> SatResult:
     solver = default_solver()
     named_constraints = {str(i): c for i, c in enumerate(constraints)}

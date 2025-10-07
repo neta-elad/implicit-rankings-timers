@@ -16,5 +16,9 @@ def add_marker[T](obj: T, marker: object) -> T:
 
 def get_methods(obj: object, marker: object) -> Iterator[tuple[str, Any]]:
     for name, member in inspect.getmembers(obj.__class__):
-        if hasattr(member, _METADATA) and marker in getattr(member, _METADATA):
+        if has_marker(member, marker):
             yield name, member
+
+
+def has_marker(obj: object, marker: object) -> bool:
+    return hasattr(obj, _METADATA) and marker in getattr(obj, _METADATA)
