@@ -443,7 +443,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def proposal_received_implies_proposal(
         self, N: Node, R: Round, V: Value
     ) -> BoolRef:
-        return Implies(self.sys.proposal_received(N, R, V), self.sys.proposal(R,V))
+        return Implies(self.sys.proposal_received(N, R, V), self.sys.proposal(R, V))
 
     @invariant
     # quantifer alternation
@@ -460,14 +460,18 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
         R = Round("R")
         V = Value("V")
-        return self.sys.one_a_received(N, self.sys.r0) == Exists([R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V))
-            
+        return self.sys.one_a_received(N, self.sys.r0) == Exists(
+            [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
+        )
+
     @invariant
     def proposal_received_iff_vote(self, N: Node, V: Value) -> BoolRef:
-        return self.sys.proposal_received(N, self.sys.r0, V) == self.sys.vote(N, self.sys.r0, V)
+        return self.sys.proposal_received(N, self.sys.r0, V) == self.sys.vote(
+            N, self.sys.r0, V
+        )
 
     # temporal invariants -- essentially just the negated property.
-         
+
     @temporal_invariant
     def eventually_one_r0(self) -> BoolRef:
         return F(self.sys.one_a(self.sys.r0))
@@ -618,7 +622,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.proposal_received_timer_rank(),
         )
 
-
     ## simplifying assumptions for debugging - don't affect final proof.
     def no_one_a_r0(self) -> BoolRef:
         return Not(self.sys.one_a(self.sys.r0))
@@ -672,7 +675,8 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             ),
         )
 
+
 proof = PaxosProof()
 # proof.check()
 proof._check_conserved()
-proof._check_decreases() 
+proof._check_decreases()
