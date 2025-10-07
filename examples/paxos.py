@@ -1,4 +1,5 @@
 from prelude import *
+import temporal
 
 # @ status - timeout of inv in init
 
@@ -6,16 +7,16 @@ from prelude import *
 # Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy
 
 
-class Node(Expr): ...
+class Node(Finite): ...
 
 
 class Value(Expr): ...
 
 
-class Quorum(Expr): ...
+class Quorum(Finite): ...
 
 
-class Round(Expr): ...
+class Round(Finite): ...
 
 
 class PaxosSystem(TransitionSystem):
@@ -292,7 +293,8 @@ class PaxosSystem(TransitionSystem):
                 ),
                 And(
                     self.vote.update({(n, r, v): true}),
-                    # "from negation of the liveness property"
+                    # "from negation of the liveness property" 
+                    # # NOTICE - THIS IS PROBABLY JUST AN OLD ARTIFACT FROM IVY
                     Not(
                         Exists(
                             Q,
@@ -427,6 +429,25 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def no_vote_after_r0(self, N: Node, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0))
 
+    # # these appeared in the ivy file but not sure they dont time out.
+    # # @invariant
+    # def projection_proposal(self, R: Round, V: Value) -> BoolRef:
+    #     # (exists V. proposal(R,V)) <-> proposed(R)
+    #     return self.sys.proposed(R) == Exists(V, self.sys.proposal(R, V))
+
+    # # @invariant
+    # def proposal_received_implies_proposed(self, N: Node, R: Round, V: Value) -> BoolRef:
+    #     return Implies(self.sys.proposal_received(N, R, V), self.sys.proposed(R))
+
+    # # @invariant
+    # def one_b_received_equiv(self, R: Round, N: Node) -> BoolRef:
+    #     # one_b_received(R,N) <-> (exists R2,V . one_b_max_vote_received(R,N,R2,V))
+    #     R2 = Round("R2")
+    #     V = Value("V")
+    #     return self.sys.one_b_received(R, N) == Exists([R2, V], self.sys.one_b_max_vote_received(R, N, R2, V))
+
+    # need an invariant connecting one_b_max_vote and one_a_received (I think)
+
     @temporal_invariant
     def eventulaly_one_a_r0(self) -> BoolRef:
         return F(self.sys.one_a(self.sys.r0))
@@ -498,12 +519,153 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
     def one_a_r0_timer_rank(self) -> Rank:
         return self.timer_rank(self.sys.one_a(self.sys.r0), None, None)
+    # rank capturing fairness 1
+
+    # def one_a_r0_binary_rank(self) -> Rank:
+    #     return BinRank(Not(self.sys.one_a(self.sys.r0)))
+    # # this rank decreases when fairness 1 is met
 
     def proposed_r0_timer_rank(self) -> Rank:
         return self.timer_rank(self.sys.proposed(self.sys.r0), None, None)
+    # rank capturing fairness 3
+
+    # def proposed_r0_binary_rank(self) -> Rank:
+    #     return BinRank(Not(self.sys.one_a(self.sys.r0)))
+    # this rank decreases when fairness 3 is met
+
+    def negated_one_b_max_vote_r0(self, N: Node, MAXR: Round, V: Value) -> BoolRef:
+        return Not(self.sys.one_b_max_vote(N,self.sys.r0,MAXR,V))
+
+    # def set_of_one_b_max_vote(self) -> Rank:
+    #     return DomainPointwiseRank(
+    #         BinRank(
+    #             self.negated_one_b_max_vote_r0
+    #         ),
+    #         ParamSpec(
+    #             N=Node,MAXR=Round,V=Value
+    #         ),
+    #         None, #todo finiteness
+    #         None, #todo hints
+    #     )
+    # this rank decreases when one_a_received is set to true - which will happen because of fairness 2 part 1 
+    # this fairness triggering will cause a decrease of rank only if it hasn't already decreased for the relvant node 
+
+    def one_a_received_r0(self, N: Node) -> BoolRef:
+        return self.sys.one_a_received(N, self.sys.r0)
+    
+    def negated_one_a_received_r0(self, N: Node) -> BoolRef:
+        return Not(self.sys.one_a_received(N, self.sys.r0))
+
+    def one_a_received_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            self.one_a_received_r0,
+            self.negated_one_a_received_r0,
+            None
+        )
+
+    def one_b_received_r0(self, N: Node) -> BoolRef:
+        return self.sys.one_b_received(self.sys.r0, N)
+    
+    def negated_one_b_received_r0(self, N: Node) -> BoolRef:
+        return Not(self.sys.one_b_received(self.sys.r0, N))
+
+    def one_b_received_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            self.one_b_received_r0,
+            self.negated_one_b_received_r0,
+            None
+        )
+    
+    def proposal_received(self, N: Node, V: Value) -> BoolRef:
+        return self.sys.proposal_received(N, self.sys.r0, V)
+    
+    def negated_proposal_received(self, N: Node, V: Value) -> BoolRef:
+        return Not(self.sys.proposal_received(N, self.sys.r0, V))
+
+    def proposal_received_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            self.proposal_received,
+            self.negated_proposal_received,
+            None
+        )
+
+    # there is some redundancy between then system ranks and timer ranks, perhaps we don't need any system rank
+    # the thing we need is invariants that guarantee that appropriate timer ranks are < inf
+    # need invariant connecting one_a_received and one_b_max_vote but maybe wihtout qunatifers somehow
+
+    # if no one_a(r0) -> one_a_r0_timer_rank decreases
+    # else one_a(r0) if not all members of q0 have one_a_received one_a_received_timer_rank(N) decreases
+    # else forall N in q0 one_a_received(N) --> one_b_max_vote 
+    #       if N in q0 no one_b_received -> one_b_received_timer_rank
+    # else forall N in q0 one_b_received(N) 
+    # if no proposal(r0,V) -> proposal_received_timer_rank decreases
+    # else proposal(r,V) if N in q0 not proposal_received -> proposal_received_timer_rank decreases
+    # if proposal_received for all N -> vote for all N
+
+    # actually what I think this argument is missing is that 
+    # we need this to happen in a certain order - thats why we assume they have infinitely often
+    # one_a -> one_b -> proposal probably.
+    # so the timer 
 
     def rank(self) -> Rank:
-        return PointwiseRank(self.one_a_r0_timer_rank(), self.proposed_r0_timer_rank())
+        return PointwiseRank(
+            self.one_a_r0_timer_rank(),
+
+            self.one_a_received_timer_rank(),
+
+            self.one_b_received_timer_rank(),
+            
+            self.proposed_r0_timer_rank(),
+
+            self.proposal_received_timer_rank()
+        )
+
+    ## HAVENT CHECKED VALIDTY OF THIS INVARIANT
+    @invariant
+    def one_a_received_then_one_b_max_vote(self,N: Node) -> BoolRef:
+        R = Round('R')
+        V = Value('V')
+        return Implies(
+            self.sys.one_a_received(N,self.sys.r0),
+            Exists([R,V],self.sys.one_b_max_vote(N,self.sys.r0,R,V))
+        )
+
+    ## simplifying assumption for debugging - don't affect final proof.
+    def no_one_a_r0(self) -> BoolRef:
+        return Not(self.sys.one_a(self.sys.r0))
+
+    def not_proposed_r0(self) -> BoolRef:
+        return Not(self.sys.proposed(self.sys.r0))
+    
+    def exists_N_in_q0_not_received_one_a(self) -> BoolRef:
+        N = Node('N')
+        return Exists(N,And(
+            self.sys.member(N,self.sys.q0),
+            Not(self.sys.one_a_received(N,self.sys.r0))
+        ))
+
+    def exists_N_in_q0_not_received_one_b(self) -> BoolRef:
+        N = Node('N')
+        return Exists(N,And(
+            self.sys.member(N,self.sys.q0),
+            Not(self.sys.one_b_received(self.sys.r0,N))
+        ))
+
+    def exists_N_in_q0_not_received_proposal(self) -> BoolRef:
+        N = Node('N')
+        V = Value('V')
+        return Exists([N,V],And(
+            self.sys.member(N,self.sys.q0),
+            Not(self.sys.proposal_received(N,self.sys.r0,V))
+        ))
 
 
-PaxosProof().check()
+
+proof = PaxosProof()
+# proof._check_conserved()
+proof._check_inv()
+# proof._check_decreases(proof.no_one_a_r0()) #works
+# proof._check_decreases(proof.not_proposed_r0()) #works 
+# proof._check_decreases(proof.exists_N_in_q0_not_received_one_a()) #works 
+# proof._check_decreases(proof.exists_N_in_q0_not_received_one_b())
+# proof._check_decreases(proof.exists_N_in_q0_not_received_proposal())
