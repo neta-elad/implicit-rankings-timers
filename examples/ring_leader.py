@@ -149,68 +149,58 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
 
     @invariant
     # simpler way to say whats needed for conserved of rank
-    def pending_ids_less_than_max(self, A:Id, N:Node) -> BoolRef:
-        return Implies(self.sys.pending(A,N),self.sys.le(A,self.sys.id(self.sys.max)))
+    def pending_ids_less_than_max(self, A: Id, N: Node) -> BoolRef:
+        return Implies(
+            self.sys.pending(A, N), self.sys.le(A, self.sys.id(self.sys.max))
+        )
 
     @invariant
     def max_id_always_in_ring(self) -> BoolRef:
-        N = Node('N')
+        N = Node("N")
         return Or(
             self.sys.leader(self.sys.max),
             Not(self.sys.sent_own(self.sys.max)),
-            Exists(N,self.sys.pending(self.sys.id(self.sys.max),N))
+            Exists(N, self.sys.pending(self.sys.id(self.sys.max), N)),
         )
 
     def not_sent_own(self, n: Node) -> BoolRef:
         return Not(self.sys.sent_own(n))
 
     def set_of_not_sent_own(self) -> Rank:
-        return DomainPointwiseRank(
-            BinRank(self.not_sent_own), 
-            ParamSpec(n=Node), 
-            None
-        )
+        return DomainPointwiseRank(BinRank(self.not_sent_own), ParamSpec(n=Node), None)
 
-    def pending_id(self,A:Id,n:Node) -> BoolRef:
-        return self.sys.pending(A,n)
+    def pending_id(self, A: Id, n: Node) -> BoolRef:
+        return self.sys.pending(A, n)
 
-    def finiteness_lemma_for_id(self, A:Id, n:Node) -> BoolRef: 
-        N = Node('N')
-        return Exists(N,self.sys.pending(A,N))
-
+    def finiteness_lemma_for_id(self, A: Id, n: Node) -> BoolRef:
+        N = Node("N")
+        return Exists(N, self.sys.pending(A, N))
 
     def set_of_pending_ids(self) -> Rank:
         return DomainPointwiseRank(
             BinRank(self.pending_id),
             ParamSpec(A=Id),
-            FiniteLemma(self.finiteness_lemma_for_id)
+            FiniteLemma(self.finiteness_lemma_for_id),
         )
 
-    def lt_max_minimal(self,n1:Node,n2:Node) -> BoolRef:
+    def lt_max_minimal(self, n1: Node, n2: Node) -> BoolRef:
         return Or(
             And(
                 n1 == self.sys.max,
-                n2 != self.sys.max, 
+                n2 != self.sys.max,
             ),
-            self.sys.btw(self.sys.max, n2, n1)
-        )    
+            self.sys.btw(self.sys.max, n2, n1),
+        )
 
     def rank_agg_n2(self) -> Rank:
-        return DomainLexRank(
-            self.set_of_pending_ids(),
-            self.lt_max_minimal
-        )
+        return DomainLexRank(self.set_of_pending_ids(), self.lt_max_minimal)
 
     def rank_bin_sent_max(self) -> Rank:
-        return BinRank(
-            Not(self.sys.sent_own(self.sys.max))
-        )
+        return BinRank(Not(self.sys.sent_own(self.sys.max)))
 
     def scheduling_helpful(self, N: Node) -> BoolRef:
-        A = Id('A')
-        return Or(
-            Not(self.sys.sent_own(N)), Exists(A, self.sys.pending(A, N))
-        )
+        A = Id("A")
+        return Or(Not(self.sys.sent_own(N)), Exists(A, self.sys.pending(A, N)))
 
     def scheduled(self, N: Node) -> BoolRef:
         return self.sys.scheduled(N)
@@ -223,7 +213,8 @@ class RingLeaderProof(Proof[RingLeader], prop=RingLeaderProp):
             self.set_of_not_sent_own(),
             self.rank_bin_sent_max(),
             self.rank_agg_n2(),
-            self.scheduling_rank()
+            self.scheduling_rank(),
         )
+
 
 RingLeaderProof().check()
