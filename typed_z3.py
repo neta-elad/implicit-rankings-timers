@@ -1,23 +1,38 @@
+"""
+This module defines a type-safe interface for Z3,
+so that well-sortedness of expressions can be *statically* checked
+by tools for checking Python type annotations (e.g., `mypy`).
+"""
+
 from abc import ABC
 from collections.abc import Callable, Mapping
 from functools import cached_property
-from typing import TYPE_CHECKING, Self, ClassVar, cast, get_type_hints, Any
+from typing import TYPE_CHECKING, Self, ClassVar, cast, get_type_hints, Any, Literal
 
 import z3
 
 if not TYPE_CHECKING:
 
     class Expr(z3.ExprRef, ABC):
+        """
+        A representation of a Z3 logical sort at the type-level.
+        New type-safe sorts are defined by sub-classing this class
+        (either directly or through the `Finite` class).
+        An instance of the class represents a (transition-system) constant
+        of this sort.
+        """
+
         const_name: str
         mutable: bool
 
         _cache: ClassVar[dict[str, type["Expr"]]] = {}
 
         def __init__(
-            self, name: str, mutable: bool = True, *, const: "z3.Const | None" = None
+            self,
+            name: str,
+            mutable: bool = True,  # *, #const: z3.ExprRef | None = None
         ) -> None:
-            if const is None:
-                const = z3.Const(name, self.__class__.ref())
+            const = z3.Const(name, self.__class__.ref())
             super(Expr, self).__init__(const.ast, const.ctx)
             self.const_name = name
             self.mutable = mutable
@@ -57,14 +72,18 @@ if not TYPE_CHECKING:
         def fun_ref(self) -> z3.FuncDeclRef:
             return self.decl()
 
+        @cached_property
+        def next(self) -> Self:
+            return self.__class__(self.const_name + "'", self.mutable)
+
         def unchanged(self) -> z3.BoolRef:
             if not self.mutable:
                 return z3.BoolVal(True)
-            return self == self.__class__(self.const_name + "'", self.mutable)
+            return self.update(self)
 
         def update(self, val: Self) -> z3.BoolRef:
-            assert not self.mutable, f"Trying to update immutable constant {self}"
-            return self.__class__(self.const_name + "'", self.mutable) == val
+            assert self.mutable, f"Trying to update immutable constant {self}"
+            return self.next == val
 
     class Bool(Expr):
         @classmethod
@@ -114,6 +133,8 @@ if TYPE_CHECKING:
 
         def unchanged(self) -> z3.BoolRef: ...
 
+        def update(self, val: Self) -> z3.BoolRef: ...
+
     class Bool(z3.Bool, Expr): ...
 
     class Int(z3.Int, Expr):
@@ -122,8 +143,18 @@ if TYPE_CHECKING:
 
 
 class Finite(Expr, ABC):
+    """
+    A subclass of Expr for defining sorts that are
+    *assumed by the user* to be finite.
+    For example,
+    ```python
+    class Thread(Finite): ...
+    ```
+    declares the `Thread` sort to be finite.
+    """
+
     @classmethod
-    def finite(cls) -> bool:
+    def finite(cls) -> Literal[True]:
         return True
 
 

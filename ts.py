@@ -231,15 +231,10 @@ class ParamSpec(dict[str, Sort]):
         return [sort(param + suffix) for param, sort in self.items()]
 
 
-from typing import TypeVar, Generic
-
-_T = TypeVar("_T", covariant=True, default=z3.ExprRef, bound=z3.ExprRef)
-
-
 @dataclass(frozen=True)
-class TSTerm(Generic[_T]):
+class TSTerm[T]:
     spec: ParamSpec
-    fun: RawTSTerm[_T]
+    fun: RawTSTerm[T]
     name: str
 
     @cached_property
@@ -258,7 +253,7 @@ class TSTerm(Generic[_T]):
             self.name + "'",
         )
 
-    def __call__(self, ts: BaseTransitionSystem, params: Params | None = None) -> _T:
+    def __call__(self, ts: BaseTransitionSystem, params: Params | None = None) -> T:
         return self.fun(ts, params or self.params)
 
 

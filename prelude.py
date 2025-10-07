@@ -1,5 +1,3 @@
-from typing import Self
-
 from z3 import BoolRef, ExprRef, And, Implies, Or, Not, ForAll, If, Exists, EnumSort
 
 from ranks import (
@@ -46,7 +44,6 @@ from ts import (
 from typed_z3 import Expr, Rel, Fun, Finite, WFRel, Bool, Enum, false, true
 
 __all__ = [
-    "Self",
     "BoolRef",
     "ExprRef",
     "And",
