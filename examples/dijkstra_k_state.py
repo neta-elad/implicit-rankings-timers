@@ -1,4 +1,3 @@
-from z3 import Function
 from prelude import *
 
 # @status - start
@@ -6,10 +5,6 @@ from prelude import *
 # Dijkstra's k-state self-stabilization protocol
 # Dijkstra, E.W.: Self-stabilizing systems in spite of distributed control.
 # Commun. ACM 17(11), 643–644 (nov 1974), https://doi.org/10.1145/361179.361202
-
-# We prove the property by breaking it into several lemmas, as is suggested in:
-# Chih-Duo Hong and Anthony W. Lin. 2024. Regular Abstractions for Array Systems.
-# Proc. ACM Program. Lang. 8, POPL, Article 22 (January 2024), 29 pages. https://doi.org/10.1145/3632864
 
 
 class Node(Finite): ...
@@ -23,7 +18,7 @@ class DijkstraKStateSystem(TransitionSystem):
     skd: Immutable[Node]
     bot: Immutable[Node]
     witness_value: Immutable[Value]
-    node_h: Immutable[Node]
+    # node_h: Immutable[Node]
     leq_node: Immutable[Rel[Node, Node]]
     leq_value: Immutable[Rel[Value, Value]]
 
@@ -92,6 +87,27 @@ class DijkstraKStateSystem(TransitionSystem):
             Or(self.leq_value(S, R), self.leq_value(R, S)),
         )
 
+    # this should be with @witness - TODO
+    # defining 'witness value' as epsilon(minimal missing value in ring)
+    @axiom
+    def witness_definition(self, R: Value, X: Node, S: Value) -> BoolRef:
+        return Implies(
+            Exists(R, ForAll(X, self.a(X) != R)),
+            And(
+                ForAll(X, self.a(X) != self.witness_value),
+                ForAll(
+                    S,
+                    Implies(
+                        ForAll(X, self.a(X) != S),
+                        Or(
+                            S == self.witness_value,
+                            self.btw(self.a(self.bot), self.witness_value, S),
+                        ),
+                    ),
+                ),
+            ),
+        )
+
     # Some of our safety premises only hold in finite models, and so we use induction axioms to prove them
     # Our use of induction axioms is based on "Elad, N., Shoham, S.: Axe 'em: Eliminating spurious states with induction axioms."
     @axiom
@@ -115,10 +131,6 @@ class DijkstraKStateSystem(TransitionSystem):
     @axiom
     def more_values_than_nodes_axiom(self, R: Value, X: Node) -> BoolRef:
         return Exists(R, ForAll(X, self.a(X) != R))
-
-    @init
-    def initial(self, X: Node, Y: Node, S: Value, T: Value) -> BoolRef:
-        return true
 
     @transition
     def wakeup(self, n: Node) -> BoolRef:
@@ -147,10 +159,25 @@ class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
         Y = Node("Y")
         return Implies(
             G(F(Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd)))),
-            F(
-                G(
-                    ForAll(
-                        [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
+            # F(
+            #     G(
+            #         ForAll(
+            #             [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
+            #         )
+            #     )
+            # ),
+            # P1
+            # G(F(self.sys.skd==self.sys.bot))
+            # P2
+            # G(F(ForAll(
+            #     X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
+            # )))
+            # P3
+            G(
+                F(
+                    And(
+                        self.sys.priv(self.sys.bot),
+                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
                     )
                 )
             ),
@@ -158,27 +185,134 @@ class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
 
 
 class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
-    pass
 
-    # todo: proof -- in the prev paper I split it up to many properties, but maybe now we can do it as a single prop.
+    @invariant
+    def exists_privilege(self) -> BoolRef:
+        N = Node("N")
+        return Exists(N, self.sys.priv(N))
 
-    # this should be with @witness
-    # defining 'witness value' as epsilon(minimal missing value in ring)
-    # @axiom
-    # def witness_definition(self, R: Value, X: Node, S: Value) -> BoolRef:
-    #     return Implies(
-    #         Exists(R, ForAll(X, self.a(X) != R)),
-    #         And(
-    #             ForAll(X, self.a(X) != self.witness_value),
-    #             ForAll(
-    #                 S,
-    #                 Implies(
-    #                     ForAll(X, self.a(X) != S),
-    #                     Or(
-    #                         S == self.witness_value,
-    #                         self.btw(self.a(self.bot), self.witness_value, S),
-    #                     ),
-    #                 ),
-    #             ),
-    #         ),
-    #     )
+    @temporal_invariant
+    def scheduling_of_privileged_nodes(self) -> BoolRef:
+        X = Node("X")
+        return G(F(Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd))))
+
+    def privileged_node_scheduled(self) -> BoolRef:
+        X = Node("X")
+        return Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd))
+
+    def timer_scheduling(self) -> Rank:
+        return self.timer_rank(self.privileged_node_scheduled, None, None)
+
+    # @temporal_invariant
+    def violation(self) -> BoolRef:
+        X = Node("X")
+        Y = Node("Y")
+        return Not(
+            F(
+                G(
+                    ForAll(
+                        [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
+                    )
+                )
+            )
+        )
+
+    # @temporal_invariant
+    # def violation_P1(self) -> BoolRef:
+    #     return F(G(self.sys.skd!=self.sys.bot))
+
+    # def violation_P1_timer(self) -> Rank:
+    #     return self.timer_rank(G(self.sys.skd!=self.sys.bot),None,None)
+
+    # @temporal_invariant
+    # def violation_P2(self) -> BoolRef:
+    #     X = Node("X")
+    #     return F(G(Not(ForAll(
+    #         X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
+    #     ))))
+
+    # def violation_P2_timer(self) -> Rank:
+    #     X = Node("X")
+    #     return self.timer_rank(G(Not(ForAll(
+    #         X, Implies(X != self.sys.bot, self.sys.a(X) != self.sys.a(self.sys.bot))
+    #     ))), None, None)
+
+    @temporal_invariant
+    def violation_P3(self) -> BoolRef:
+        X = Node("X")
+        return F(
+            G(
+                Not(
+                    And(
+                        self.sys.priv(self.sys.bot),
+                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
+                    )
+                )
+            )
+        )
+
+    def violation_P3_timer(self) -> Rank:
+        X = Node("X")
+        return self.timer_rank(
+            G(
+                Not(
+                    And(
+                        self.sys.priv(self.sys.bot),
+                        ForAll(X, Implies(X != self.sys.bot, Not(self.sys.priv(X)))),
+                    )
+                )
+            ),
+            None,
+            None,
+        )
+
+    def stable(self) -> BoolRef:
+        X = Node("X")
+        Y = Node("Y")
+        return ForAll([X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y))
+
+    def unstable(self) -> BoolRef:
+        X = Node("X")
+        Y = Node("Y")
+        return Not(
+            ForAll([X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y))
+        )
+
+    def timer_violation_timer_after_stable(self) -> Rank:
+        return self.timer_rank(self.unstable, self.stable, None)
+
+    def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
+        return And(
+            i1 != i2,
+            Or(And(self.sys.leq_node(i2, i1), i2 != self.sys.bot), i1 == self.sys.bot),
+        )
+
+    def priv(self, i: Node) -> BoolRef:
+        return self.sys.priv(i)
+
+    def lexicographic_privileges(self) -> Rank:
+        return DomainLexRank(BinRank(self.priv), self.lt_reversed_bot_minimal, None)
+
+    def value_bot_needs_to_pass(self, v: Value) -> BoolRef:
+        return Or(
+            And(v == self.sys.a(self.sys.bot), v != self.sys.witness_value),
+            self.sys.btw(self.sys.a(self.sys.bot), v, self.sys.witness_value),
+        )
+
+    def all_values_bot_needs_to_pass(self) -> Rank:
+        return DomainPointwiseRank.close(BinRank(self.value_bot_needs_to_pass), None)
+
+    # this is close to good for the entire property.
+    def rank(self) -> Rank:
+        return LexRank(
+            # self.violation_P1_timer(),
+            # self.violation_P2_timer(),
+            self.violation_P3_timer(),
+            self.all_values_bot_needs_to_pass(),
+            self.lexicographic_privileges(),
+            self.timer_scheduling(),
+        )
+
+
+proof = DijsktraKStateProof()
+proof.check()

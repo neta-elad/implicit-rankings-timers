@@ -51,6 +51,7 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
+- [ ] If there's a non-temporal formula don't have timers for its subformulas.
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper 
   - review this in connection to what raz noted about soundness.
 - [x] hints in DomLex
