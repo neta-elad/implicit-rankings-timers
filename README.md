@@ -54,7 +54,6 @@ TIMERS=unint make examples/ticket.py
 - [ ] If there's a non-temporal formula don't have timers for its subformulas.
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper 
   - review this in connection to what raz noted about soundness.
-- [x] hints in DomLex
 - [ ] In readme, write list of all features
 - [ ] (optional) toggle between stopping at first failure and continuing after first failure.
 - [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
