@@ -265,10 +265,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     def timer_invariant(self, K: Ticket) -> BoolRef:
         return Or(
             F(
-                And(
-                    self.sys.pc2(self.skolem_thread),
-                    G(Not(self.sys.pc3(self.skolem_thread))),
-                )
+                self.starved(),
             ),
             And(
                 G(Not(self.sys.pc3(self.skolem_thread))),
@@ -280,7 +277,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
             ),
         )
 
-    def locked(self) -> BoolRef:
+    def starved(self) -> BoolRef:
         return And(
             self.sys.pc2(self.skolem_thread),
             G(Not(self.sys.pc3(self.skolem_thread))),
@@ -288,10 +285,7 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
 
     def rk1(self) -> Rank:
         return self.timer_rank(
-            And(
-                self.sys.pc2(self.skolem_thread),
-                G(Not(self.sys.pc3(self.skolem_thread))),
-            ),
+            self.starved(),
             None,
             None,
         )
