@@ -1,6 +1,16 @@
+"""
+Simplified DPLL algorithm for sat solving
+Nieuwenhuis, R., Oliveras, A., Tinelli, C. (2005). Abstract DPLL and Abstract DPLL Modulo Theories.
+Logic for Programming, Artificial Intelligence, and Reasoning. LPAR 2005. https://doi.org/10.1007/978-3-540-32275-7_3
+we also allow clause learning
+
+The clauses in the formula are those that satisfy in_F
+"""
+
 from prelude import *
 
-# @status - problem with backjump transition
+# @status - done
+
 
 class Variable(Finite): ...
 
@@ -205,7 +215,6 @@ class CDCL(TransitionSystem):
 
     @transition
     def learn(self, c_learn: Clause) -> BoolRef:
-
         return And(
             Not(self.in_F(c_learn)),
             # Not modeling the fact that c_learn follows from F - not safe
@@ -334,7 +343,7 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
         return DomainPointwiseRank(self.binary_ij(), ParamSpec(j=Level), None)
 
     def strict_order(self, i1: Level, i2: Level) -> BoolRef:
-        return And(self.sys.lvl_order(i1, i2), i1 != i2)
+        return And(self.sys.lvl_order(i2, i1), i1 != i2)
 
     def lex(self) -> Rank:
         return DomainLexRank(self.sum_j(), self.strict_order)
@@ -365,4 +374,5 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
         )
 
 
-CDCLProof().check()
+proof = CDCLProof()
+proof.check()
