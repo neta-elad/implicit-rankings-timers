@@ -339,6 +339,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             return False
 
         print(f"All passed!")
+        print(f"Rank: {self.rank()}")
         print(f"Rank size: {self.rank().size}")
         return True
 
