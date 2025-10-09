@@ -230,7 +230,7 @@ def order_leq[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
     )
 
 
-def total_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
+def strict_partial_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     order_fun = order_rel.fun
 
     def order(*args: z3.ExprRef) -> z3.BoolRef:
@@ -239,34 +239,29 @@ def total_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
 
-    return total_order_axioms(order, sorts)
+    return strict_partial_order_axioms(order, sorts)
 
 
 class Predicate(Protocol):
     def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
 
 
-def total_order_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
+def strict_partial_order_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]
+    # todo: require immutable
     return z3.And(
-        # transitive, antisymmetric z3.and total
+        # transitive, antisymmetric and total
         z3.ForAll(
             X + Y + Z,
             z3.Implies(z3.And(order(*X, *Y), order(*Y, *Z)), order(*X, *Z)),
         ),
         z3.ForAll(X, z3.Not(order(*X, *X))),
-        z3.ForAll(
-            X + Y,
-            z3.Or(
-                z3.And(*(x == y for x, y in zip(X, Y))), order(*X, *Y), order(*Y, *X)
-            ),
-        ),
     )
 
 
-def minimal_in_order_lt[T: Expr](term: T, order: Rel[T, T]) -> z3.BoolRef:
+def minimal_in_order[T: Expr](term: T, order: Rel[T, T]) -> z3.BoolRef:
     sort = order.fun.domain(0)
     Y = cast(T, z3.Const("Y", sort))
     return z3.ForAll(Y, z3.Not(order(Y, term)))
