@@ -76,7 +76,18 @@ class ToyAckermannSystem(TransitionSystem):
             Not(self.n_done),
             self.succ_index(self.n,self.next.n),
             self.c.unchanged(),
-            # n_done is updated arbitrarily
+            self.n_done.unchanged()
+        )
+
+    @transition
+    def init_c(self) -> BoolRef:
+        I = Index('I')
+        return And(
+            Not(self.n_done),
+            self.n_done.update(true),
+            self.n.unchanged(),
+            ForAll(I,Implies(Not(self.lt_index(I,self.n)),self.next.c(I) == self.zero_value))
+            # for indices I < n, c is set arbitrarily
         )
 
     @transition
@@ -105,6 +116,10 @@ class ToyAckermannProp(Prop[ToyAckermannSystem]):
 
 class ToyAckermannProof(Proof[ToyAckermannSystem], prop=ToyAckermannProp):
 
+    @invariant
+    def c_is_zero_after_n(self, I:Index) -> BoolRef:
+        return ForAll(I,Implies(Not(self.sys.lt_index(I,self.sys.n)),self.sys.c(I) == self.sys.zero_value))
+
     @temporal_invariant
     def eventually_n_done(self) -> BoolRef:
         return F(self.sys.n_done)
@@ -118,15 +133,18 @@ class ToyAckermannProof(Proof[ToyAckermannSystem], prop=ToyAckermannProp):
     def pos_value_of_i(self) -> Rank:
         return PosInOrderRank(self.value_of_i, self.sys.lt_value)
 
+    def finiteness_lemma_indices(self,i:Index) -> BoolRef:
+        return self.sys.lt_index(i,self.sys.n)
+
     def lexicographic_rank(self) -> Rank:
         return DomainLexRank(
             self.pos_value_of_i(),
             (self.sys.lt_index, Index("i")),
-            None
+            FiniteLemma(self.finiteness_lemma_indices)
         )
 
     def rank(self) -> Rank:
-        return PointwiseRank(
+        return LexRank(
             self.timer_n_done(),
             self.lexicographic_rank()
         )
