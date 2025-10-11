@@ -144,8 +144,11 @@ class FiniteSCBySort(SoundnessCondition):
     spec: ParamSpec
 
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
-        return all(sort.finite() for sort in self.spec.values())
-
+        for sort in self.spec.values():
+            if not sort.finite():
+                print(f"{sort.ref()} is not finite")
+                return False
+        return True
 
 @dataclass(frozen=True)
 class FiniteLemma:

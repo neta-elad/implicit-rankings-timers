@@ -479,7 +479,7 @@ def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm
     return TSTerm(spec, raw_term, fun_name)
 
 
-type TermLike[E: z3.ExprRef, *Ts] = TSTerm[E] | Callable[..., E] | E
+type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
 
 
 def unbind[T: BaseTransitionSystem, *Ts, R](

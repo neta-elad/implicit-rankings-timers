@@ -112,17 +112,16 @@ class ToyAckermannProof(Proof[ToyAckermannSystem], prop=ToyAckermannProp):
     def timer_n_done(self) -> Rank:
         return self.timer_rank(self.sys.n_done,None,None)
 
-    @ts_term
-    def value_of_i(self, i:Index) -> TSTerm:
+    def value_of_i(self, i:Index) -> Value:
         return self.sys.c(i)
 
     def pos_value_of_i(self) -> Rank:
-        return PosInOrderRank(self.value_of_i,self.sys.lt_value)
+        return PosInOrderRank(self.value_of_i, self.sys.lt_value)
 
     def lexicographic_rank(self) -> Rank:
         return DomainLexRank(
             self.pos_value_of_i(),
-            self.sys.lt_index,
+            (self.sys.lt_index, Index("i")),
             None
         )
 
