@@ -1,6 +1,5 @@
 # the example discussed with oded that is omega^omega and extensions?
 
-# possible examples from Sound Verification Procedures / Peyras et al. 
 
 # From Proving Termination with Multiset Orderings / Manna & Dershovitz
 # actually this is based on one of Dijkstra's notes [1] in the above
@@ -18,3 +17,5 @@
 # white, red--~ red, white
 # blue, red ~ red, blue
 # blue, white --~ white, blue. 
+
+# possible examples from Sound Verification Procedures / Peyras et al. 
