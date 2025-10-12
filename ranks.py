@@ -150,6 +150,7 @@ class FiniteSCBySort(SoundnessCondition):
                 return False
         return True
 
+
 @dataclass(frozen=True)
 class FiniteLemma:
     alpha_src: TermLike[z3.BoolRef]
@@ -435,9 +436,7 @@ class PosInOrderRank[T: Expr](Rank):
     def minimal(self) -> TSFormula:
         return TSTerm(
             self.spec,
-            lambda ts, params: minimal_in_order(
-                self.term(ts, params), self.order(ts)
-            ),
+            lambda ts, params: minimal_in_order(self.term(ts, params), self.order(ts)),
             f"{self}_<minimal>",
         )
 

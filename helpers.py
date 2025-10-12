@@ -246,7 +246,9 @@ class Predicate(Protocol):
     def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
 
 
-def strict_partial_order_axioms(order: Predicate, sorts: list[z3.SortRef]) -> z3.BoolRef:
+def strict_partial_order_axioms(
+    order: Predicate, sorts: list[z3.SortRef]
+) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]
