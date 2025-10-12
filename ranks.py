@@ -153,46 +153,46 @@ class FiniteSCBySort(SoundnessCondition):
 
 @dataclass(frozen=True)
 class FiniteLemma:
-    alpha_src: TermLike[z3.BoolRef]
+    beta_src: TermLike[z3.BoolRef]
     m: int = 1  # number of elements added initially and in each transition
     init_hints: FiniteSCHints | None = None
     tr_hints: FiniteSCHints | None = None
 
     @cached_property
-    def alpha(self) -> TSFormula:
-        return ts_term(self.alpha_src)
+    def beta(self) -> TSFormula:
+        return ts_term(self.beta_src)
 
 
 @dataclass(frozen=True)
-class FiniteSCByAlpha(SoundnessCondition):
+class FiniteSCByBeta(SoundnessCondition):
     spec: ParamSpec
     rank: "Rank"  # todo: differently?
     lemma: FiniteLemma
 
     def __post_init__(self) -> None:
-        assert self.alpha.spec == self.beta.spec
+        assert self.beta.spec == self.alpha.spec
 
     @cached_property
-    def beta(self) -> TSFormula:
+    def alpha(self) -> TSFormula:
         theta_min = self.rank.minimal
         return TSTerm(
             theta_min.spec,
             lambda ts, params: z3.Not(theta_min(ts, params)),
-            f"beta_<{theta_min.name}>",
+            f"alpha_<{theta_min.name}>",
         )
 
     @cached_property
-    def alpha(self) -> TSFormula:
-        return self.lemma.alpha
+    def beta(self) -> TSFormula:
+        return self.lemma.beta
 
     @cached_property
-    def beta_implies_alpha(self) -> TSFormula:
+    def alpha_implies_beta(self) -> TSFormula:
         return TSTerm(
-            self.alpha.spec,
+            self.beta.spec,
             lambda ts, params: z3.Implies(
-                self.beta(ts, params), self.alpha(ts, params)
+                self.alpha(ts, params), self.beta(ts, params)
             ),
-            f"beta->alpha_<{self.rank}>",
+            f"alpha->beta_<{self.rank}>",
         )
 
     def exists_ys_with_hints(
@@ -220,7 +220,7 @@ class FiniteSCByAlpha(SoundnessCondition):
 
         return z3.Or(*(one_instantiation(hint_set) for hint_set in hints))
 
-    def at_most_m_alpha_at_init(self, ts: BaseTransitionSystem) -> z3.BoolRef:
+    def at_most_m_beta_at_init(self, ts: BaseTransitionSystem) -> z3.BoolRef:
         ys = [
             [sort(f"{param}_{i}") for param, sort in self.spec.items()]
             for i in range(self.lemma.m)
@@ -231,7 +231,7 @@ class FiniteSCByAlpha(SoundnessCondition):
         body = z3.ForAll(
             params,
             z3.Implies(
-                self.alpha(ts),
+                self.beta(ts),
                 z3.Or(
                     *(
                         z3.And(*(param == y for param, y in zip(params, y_tuple)))
@@ -243,7 +243,7 @@ class FiniteSCByAlpha(SoundnessCondition):
 
         return self.exists_ys_with_hints(ts, body, self.lemma.init_hints)
 
-    def at_most_m_alpha_added(self, ts: BaseTransitionSystem) -> z3.BoolRef:
+    def at_most_m_beta_added(self, ts: BaseTransitionSystem) -> z3.BoolRef:
         ys = [
             [sort(f"{param}_{i}") for param, sort in self.spec.items()]
             for i in range(self.lemma.m)
@@ -254,9 +254,9 @@ class FiniteSCByAlpha(SoundnessCondition):
         body = z3.ForAll(
             params,
             z3.Implies(
-                self.alpha(ts.next),
+                self.beta(ts.next),
                 z3.Or(
-                    self.alpha(ts),
+                    self.beta(ts),
                     *(
                         z3.And(*(param == y for param, y in zip(params, y_tuple)))
                         for y_tuple in ys
@@ -268,14 +268,14 @@ class FiniteSCByAlpha(SoundnessCondition):
         return self.exists_ys_with_hints(ts, body, self.lemma.tr_hints)
 
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
-        ts_formula = self.beta_implies_alpha
+        ts_formula = self.alpha_implies_beta
         if not ts.check_and_print(
-            self.beta_implies_alpha.name,
+            self.alpha_implies_beta.name,
             invariant,
             z3.Not(universal_closure(ts_formula, ts)),
         ):
             return False
-        self.at_most_m_alpha_at_init(ts)
+        self.at_most_m_beta_at_init(ts)
         z = ParamSpec(
             {
                 param: sort
@@ -285,13 +285,13 @@ class FiniteSCByAlpha(SoundnessCondition):
         )
 
         if not ts.check_and_print(
-            f"init->at most {self.lemma.m} alpha_<{self.rank}>",
+            f"init->at most {self.lemma.m} beta_<{self.rank}>",
             ts.init,
             z3.Not(
                 quantify(
                     True,
                     z.consts(),  # todo: maybe flip to exists ys forall z
-                    self.at_most_m_alpha_at_init(ts),
+                    self.at_most_m_beta_at_init(ts),
                 )
             ),
         ):
@@ -299,14 +299,14 @@ class FiniteSCByAlpha(SoundnessCondition):
 
         for name, trans in ts.transitions.items():
             if not ts.check_and_print(
-                f"{name}->at most {self.lemma.m} alpha added_<{self.rank}>",
+                f"{name}->at most {self.lemma.m} beta added_<{self.rank}>",
                 invariant,
                 trans,
                 z3.Not(
                     quantify(
                         True,
                         z.consts(),  # todo: maybe flip to exists ys forall z
-                        self.at_most_m_alpha_added(ts),
+                        self.at_most_m_beta_added(ts),
                     ),
                 ),
                 with_next=True,
@@ -719,7 +719,7 @@ class DomainPointwiseRank(Rank):
         if self.finite_lemma is None:
             return FiniteSCBySort(self.quant_spec)
         else:
-            return FiniteSCByAlpha(self.quant_spec, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.quant_spec, self.rank, self.finite_lemma)
 
     @property
     def decreases(self) -> TSFormula:
@@ -989,7 +989,7 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
             return FiniteSCBySort(self.quant_spec)
         else:
             # todo: add soundness condition of WF of order as well
-            return FiniteSCByAlpha(self.quant_spec, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.quant_spec, self.rank, self.finite_lemma)
 
     @cached_property
     def decreases_conserved_hints(self) -> DomainLexConservedHints | None:
@@ -1219,7 +1219,7 @@ class DomainPermutedRank(Rank):
         if self.finite_lemma is None:
             return FiniteSCBySort(self.ys)
         else:
-            return FiniteSCByAlpha(self.ys, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.ys, self.rank, self.finite_lemma)
 
     @property
     def decreases(self) -> TSFormula:
