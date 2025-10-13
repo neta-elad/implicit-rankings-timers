@@ -1,10 +1,10 @@
 from inspect import stack
 from prelude import *
 
-# @status - inv fails
+# @status - done, except for soundness which we put away for now
 
 # Ackermann function implementation using a stack-based approach
-# Slightly modified - removed the finish action, instead we prove eventually m=0 and len=0
+# Slightly modified - removed the finish action, instead we prove termination
 # Additionally removed temporal instrumentation / witness variables
 # Based on the implementation in Ivy, see The Power of Temporal Prophecy Paper (unpublished)
 
@@ -17,20 +17,16 @@ from prelude import *
 class Nat(Expr): ...
 
 
-class StackType(Enum):
-    concrete: "StackType"
-    ghost: "StackType"
+# class StackType(Enum):
+#     concrete: "StackType"
+#     ghost: "StackType"
 
 
 class AckermannSystem(TransitionSystem):
-    # Immutable constants and relations
     zero: Immutable[Nat]
-    lt: Immutable[Rel[Nat, Nat]]  # changed from leq to lt
-    lt_rev: Immutable[Rel[Nat, Nat]]
+    lt: Immutable[WFRel[Nat]]
 
-    # Mutable state variables
     len: Nat
-    len_minus_1: Nat  ##added ghost
     m: Nat  # initiated arbitrarily
     n: Nat  # initiated arbitrarily
     stack: Rel[Nat, Nat]  # one of these is stack variables and the other is data
@@ -42,10 +38,6 @@ class AckermannSystem(TransitionSystem):
             Implies(And(self.lt(X, Y), self.lt(Y, X)), false),
             Or(self.lt(X, Y), self.lt(Y, X), X == Y),
             Or(self.lt(self.zero, X), X == self.zero),
-            Or(
-                self.succ(self.len_minus_1, self.len), self.len == self.zero
-            ),  # added ghost definition
-            self.lt(X, Y) == self.lt_rev(X, Y),
         )
 
     def succ(self, n1: Nat, n2: Nat) -> BoolRef:
@@ -108,7 +100,6 @@ class AckermannSystem(TransitionSystem):
 class AckermannProp(Prop[AckermannSystem]):
     def prop(self) -> BoolRef:
         return false
-        return F(And(self.sys.m == self.sys.zero, self.sys.len == self.sys.zero))
 
 
 class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
@@ -143,7 +134,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             Or(self.sys.lt(self.sys.m, X), self.sys.m == X),
         )
 
-    # for an alternative idea - see the paper Proving Termination with Multiset Orderings  by Manna and Dershovitz.
+    # rank based on  "Proving Termination with Multiset Orderings" by Manna and Dershovitz.
 
     # rank = {(s_k + 1, 0), (s_k-1 + 1, 0) ..... (S_2 + 1, 0), (y,z)} multiset
     # equivalently: {stack_values x {0} union (m-1,n)}
@@ -168,7 +159,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def number_of_pairs(self) -> Rank:
         return DomainPointwiseRank(
             BinRank(self.any_pair),
-            ParamSpec(i=Nat),
+            ParamSpec(index=Nat),
             None,  # we need one - TODO
             None,  # maybe need hints
         )
@@ -176,7 +167,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
         return Or(
             self.sys.lt(a1, a2),
-            And(Or(self.sys.lt(a1, a2), a1 == a2), self.sys.lt(b1, b2)),
+            And(a1 == a2, self.sys.lt(b1, b2)),
         )
 
     def multiset_rank(self) -> Rank:
@@ -188,6 +179,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def rank(self) -> Rank:
         return self.multiset_rank()
 
+    # alternative idea for a proof: with DomLex over Nat and not Nat*Nat,
     # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
     # lexicographic order with the more significant being the higher values (otherwise not well-founded)
     # the intuition to use this is step1 which will "in the future" add unbounded number of values smaller than largest m
@@ -217,94 +209,93 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     # decrease in stack (and in m)
     # the decrease is witnessed in value 2 pointwise
 
-    def position_of_m(self) -> Rank:
-        return PosInOrderRank(self.sys.m, self.sys.lt)
+    # def position_of_m(self) -> Rank:
+    #     return PosInOrderRank(self.sys.m, self.sys.lt)
 
-    def position_of_n(self) -> Rank:
-        return PosInOrderRank(self.sys.n, self.sys.lt)
+    # def position_of_n(self) -> Rank:
+    #     return PosInOrderRank(self.sys.n, self.sys.lt)
 
-    def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
-        # m_minus_1 = Nat("m_minus_1")
-        return Or(
-            # usual stack values
-            And(
-                self.sys.stack(X, Y),
-                T == StackType.concrete,
-            ),
-            # n+1 copies of Y == m - 1
-            And(
-                Or(self.sys.lt(X, self.sys.n), X == self.sys.n),
-                self.sys.succ(Y, self.sys.m),
-                T == StackType.ghost,
-            ),
-            # # n copies of Y == m - 1
-            # And(
-            #     self.sys.lt(X, self.sys.n),
-            #     self.sys.succ(Y, self.sys.m),
-            #     T == StackType.ghost,
-            # ),
-            # # 1 copy of Y = m - 2
-            # And(
-            #     Exists(
-            #         m_minus_1,
-            #         And(
-            #             self.sys.succ(Y, m_minus_1),
-            #             self.sys.succ(m_minus_1, self.sys.m),
-            #         ),
-            #     ),
-            #     X == self.sys.zero,
-            #     T == StackType.ghost,
-            # ),
-        )
+    # def stack_value_or_ghost(self, X: Nat, Y: Nat, T: StackType) -> BoolRef:
+    #     # m_minus_1 = Nat("m_minus_1")
+    #     return Or(
+    #         # usual stack values
+    #         And(
+    #             self.sys.stack(X, Y),
+    #             T == StackType.concrete,
+    #         ),
+    #         # n+1 copies of Y == m - 1
+    #         And(
+    #             Or(self.sys.lt(X, self.sys.n), X == self.sys.n),
+    #             self.sys.succ(Y, self.sys.m),
+    #             T == StackType.ghost,
+    #         ),
+    #         # # n copies of Y == m - 1
+    #         # And(
+    #         #     self.sys.lt(X, self.sys.n),
+    #         #     self.sys.succ(Y, self.sys.m),
+    #         #     T == StackType.ghost,
+    #         # ),
+    #         # # 1 copy of Y = m - 2
+    #         # And(
+    #         #     Exists(
+    #         #         m_minus_1,
+    #         #         And(
+    #         #             self.sys.succ(Y, m_minus_1),
+    #         #             self.sys.succ(m_minus_1, self.sys.m),
+    #         #         ),
+    #         #     ),
+    #         #     X == self.sys.zero,
+    #         #     T == StackType.ghost,
+    #         # ),
+    #     )
 
-    def finite_lemma_for_stack_value_or_ghost(
-        self, X: Nat, Y: Nat, T: StackType
-    ) -> BoolRef:
-        return Or(
-            And(
-                self.sys.stack(X, Y),
-                T == StackType.concrete,
-            ),
-            And(self.sys.lt(X, self.sys.n), T == StackType.ghost),
-        )
+    # def finite_lemma_for_stack_value_or_ghost(
+    #     self, X: Nat, Y: Nat, T: StackType
+    # ) -> BoolRef:
+    #     return Or(
+    #         And(
+    #             self.sys.stack(X, Y),
+    #             T == StackType.concrete,
+    #         ),
+    #         And(self.sys.lt(X, self.sys.n), T == StackType.ghost),
+    #     )
 
-    def stack_value_or_ghost_binary(self) -> Rank:
-        return BinRank(self.stack_value_or_ghost)
+    # def stack_value_or_ghost_binary(self) -> Rank:
+    #     return BinRank(self.stack_value_or_ghost)
 
-    def num_appearances_of_value_or_ghost(self) -> Rank:
-        conserved_hints = [
-            (
-                # permute discussed above
-                [{"X": self.sys.n, "T": StackType.ghost}],
-                [{"X": self.sys.len_minus_1, "T": StackType.concrete}],
-            ),
-            (
-                # no permute
-                [{"X": self.sys.n, "T": StackType.concrete}],
-                [{"X": self.sys.n, "T": StackType.concrete}],
-            ),
-        ]
-        # decrease_hints = [
-        #     (
-        #         [{"i": self.sys.node1}],
-        #         [{"i": self.sys.node2}],
-        #         {"i": self.sys.node3},
-        #     )
-        # ]
-        return DomainPermutedRank(
-            self.stack_value_or_ghost_binary(),
-            ParamSpec(X=Nat, T=StackType),
-            k=1,
-            finite_lemma=None,
-            conserved_hints=conserved_hints,
-        )
+    # def num_appearances_of_value_or_ghost(self) -> Rank:
+    #     conserved_hints = [
+    #         (
+    #             # permute discussed above
+    #             [{"X": self.sys.n, "T": StackType.ghost}],
+    #             [{"X": self.sys.len_minus_1, "T": StackType.concrete}],
+    #         ),
+    #         (
+    #             # no permute
+    #             [{"X": self.sys.n, "T": StackType.concrete}],
+    #             [{"X": self.sys.n, "T": StackType.concrete}],
+    #         ),
+    #     ]
+    #     # decrease_hints = [
+    #     #     (
+    #     #         [{"i": self.sys.node1}],
+    #     #         [{"i": self.sys.node2}],
+    #     #         {"i": self.sys.node3},
+    #     #     )
+    #     # ]
+    #     return DomainPermutedRank(
+    #         self.stack_value_or_ghost_binary(),
+    #         ParamSpec(X=Nat, T=StackType),
+    #         k=1,
+    #         finite_lemma=None,
+    #         conserved_hints=conserved_hints,
+    #     )
 
-    def stack_appearances_lexicographically(self) -> Rank:
-        return DomainLexRank(
-            # maybe we need here the reverse ordering?
-            self.num_appearances_of_value_or_ghost(),
-            (self.sys.lt_rev, Nat("Y")),
-        )
+    # def stack_appearances_lexicographically(self) -> Rank:
+    #     return DomainLexRank(
+    #         # maybe we need here the reverse ordering?
+    #         self.num_appearances_of_value_or_ghost(),
+    #     )
 
     # def rank(self) -> Rank:
     #     return self.stack_appearances_lexicographically()
@@ -316,3 +307,4 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
 
 AckermannProof().check()
+print(AckermannProof().rank().size)

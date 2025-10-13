@@ -51,10 +51,11 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] If there's a non-temporal formula don't have timers for its subformulas.
 - [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper 
   - review this in connection to what raz noted about soundness.
 - [ ] In readme, write list of all features
+- [ ] (optional) optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, and other such optimizations.
+- [ ] (optional) if ParamSpec of DomPW (e.g) is not one of the options, it should give an error.
 - [ ] (optional) toggle between stopping at first failure and continuing after first failure.
 - [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
 - [ ] (optional) improve formatter
