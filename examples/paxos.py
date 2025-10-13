@@ -4,7 +4,7 @@ import temporal
 # @ status - done
 
 # Paxos consensus protocol implementation
-# Based on the Ivy implementation in ivy_examples/paxos_liveness.ivy
+# Based on the Ivy implementation in paxos_liveness.ivy
 
 
 class Node(Finite): ...
@@ -20,20 +20,16 @@ class Round(Finite): ...
 
 
 class PaxosSystem(TransitionSystem):
-    # Immutable constants and relations
     none: Immutable[Round]
     le: Immutable[Rel[Round, Round]]  # total order on rounds
     member: Immutable[Rel[Node, Quorum]]  # quorum membership
     r0: Immutable[Round]  # the round after which no ballot must be started
     q0: Immutable[Quorum]  # the quorum that must be responsive
 
-    # Main protocol state variables
-    one_a: Rel[Round]  # 1a messages (prepare requests)
-    one_b_max_vote: Rel[Node, Round, Round, Value]  # 1b messages (prepare responses)
-    proposal: Rel[Round, Value]  # 2a messages (accept requests)
-    vote: Rel[Node, Round, Value]  # 2b messages (accept responses)
-
-    # Message tracking relations
+    one_a: Rel[Round]
+    one_b_max_vote: Rel[Node, Round, Round, Value]
+    proposal: Rel[Round, Value]
+    vote: Rel[Node, Round, Value]
     one_a_received: Rel[Node, Round]
     one_b_max_vote_received: Rel[Round, Node, Round, Value]
     proposal_received: Rel[Node, Round, Value]
@@ -89,9 +85,6 @@ class PaxosSystem(TransitionSystem):
             # guard
             r != self.none,
             Not(self.one_a(r)),
-            self.le(
-                r, self.r0
-            ),  # assumption for liveness (the "fairness" assumption) - from original
             # updates
             self.one_a.update({(r,): true}),
             # other relations unchanged
@@ -186,7 +179,7 @@ class PaxosSystem(TransitionSystem):
         N = Node("N")
         MAXR = Round("MAXR")
         V = Value("V")
-        Q = Quorum("Q")  # Add Q for the missing assumption
+        Q = Quorum("Q")
         return And(
             # guard
             r != self.none,
@@ -297,14 +290,6 @@ class PaxosSystem(TransitionSystem):
                 And(
                     self.vote.update({(n, r, v): true}),
                     # here in ivy they use the violation -- this is a bit cheaty, the skolemization is a better approach
-                    # Not(
-                    #     Exists(
-                    #         Q,
-                    #         ForAll(
-                    #             N, Implies(self.member(N, Q), self.vote(N, self.r0, v))
-                    #         ),
-                    #     )
-                    # ),
                 ),
                 self.vote.unchanged(),
             ),
@@ -320,7 +305,6 @@ class PaxosSystem(TransitionSystem):
 
 
 # Property: A quorum of nodes eventually votes for the same value in round r0
-# Based on Ivy specification: exists V:value, Q:quorum. F. forall N:node. member(N,Q) -> vote(N,r0,V)
 class PaxosProperty(Prop[PaxosSystem]):
     def prop(self) -> BoolRef:
         V = Value("V")
@@ -328,7 +312,6 @@ class PaxosProperty(Prop[PaxosSystem]):
         N = Node("N")
         R = Round("R")
 
-        # Fairness conditions from the Ivy specification:
         fairness_conditions = And(
             F(self.sys.one_a(self.sys.r0)),
             G(
@@ -375,11 +358,12 @@ class PaxosProperty(Prop[PaxosSystem]):
                 ),
             ),
             F(
-                self.sys.proposal(self.sys.r0, self.sys.skolem_value)
-            ),  ## slightly modified from ivy
+                self.sys.proposal(
+                    self.sys.r0, self.sys.skolem_value
+                )  # slightly modified from ivy, using skolem_value
+            ),
         )
 
-        # The main liveness property: exists V:value, Q:quorum. F. forall N:node. member(N,Q) -> vote(N,r0,V)
         liveness_property = Exists(
             [Q],
             F(
@@ -387,13 +371,14 @@ class PaxosProperty(Prop[PaxosSystem]):
                     N,
                     Implies(
                         self.sys.member(N, Q),
-                        self.sys.vote(N, self.sys.r0, self.sys.skolem_value),
+                        self.sys.vote(
+                            N, self.sys.r0, self.sys.skolem_value
+                        ),  # slightly modified, using skolem_value
                     ),
                 )
             ),
         )
 
-        # The complete property: fairness conditions imply the liveness property
         return Implies(fairness_conditions, liveness_property)
 
 
@@ -494,22 +479,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             )
         )
 
-    # non-temporal consequence of the temporal invariants
-
-    # @invariant
-    # this invariant appears in the ivy file and its necessary but i dont know how to prove it
-    # problematic invariant
-    # i think we should be able to do without this invariant
-    # def exists_node_in_q0_not_voted(self) -> BoolRef:
-    #     N = Node("N")
-    #     return Exists(
-    #         N,
-    #         And(
-    #             self.sys.member(N, self.sys.q0),
-    #             Not(self.sys.vote(N, self.sys.r0, self.sys.skolem_value)),
-    #         ),
-    #     )
-
     @invariant
     def proposal_uniqueness(self, R: Round, V1: Value, V2: Value) -> BoolRef:
         return Implies(
@@ -570,15 +539,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         V = Value("V")
         return self.sys.proposed(R) == Exists(V, self.sys.proposal(R, V))
 
-    # @invariant
-    # # necessary?
-    # def one_b_received_equiv(self, N: Node) -> BoolRef:
-    #     R2 = Round("R2")
-    #     V = Value("V")
-    #     return self.sys.one_b_received(self.sys.r0, N) == Exists(
-    #         [R2, V], self.sys.one_b_max_vote_received(self.sys.r0, N, R2, V)
-    #     )
-
     @invariant(leaf=True)
     def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
         R = Round("R")
@@ -610,7 +570,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         return self.timer_rank(
             self.one_a_received_r0,
             None,
-            # self.negated_one_a_received_r0,
             None,
         )
 
@@ -626,16 +585,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def proposal_received_skolem_value(self, N: Node) -> BoolRef:
         return self.sys.proposal_received(N, self.sys.r0, self.sys.skolem_value)
 
-    # def V_is_skolem_value(self, N: Node, V: Value) -> BoolRef:
-    #     return V==self.sys.skolem_value
-
-    # def proposal_received_timer_rank(self) -> Rank:
-    #     return self.timer_rank(
-    #         self.proposal_received,
-    #         self.V_is_skolem_value,
-    #         FiniteLemma(self.V_is_skolem_value)
-    #     )
-
     def proposal_received_skolem_value_timer_rank(self) -> Rank:
         return self.timer_rank(self.proposal_received_skolem_value, None, None)
 
@@ -649,76 +598,62 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         )
 
     # simplifying assumptions for debugging - don't affect final proof.
-    def no_one_a_r0(self) -> BoolRef:
-        return Not(self.sys.one_a(self.sys.r0))
 
-    def not_proposed_r0(self) -> BoolRef:
-        return Not(self.sys.proposal(self.sys.r0, self.sys.skolem_value))
+    # def no_one_a_r0(self) -> BoolRef:
+    #     return Not(self.sys.one_a(self.sys.r0))
 
-    def exists_N_in_q0_not_received_one_a(self) -> BoolRef:
-        N = Node("N")
-        return Exists(
-            N,
-            And(
-                self.sys.member(N, self.sys.q0),
-                Not(self.sys.one_a_received(N, self.sys.r0)),
-            ),
-        )
+    # def not_proposed_r0(self) -> BoolRef:
+    #     return Not(self.sys.proposal(self.sys.r0, self.sys.skolem_value))
 
-    def exists_N_in_q0_not_received_one_b(self) -> BoolRef:
-        N = Node("N")
-        return Exists(
-            N,
-            And(
-                self.sys.member(N, self.sys.q0),
-                Not(self.sys.one_b_received(self.sys.r0, N)),
-            ),
-        )
+    # def exists_N_in_q0_not_received_one_a(self) -> BoolRef:
+    #     N = Node("N")
+    #     return Exists(
+    #         N,
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             Not(self.sys.one_a_received(N, self.sys.r0)),
+    #         ),
+    #     )
 
-    def exists_N_in_q0_not_received_proposal(self) -> BoolRef:
-        N = Node("N")
-        V = Value("V")
-        return Exists(
-            [N, V],
-            And(
-                self.sys.member(N, self.sys.q0),
-                self.sys.proposal(self.sys.r0, V),
-                Not(self.sys.proposal_received(N, self.sys.r0, V)),
-            ),
-        )
+    # def exists_N_in_q0_not_received_one_b(self) -> BoolRef:
+    #     N = Node("N")
+    #     return Exists(
+    #         N,
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             Not(self.sys.one_b_received(self.sys.r0, N)),
+    #         ),
+    #     )
 
-    def all_nodes_in_q0_proposal_received_some_V(self) -> BoolRef:
-        N = Node("N")
-        V = Value("V")
-        return And(
-            Not(
-                Exists(
-                    [N, V],
-                    And(
-                        self.sys.member(N, self.sys.q0),
-                        self.sys.proposal(self.sys.r0, V),
-                        Not(self.sys.proposal_received(N, self.sys.r0, V)),
-                    ),
-                )
-            ),
-            Exists(V, self.sys.proposal(self.sys.r0, V)),
-        )
+    # def exists_N_in_q0_not_received_proposal(self) -> BoolRef:
+    #     N = Node("N")
+    #     V = Value("V")
+    #     return Exists(
+    #         [N, V],
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             self.sys.proposal(self.sys.r0, V),
+    #             Not(self.sys.proposal_received(N, self.sys.r0, V)),
+    #         ),
+    #     )
+
+    # def all_nodes_in_q0_proposal_received_some_V(self) -> BoolRef:
+    #     N = Node("N")
+    #     V = Value("V")
+    #     return And(
+    #         Not(
+    #             Exists(
+    #                 [N, V],
+    #                 And(
+    #                     self.sys.member(N, self.sys.q0),
+    #                     self.sys.proposal(self.sys.r0, V),
+    #                     Not(self.sys.proposal_received(N, self.sys.r0, V)),
+    #                 ),
+    #             )
+    #         ),
+    #         Exists(V, self.sys.proposal(self.sys.r0, V)),
+    #     )
 
 
 proof = PaxosProof()
-# proof._check_soundness()
 proof.check()
-# proof._check_conserved()
-# proof._check_decreases()
-# print("case1")
-# proof._check_decreases(assumption=proof.no_one_a_r0())
-# print("case2")
-# proof._check_decreases(assumption=proof.not_proposed_r0())
-# print("case3")
-# proof._check_decreases(assumption=proof.exists_N_in_q0_not_received_one_a())
-# print("case4")
-# proof._check_decreases(assumption=proof.exists_N_in_q0_not_received_one_b())
-# print("case5")
-# proof._check_decreases(assumption=proof.exists_N_in_q0_not_received_proposal())
-# print("case6")
-# proof._check_decreases(assumption=proof.all_nodes_in_q0_proposal_received_some_V()) # verifies in all except cast_vote for some reason
