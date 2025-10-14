@@ -1,9 +1,9 @@
 import operator
 from abc import ABC, abstractmethod
-from collections.abc import Callable, Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence, Iterable
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import cast, Any, overload
+from typing import cast, Any, overload, Self
 
 import z3
 
@@ -15,6 +15,7 @@ from helpers import (
     Predicate,
     strict_partial_immutable_order_axioms,
     Instances,
+    expr_size,
 )
 from timers import Time, timer_zero, timer_order
 from ts import (
@@ -44,6 +45,44 @@ type FiniteSCHint = Sequence[Hint]
 type FiniteSCHints = Sequence[FiniteSCHint]
 
 type _RawTSRel[*Ts] = Callable[[BaseTransitionSystem], Rel[*Ts]]
+
+
+def hint_size(ts: BaseTransitionSystem, hint: Iterable[Any] | None) -> int:
+    if hint is None:
+        return 0
+    if hasattr(hint, "values") and callable(hint.values):
+        return sum(expr_size(ts_term(term)(ts)) for term in hint.values())
+    return sum(hint_size(ts, sub_hint) for sub_hint in hint)
+
+
+#
+# def hints_size(ts: BaseTransitionSystem, hints: Iterable[Hint] | None) -> int:
+#     if hints is None:
+#         return 0
+#     return sum(hint_size(ts, hint) for hint in hints)
+#
+#
+# def m_hints_size(
+#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Hint]] | None
+# ) -> int:
+#     if multi_hints is None:
+#         return 0
+#     return sum(hints_size(ts, hints) for hints in multi_hints)
+#
+#
+# def mm_hints_size(
+#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Iterable[Hint]]] | None
+# ) -> int:
+#     if multi_hints is None:
+#         return 0
+#     return sum(m_hints_size(ts, hints) for hints in multi_hints)
+#
+# def mmm_hints_size(
+#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Iterable[Iterable[Hint]]]] | None
+# ) -> int:
+#     if multi_hints is None:
+#         return 0
+#     return sum(mm_hints_size(ts, hints) for hints in multi_hints)
 
 
 @dataclass(frozen=True)
@@ -161,6 +200,12 @@ class FiniteLemma:
     @cached_property
     def beta(self) -> TSFormula:
         return ts_term(self.beta_src)
+
+
+def lemma_size(ts: BaseTransitionSystem, lemma: FiniteLemma | None) -> int:
+    if lemma is None:
+        return 0
+    return expr_size(lemma.beta(ts))
 
 
 @dataclass(frozen=True)
@@ -329,6 +374,9 @@ class ClosedRank(ABC):
     @abstractmethod
     def size(self) -> int: ...
 
+    @abstractmethod
+    def expr_size(self, ts: BaseTransitionSystem) -> int: ...
+
 
 class Rank(ClosedRank, ABC):
     @property
@@ -394,6 +442,10 @@ class BinRank(Rank):
     def size(self) -> int:
         return 1
 
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + alpha
+        return 1 + expr_size(self.alpha(ts))
+
     def __str__(self) -> str:
         return f"Bin({self.alpha.name})"
 
@@ -458,6 +510,10 @@ class PosInOrderRank[T: Expr](Rank):
     @property
     def size(self) -> int:
         return 1
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + order + term
+        return 1 + 1 + expr_size(self.term(ts))
 
     def __str__(self) -> str:
         return f"Pos({self.term.name})"
@@ -528,6 +584,10 @@ class LexRank(Rank):
     def size(self) -> int:
         return 1 + sum(rank.size for rank in self.ranks)
 
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + sub-ranks
+        return 1 + sum(rank.expr_size(ts) for rank in self.ranks)
+
     def __str__(self) -> str:
         return f"Lex({", ".join(map(str, self.ranks))})"
 
@@ -586,6 +646,10 @@ class PointwiseRank(Rank):
     @property
     def size(self) -> int:
         return 1 + sum(rank.size for rank in self.ranks)
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + sub-ranks
+        return 1 + sum(rank.expr_size(ts) for rank in self.ranks)
 
     def __str__(self) -> str:
         return f"PW({", ".join(map(str, self.ranks))})"
@@ -654,6 +718,10 @@ class CondRank(Rank):
     @property
     def size(self) -> int:
         return 1 + self.rank.size
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + sub-rank + alpha
+        return 1 + self.rank.expr_size(ts) + expr_size(self.alpha(ts))
 
     def __str__(self) -> str:
         return f"Cond({self.rank}, {self.alpha.name})"
@@ -735,6 +803,16 @@ class DomainPointwiseRank(Rank):
     @property
     def size(self) -> int:
         return 1 + self.rank.size
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + sub-rank + quant-spec + lemma + hints
+        return (
+            1
+            + self.rank.expr_size(ts)
+            + len(self.quant_spec)
+            + lemma_size(ts, self.finite_lemma)
+            + hint_size(ts, self.decreases_hints)
+        )
 
     def exists_with_hints(self, ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
         formula = z3.Exists(
@@ -1031,6 +1109,22 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
     def size(self) -> int:
         return 1 + self.rank.size
 
+    def order_expr_size(self, ts: BaseTransitionSystem) -> int:
+        xs = [z3.Const(f"_x_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+        ys = [z3.Const(f"_y_{i}", sort.ref()) for i, sort in enumerate(self.sorts)]
+
+        return expr_size(self.order_pred(ts)(*xs, *ys))
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + order + lemma + hints
+        return (
+            1
+            + self.order_expr_size(ts)
+            + lemma_size(ts, self.finite_lemma)
+            + hint_size(ts, self.conserved_hints)
+            + hint_size(ts, self.decreases_hints)
+        )
+
     def __str__(self) -> str:
         return f"DomLex({self.rank}, {self.order_name}, [{", ".join(self.names)}])"
 
@@ -1235,6 +1329,17 @@ class DomainPermutedRank(Rank):
     def size(self) -> int:
         return 1 + self.rank.size
 
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + ys + k + lemma + hints
+        return (
+            1
+            + len(self.ys)
+            + 1
+            + lemma_size(ts, self.finite_lemma)
+            + hint_size(ts, self.conserved_hints)
+            + hint_size(ts, self.decreases_hints)
+        )
+
     def __str__(self) -> str:
         return f"DomPerm({self.rank}, {self.ys}, {self.k})"
 
@@ -1290,6 +1395,10 @@ class TimerPosInOrderRank(Rank):
     @property
     def size(self) -> int:
         return 1
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + term
+        return 1 + expr_size(self.term(ts))
 
     def __str__(self) -> str:
         return f"TimerPos({self.term.name})"
@@ -1350,6 +1459,18 @@ class TimerRank(Rank):
     @property
     def size(self) -> int:
         return 1
+
+    def expr_size(self, ts: BaseTransitionSystem) -> int:
+        # rank + term + alpha + lemma
+        alpha_size = 0
+        if self.alpha is not None:
+            alpha_size = expr_size(self.alpha(ts))
+        return (
+            1
+            + expr_size(self.term(ts))
+            + alpha_size
+            + lemma_size(ts, self.finite_lemma)
+        )
 
     def __str__(self) -> str:
         if self.alpha is None:

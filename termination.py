@@ -7,6 +7,7 @@ from typing import ClassVar, cast, Any, Self, overload
 
 import z3
 
+from helpers import expr_size
 from metadata import add_marker, get_methods, has_marker
 from ranks import Rank, FiniteLemma, TimerRank
 from temporal import Prop, nnf
@@ -251,6 +252,14 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return size
 
     @cached_property
+    def invariant_expr_size(self) -> int:
+        return sum(1 + expr_size(inv.formula) for inv in self.invariants.values())
+
+    @cached_property
+    def size(self) -> int:
+        return self.invariant_expr_size + self.rank().expr_size(self)
+
+    @cached_property
     def no_leaf_invariant(self) -> z3.BoolRef:
         return z3.And(
             *(inv.formula for inv in self.invariants.values() if not inv.leaf)
@@ -355,6 +364,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         print(f"Rank size: {self.rank().size}")
         print(f"Invariant size: {self.invariant_size}")
         print(f"Time: {end_time - start_time:.3f} seconds")
+        print(f"Proof size: {self.size}")
         return True
 
     def _check_inv(self) -> bool:
