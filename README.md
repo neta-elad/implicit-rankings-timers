@@ -26,6 +26,11 @@
     make precommit
     ```
   
+- To count size of an Ivy proof, e.g., `ivy_examples/ticket.ivy`, run:
+    ```shell
+    make measure_ivy_proof.py IVY_FILE=ivy_examples/ticket.ivy
+    ```
+  
 For a simple example, check out the `examples/trivial_termination.py` file.
 
 ## Features
