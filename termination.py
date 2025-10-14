@@ -1,3 +1,4 @@
+import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -318,6 +319,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return phi_term
 
     def check(self) -> bool:
+        start_time = time.monotonic()
         if not self.sys.sanity_check():
             print("fail: sanity")
             return False
@@ -338,9 +340,11 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             print(f"fail: soundness")
             return False
 
+        end_time = time.monotonic()
         print(f"All passed!")
         print(f"Rank: {self.rank()}")
         print(f"Rank size: {self.rank().size}")
+        print(f"Time: {end_time - start_time:.3f} seconds")
         return True
 
     def _check_inv(self) -> bool:
