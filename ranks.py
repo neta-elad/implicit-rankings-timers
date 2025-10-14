@@ -8,12 +8,12 @@ from typing import cast, Any, overload
 import z3
 
 from helpers import (
-    strict_partial_order,
+    strict_partial_immutable_order,
     minimal_in_order,
     quantify,
     instantiate,
     Predicate,
-    strict_partial_order_axioms,
+    strict_partial_immutable_order_axioms,
     Instances,
 )
 from timers import Time, timer_zero, timer_order
@@ -420,7 +420,7 @@ class PosInOrderRank[T: Expr](Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                strict_partial_order(self.order(ts)),
+                strict_partial_immutable_order(self.order(ts)),
                 z3.Or(
                     self.order(ts)(
                         self.term.next(ts, params),
@@ -449,7 +449,7 @@ class PosInOrderRank[T: Expr](Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                strict_partial_order(self.order(ts)),
+                strict_partial_immutable_order(self.order(ts)),
                 self.order(ts)(self.term.next(ts, params), self.term(ts, params)),
             ),
             f"{self}_<decreases>",
@@ -953,7 +953,9 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
             )
 
         return z3.And(
-            strict_partial_order_axioms(self.order_pred(ts), self.sort_refs),
+            strict_partial_immutable_order_axioms(
+                self.order_pred(ts), self.order_pred(ts.next), self.sort_refs
+            ),
             z3.ForAll(
                 ys,
                 z3.Or(

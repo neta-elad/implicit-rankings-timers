@@ -230,29 +230,31 @@ def order_leq[T: Expr](order: Rel[T, T]) -> z3.BoolRef:
     )
 
 
-def strict_partial_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
+def strict_partial_immutable_order[T: Expr](order_rel: Rel[T, T]) -> z3.BoolRef:
     order_fun = order_rel.fun
 
     def order(*args: z3.ExprRef) -> z3.BoolRef:
         return cast(z3.BoolRef, order_fun(*args))
 
+    def next_order(*args: z3.ExprRef) -> z3.BoolRef:
+        return cast(z3.BoolRef, order_rel.next.fun(*args))
+
     half_arity = order_fun.arity() // 2
     sorts = [order_fun.domain(i) for i in range(half_arity)]
 
-    return strict_partial_order_axioms(order, sorts)
+    return strict_partial_immutable_order_axioms(order, next_order, sorts)
 
 
 class Predicate(Protocol):
     def __call__(self, *args: z3.ExprRef) -> z3.BoolRef: ...
 
 
-def strict_partial_order_axioms(
-    order: Predicate, sorts: list[z3.SortRef]
+def strict_partial_immutable_order_axioms(
+    order: Predicate, next_order: Predicate, sorts: list[z3.SortRef]
 ) -> z3.BoolRef:
     X = [z3.Const(f"X{i}", sort) for i, sort in enumerate(sorts)]
     Y = [z3.Const(f"Y{i}", sort) for i, sort in enumerate(sorts)]
     Z = [z3.Const(f"Z{i}", sort) for i, sort in enumerate(sorts)]
-    # todo: require immutable
     return z3.And(
         # transitive, antisymmetric and total
         z3.ForAll(
@@ -260,6 +262,7 @@ def strict_partial_order_axioms(
             z3.Implies(z3.And(order(*X, *Y), order(*Y, *Z)), order(*X, *Z)),
         ),
         z3.ForAll(X, z3.Not(order(*X, *X))),
+        z3.ForAll(X + Y, order(*X, *Y) == next_order(*X, *Y)),
     )
 
 

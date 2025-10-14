@@ -240,6 +240,12 @@ class Fun[*Ts, T: z3.ExprRef]:
     def _subclass_name(cls, signature: Signature) -> str:
         return f"Fun[{", ".join(str(sort) for sort in signature)}]"
 
+    @cached_property
+    def next(self) -> Self:
+        if not self.mutable:
+            return self
+        return self.__class__(self.name + "'", self.mutable)
+
     def __call__(self, *args: *Ts) -> T:
         return self.fun(*args)  # type: ignore
 
@@ -251,8 +257,7 @@ class Fun[*Ts, T: z3.ExprRef]:
     ) -> z3.BoolRef:
         consts = tuple(sort(f"X{i}") for i, sort in enumerate(self.signature[0:-1]))
         args = cast(tuple[*Ts], consts)
-        self_next = self.__class__(self.name + "'", self.mutable)
-        return z3.ForAll(consts, fun(self, self_next, *args))
+        return z3.ForAll(consts, fun(self, self.next, *args))
 
     def forall(self, fun: Callable[[*Ts], z3.BoolRef]) -> z3.BoolRef:
         return self.update_with_lambda(lambda _old, _new, *args: fun(*args))
