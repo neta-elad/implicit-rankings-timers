@@ -99,6 +99,13 @@ class TemporalWitness:
 class Invariant:
     formula: z3.BoolRef
     leaf: bool
+    override_size: int | None = None
+
+    @cached_property
+    def size(self) -> int:
+        if self.override_size is not None:
+            return self.override_size
+        return expr_size(self.formula)
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -229,6 +236,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             name: Invariant(
                 timer_zero(self._compile_timer(f"t_<{nnf(inv.formula)}>")(self)),
                 inv.leaf,
+                expr_size(inv.formula)
             )
             for name, inv in self.temporal_invariant_formulas.items()
         }
@@ -253,7 +261,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @cached_property
     def invariant_expr_size(self) -> int:
-        return sum(1 + expr_size(inv.formula) for inv in self.invariants.values())
+        return sum(1 + inv.size for inv in self.invariants.values())
 
     @cached_property
     def size(self) -> int:
@@ -319,9 +327,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         timer_name = f"t_<{nnf(ts_phi(self))}>"
         spec = ts_phi.spec
 
+        phi_size = expr_size(ts_phi(self))
         phi_term = self._compile_timer(timer_name, spec)
 
-        return TimerRank(phi_term, alpha, finite_lemma)
+        return TimerRank(phi_term, phi_size, alpha, finite_lemma)
 
     @staticmethod
     def _compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:

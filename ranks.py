@@ -1407,6 +1407,7 @@ class TimerPosInOrderRank(Rank):
 @dataclass(frozen=True)
 class TimerRank(Rank):
     term_like: TermLike[Time]
+    term_size: int
     alpha_like: TermLike[z3.BoolRef] | None = None
     finite_lemma: FiniteLemma | None = None
 
@@ -1467,7 +1468,7 @@ class TimerRank(Rank):
             alpha_size = expr_size(self.alpha(ts))
         return (
             1
-            + expr_size(self.term(ts))
+            + self.term_size
             + alpha_size
             + lemma_size(ts, self.finite_lemma)
         )
