@@ -392,3 +392,14 @@ def _merge_subs(subs: list[Substitution | None]) -> Substitution | None:
             return None
         merged |= sub
     return merged
+
+
+def expr_size(expr: z3.ExprRef) -> int:
+    if z3.is_const(expr):
+        return 1
+    elif z3.is_quantifier(expr):
+        variables, body = unpack_quantifier(expr)
+        return len(variables) + expr_size(body)
+    else:
+        children_size = sum(expr_size(child) for child in expr.children())
+        return children_size + 1

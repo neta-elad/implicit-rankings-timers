@@ -3,6 +3,7 @@ import sys
 from os import getenv
 from pathlib import Path
 
+
 def line_size(line: str) -> int:
     regex = r"(<->|->|[a-zA-Z0-9_\$]+|~\=|(?<!~)\=|~(?=\=)|&|\|)"
     results = re.findall(regex, line.split("#")[0])
@@ -27,6 +28,7 @@ def main(filename: Path) -> None:
         size += line_size(line)
 
     print(f"[{filename}] Proof size: {size}")
+
 
 if __name__ == "__main__":
     ivy_file = getenv("IVY_FILE")
