@@ -1,5 +1,4 @@
 from prelude import *
-import temporal
 
 # @ status - done
 
