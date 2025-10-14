@@ -7,10 +7,9 @@ from typing import ClassVar, cast, Any, Self, overload
 
 import z3
 
-from helpers import unpack_quantifier
 from metadata import add_marker, get_methods, has_marker
 from ranks import Rank, FiniteLemma, TimerRank
-from temporal import Prop, nnf, is_F, F, is_G, G
+from temporal import Prop, nnf
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
     BaseTransitionSystem,
@@ -242,6 +241,16 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return z3.And(*(inv.formula for inv in self.invariants.values()))
 
     @cached_property
+    def invariant_size(self) -> int:
+        size = 0
+        for inv in self.invariants.values():
+            if z3.is_and(inv.formula):
+                size += len(inv.formula.children())
+            else:
+                size += 1
+        return size
+
+    @cached_property
     def no_leaf_invariant(self) -> z3.BoolRef:
         return z3.And(
             *(inv.formula for inv in self.invariants.values() if not inv.leaf)
@@ -344,6 +353,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         print(f"All passed!")
         print(f"Rank: {self.rank()}")
         print(f"Rank size: {self.rank().size}")
+        print(f"Invariant size: {self.invariant_size}")
         print(f"Time: {end_time - start_time:.3f} seconds")
         return True
 
