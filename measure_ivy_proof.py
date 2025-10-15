@@ -11,21 +11,12 @@ def line_size(line: str) -> int:
 
 
 def main(filename: Path) -> None:
-    in_proof = False
     size = 0
 
     for raw_line in filename.read_text().splitlines():
         line = raw_line.strip()
-        if not line:
-            continue  # empty line
-        if line.startswith("#"):
-            continue  # comment
-        if line.startswith("proof"):
-            in_proof = True
-            continue
-        if not in_proof:
-            continue
-        size += line_size(line)
+        if "invariant" in line or "conjecture" in line:
+            size += line_size(line)
 
     print(f"[{filename}] Proof size: {size}")
 
