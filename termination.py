@@ -403,7 +403,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 self.check_inductiveness(
                     lambda this: inv.formula(this),
                     name + "*",
-                    self.sys,
+                    self.sys_with_witnesses,
                     lambda this: z3.And(
                         inv.formula(this), this.no_leaf_system_invariant
                     ),
