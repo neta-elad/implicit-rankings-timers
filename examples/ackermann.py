@@ -307,4 +307,4 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
 
 AckermannProof().check()
-print(AckermannProof().rank().size)
+AckermannProof().print_stats()

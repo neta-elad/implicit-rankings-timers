@@ -86,44 +86,19 @@ class BaseTransitionSystem(ABC):
             | {symbol.range() for symbol in self.symbols.values()}
         ) - {z3.IntSort(), z3.BoolSort()}
 
-    def check_inductiveness(
-        self,
-        inv: Callable[[Self], z3.BoolRef],
-        inv_name: str = "?",
-        assumption: Callable[[Self], z3.BoolRef] | None = None,
-    ) -> bool:
-        if assumption is None:
-            assumption = inv
-
-        results = []
-        results.append(
-            self.check_and_print(f"{inv_name} in init", self.init, z3.Not(inv(self)))
-        )
-
-        for name, trans in self.transitions.items():
-            results.append(
-                self.check_and_print(
-                    f"{inv_name} in {name}",
-                    assumption(self),
-                    trans,
-                    z3.Not(inv(self.next)),
-                    with_next=True,
-                )
-            )
-
-        return all(results)
-
     def check_and_print(
         self,
         name: str,
         *args: z3.BoolRef,
+        with_axioms: bool = True,
         with_next: bool = False,
         print_calls: bool = False,
     ) -> bool:
         print(f"Checking {name}: ", end="", flush=True)
-        args += (self.axiom,)
-        if with_next:
-            args += (self.next.axiom,)
+        if with_axioms:
+            args += (self.axiom,)
+            if with_next:
+                args += (self.next.axiom,)
         result = unsat_check(args, minimize_sorts=self.sorts, print_calls=print_calls)
         if result.unsat:
             print("passed")
@@ -132,10 +107,10 @@ class BaseTransitionSystem(ABC):
             print("timeout")
             return False
         else:
-            symbols = {symbol: None for symbol in self.symbols.values()}
+            symbols = {symbol for symbol in self.symbols.values()}
             if with_next:
                 symbols |= {
-                    symbol: None
+                    symbol
                     for symbol in self.next.symbols.values()
                     if symbol not in symbols
                 }

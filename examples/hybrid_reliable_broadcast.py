@@ -517,7 +517,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
 
-# CorrectnessHRBProof().check()
+CorrectnessHRBProof().check()
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):
@@ -971,3 +971,5 @@ Checking inv symmetric_sends_to_all in init: passed
 Checking inv symmetric_sends_to_all in receive_init_X_timers: passed
 Checking inv symmetric_sends_to_all in receive_msg_X_timers: passed
 """
+# RelayHRBProof()._check_conserved()
+# RelayHRBProof()._check_decreases()

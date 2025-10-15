@@ -27,6 +27,7 @@ from ranks import (
 )
 from termination import (
     Proof,
+    system_invariant,
     invariant,
     temporal_invariant,
     witness,
@@ -89,6 +90,7 @@ __all__ = [
     "FiniteLemma",
     "TSRel",
     "Proof",
+    "system_invariant",
     "invariant",
     "temporal_invariant",
     "witness",
