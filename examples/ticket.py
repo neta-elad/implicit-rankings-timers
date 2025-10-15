@@ -161,11 +161,11 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     def skolem_thread_scheduled_infinitely_often(self) -> BoolRef:
         return G(F(self.sys.scheduled(self.skolem_thread)))
 
-    @invariant
+    @system_invariant
     def pc_at_least_one(self, T: Thread) -> BoolRef:
         return Or(self.sys.pc1(T), self.sys.pc2(T), self.sys.pc3(T))
 
-    @invariant
+    @system_invariant
     def pc_at_most_one(self, T: Thread) -> BoolRef:
         return And(
             Or(Not(self.sys.pc1(T)), Not(self.sys.pc2(T))),

@@ -97,15 +97,27 @@ class TemporalWitness:
 
 @dataclass(frozen=True)
 class Invariant:
-    formula: z3.BoolRef
+    source: TSFormula
     leaf: bool
-    override_size: int | None = None
 
-    @cached_property
-    def size(self) -> int:
-        if self.override_size is not None:
-            return self.override_size
-        return expr_size(self.formula)
+    def formula[T: TransitionSystem](self, ts: "Proof[T]") -> z3.BoolRef:
+        return universal_closure(self.source, ts)
+
+    def count[T: TransitionSystem](self, ts: "Proof[T]") -> int:
+        formula = self.source(ts)
+        if z3.is_and(formula):
+            return len(formula.children())
+        return 1
+
+    def size[T: TransitionSystem](self, ts: "Proof[T]") -> int:
+        return expr_size(self.source(ts))
+
+
+@dataclass(frozen=True)
+class TemporalInvariant(Invariant):
+    def formula[T: TransitionSystem](self, ts: "Proof[T]") -> z3.BoolRef:
+        super_formula = super().formula(ts.reset)
+        return timer_zero(ts.compile_timer(f"t_<{nnf(super_formula)}>")(ts))
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -214,63 +226,66 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def system_invariants(self) -> dict[str, Invariant]:
         return {
             name: Invariant(
-                universal_closure(method, self),
+                method,
+                has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+            )
+            for name, method in _get_methods(self, _PROOF_SYSTEM_INVARIANT)
+        }
+
+    @cached_property
+    def invariants(self) -> dict[str, Invariant]:
+        return {
+            name: Invariant(
+                method,
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
             )
             for name, method in _get_methods(self, _PROOF_INVARIANT)
         }
 
     @cached_property
-    def temporal_invariant_formulas(self) -> dict[str, Invariant]:
+    def temporal_invariants(self) -> dict[str, Invariant]:
         return {
-            name: Invariant(
-                universal_closure(method, self.reset),
+            name: TemporalInvariant(
+                method,
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
             )
             for name, method in _get_methods(self, _PROOF_TEMPORAL_INVARIANT)
         }
 
     @cached_property
-    def temporal_invariants(self) -> dict[str, Invariant]:
-        return {
-            name: Invariant(
-                timer_zero(self._compile_timer(f"t_<{nnf(inv.formula)}>")(self)),
-                inv.leaf,
-                expr_size(inv.formula),
-            )
-            for name, inv in self.temporal_invariant_formulas.items()
-        }
-
-    @cached_property
-    def invariants(self) -> dict[str, Invariant]:
-        return self.system_invariants | self.temporal_invariants
+    def all_invariants(self) -> dict[str, Invariant]:
+        return self.system_invariants | self.invariants | self.temporal_invariants
 
     @cached_property
     def invariant(self) -> z3.BoolRef:
-        return z3.And(*(inv.formula for inv in self.invariants.values()))
+        return z3.And(*(inv.formula(self) for inv in self.all_invariants.values()))
+
+    @cached_property
+    def invariant_count(self) -> int:
+        return sum(inv.count(self) for inv in self.all_invariants.values())
 
     @cached_property
     def invariant_size(self) -> int:
-        size = 0
-        for inv in self.invariants.values():
-            if z3.is_and(inv.formula):
-                size += len(inv.formula.children())
-            else:
-                size += 1
-        return size
-
-    @cached_property
-    def invariant_expr_size(self) -> int:
-        return sum(1 + inv.size for inv in self.invariants.values())
+        return sum(1 + inv.size(self) for inv in self.invariants.values())
 
     @cached_property
     def size(self) -> int:
-        return self.invariant_expr_size + self.rank().expr_size(self)
+        return self.invariant_size + self.rank().expr_size(self)
 
     @cached_property
     def no_leaf_invariant(self) -> z3.BoolRef:
         return z3.And(
-            *(inv.formula for inv in self.invariants.values() if not inv.leaf)
+            *(inv.formula(self) for inv in self.all_invariants.values() if not inv.leaf)
+        )
+
+    @cached_property
+    def no_leaf_system_invariant(self) -> z3.BoolRef:
+        return z3.And(
+            *(
+                inv.formula(self)
+                for inv in self.system_invariants.values()
+                if not inv.leaf
+            )
         )
 
     @cached_property
@@ -328,12 +343,12 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         spec = ts_phi.spec
 
         phi_size = expr_size(ts_phi(self))
-        phi_term = self._compile_timer(timer_name, spec)
+        phi_term = self.compile_timer(timer_name, spec)
 
         return TimerRank(phi_term, phi_size, alpha, finite_lemma)
 
     @staticmethod
-    def _compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:
+    def compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:
         if spec is None:
             spec = ParamSpec()
 
@@ -369,24 +384,95 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
         end_time = time.monotonic()
         print(f"All passed!")
-        print(f"Rank: {self.rank()}")
-        print(f"Rank size: {self.rank().size}")
-        print(f"Invariant size: {self.invariant_size}")
         print(f"Time: {end_time - start_time:.3f} seconds")
-        print(f"Proof size: {self.size}")
+        self.print_stats()
         return True
 
+    def print_stats(self) -> None:
+        print(f"Rank: {self.rank()}")
+        print(f"Rank size: {self.rank().size}")
+        print(f"Invariant count: {self.invariant_count}")
+        print(f"Proof size: {self.size}")
+
     def _check_inv(self) -> bool:
-        return all(
-            self.check_inductiveness(
-                lambda this: this.invariants[name].formula,
-                f"inv {name}",
-                lambda this: z3.And(
-                    this.invariants[name].formula, this.no_leaf_invariant
-                ),
+        results = []
+
+        # System invariants
+        for name, inv in self.system_invariants.items():
+            results.append(
+                self.check_inductiveness(
+                    lambda this: inv.formula(this),
+                    name + "*",
+                    self.sys,
+                    lambda this: z3.And(
+                        inv.formula(this), this.no_leaf_system_invariant
+                    ),
+                )
             )
-            for name in self.invariants
+
+        # Regular invariants
+        for name, inv in self.invariants.items():
+            results.append(
+                self.check_inductiveness(
+                    lambda this: inv.formula(this),
+                    name,
+                    self,
+                    lambda this: z3.And(inv.formula(this), this.no_leaf_invariant),
+                )
+            )
+
+        # Temporal invariants
+        for name, inv in self.temporal_invariants.items():
+            results.append(
+                self.check_inductiveness(
+                    lambda this: inv.formula(this),
+                    name,
+                    self,
+                    lambda this: z3.And(inv.formula(this), this.no_leaf_invariant),
+                )
+            )
+
+        return all(results)
+
+    def check_inductiveness(
+        self,
+        inv: Callable[[Self], z3.BoolRef],
+        inv_name: str = "?",
+        ts: BaseTransitionSystem | None = None,
+        assumption: Callable[[Self], z3.BoolRef] | None = None,
+    ) -> bool:
+        if ts is None:
+            ts = self
+
+        if assumption is None:
+            assumption = inv
+
+        results = []
+        results.append(
+            self.check_and_print(
+                f"{inv_name} in init",
+                ts.axiom,
+                ts.init,
+                z3.Not(inv(self)),
+                with_axioms=False,
+            )
         )
+
+        for name, trans in ts.transitions.items():
+            results.append(
+                self.check_and_print(
+                    f"{inv_name} in {name}",
+                    ts.axiom,
+                    ts.next.axiom,
+                    assumption(self),
+                    trans,
+                    z3.Not(inv(self.next)),
+                    with_axioms=False,
+                    with_next=True,
+                )
+            )
+
+        return all(results)
 
     def _check_conserved(self, assumption: z3.BoolRef = true) -> bool:
         results = []
@@ -428,6 +514,31 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
 
 type TypedProofFormula[T: Proof[Any], *Ts] = Callable[[T, *Ts], z3.BoolRef]
+
+
+@overload
+def system_invariant[T: Proof[Any], *Ts](
+    *, leaf: bool = False
+) -> Callable[[TypedProofFormula[T, *Ts]], TypedProofFormula[T, *Ts]]: ...
+
+
+@overload
+def system_invariant[T: Proof[Any], *Ts](
+    fun: TypedProofFormula[T, *Ts], /
+) -> TypedProofFormula[T, *Ts]: ...
+
+
+def system_invariant[T: Proof[Any], *Ts](
+    fun: Any | None = None, /, *, leaf: bool = False
+) -> Any:
+    def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
+        if leaf:
+            add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
+        return add_marker(actual_fun, _PROOF_SYSTEM_INVARIANT)
+
+    if fun is not None:
+        return wrapper(fun)
+    return wrapper
 
 
 @overload
@@ -495,6 +606,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
     return add_marker(fun, _PROOF_TEMPORAL_WITNESS)  # type: ignore
 
 
+_PROOF_SYSTEM_INVARIANT = object()
 _PROOF_INVARIANT = object()
 _PROOF_LEAF_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
