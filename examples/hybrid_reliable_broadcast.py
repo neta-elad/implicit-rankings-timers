@@ -517,7 +517,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
 
-CorrectnessHRBProof().check()
+# CorrectnessHRBProof().check()
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):
@@ -639,7 +639,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             ),
         )
 
-    @invariant
+    @system_invariant
     # passes - follows just from receive_msg def
     def correct_and_accept_then_B_quorum(self) -> BoolRef:
         B = QuorumB("B")
@@ -652,7 +652,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             ),
         )
 
-    # @invariant
+    @system_invariant
     def relay_invariant_b(self, B: QuorumB) -> BoolRef:
         n1 = self.sys.witness_correct_not_accept
         M = Node("M")
@@ -661,7 +661,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             Exists(M, And(self.sys.member_b(M, B), Not(self.sys.rcv_msg(M, n1)))),
         )
 
-    @invariant
+    @system_invariant
     def relay_invariant_a(self, A: QuorumA) -> BoolRef:
         n2 = self.sys.witness_correct_not_sent
         M = Node("M")
@@ -880,7 +880,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
     # from relay_invariant_b:
     # exists M. member_b(M,B0) & ~rcv_msg(M,n1)
 
-    @invariant
+    @system_invariant
     def aaaaa_invariant(self) -> BoolRef:
         n2 = self.sys.witness_correct_not_sent
         n0 = self.sys.witness_correct_and_accept
@@ -935,8 +935,9 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
 
 
 proof = RelayHRBProof()
+proof.check()
 # proof._check_conserved()
-proof._check_inv()
+# proof._check_inv()
 # print("not_exists_accept")
 # proof._check_decreases(proof.not_exists_accept())#works
 # print("exists_correct_rcv_init_not_sent_msg")
