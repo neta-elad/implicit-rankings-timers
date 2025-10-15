@@ -376,3 +376,4 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
 
 proof = CDCLProof()
 proof.check()
+proof.print_stats()

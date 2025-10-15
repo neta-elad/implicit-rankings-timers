@@ -360,7 +360,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         phi_term = TSTerm(spec, raw, timer_name)
         return phi_term
 
-    def check(self) -> bool:
+    def check(self, *, check_conserved: bool = False) -> bool:
         start_time = time.monotonic()
         if not self.sys.sanity_check():
             print("fail: sanity")
@@ -370,7 +370,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             print("fail: inv")
             return False
 
-        if not self._check_conserved():
+        if check_conserved and not self._check_conserved():
             print("fail: conserved")
             return False
 

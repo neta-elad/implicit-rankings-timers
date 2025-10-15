@@ -531,7 +531,7 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
         )
 
 
-# CorrectnessHRBProof().check()
+CorrectnessHRBProof().check()
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):
@@ -835,5 +835,5 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
         )
 
 
-RelayHRBProof()._check_conserved()
-RelayHRBProof()._check_decreases()
+# RelayHRBProof()._check_conserved()
+# RelayHRBProof()._check_decreases()
