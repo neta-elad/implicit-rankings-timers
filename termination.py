@@ -266,7 +266,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     @cached_property
     def invariant_size(self) -> int:
-        return sum(1 + inv.size(self) for inv in self.invariants.values())
+        return sum(1 + inv.size(self) for inv in self.all_invariants.values())
 
     @cached_property
     def size(self) -> int:
