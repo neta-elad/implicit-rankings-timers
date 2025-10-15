@@ -1,22 +1,41 @@
 import re
-import sys
 from os import getenv
 from pathlib import Path
 
+counted_expr = re.compile(r"([a-zA-Z0-9_$]+|<->|->|~=|(?<!~)=|~(?==)|&|\|)")
+
+
+def clean_line(line: str) -> tuple[str, bool]:
+    parts = line.split("#")
+    return parts[0].strip(), len(parts) > 1
+
 
 def line_size(line: str) -> int:
-    regex = r"(<->|->|[a-zA-Z0-9_\$]+|~\=|(?<!~)\=|~(?=\=)|&|\|)"
-    results = re.findall(regex, line.split("#")[0])
+    results = counted_expr.findall(line)
     return len(results)
+
+
+def starts_inv(line: str) -> bool:
+    return line.startswith("invariant") or line.startswith("conjecture")
+
+
+def continuation(line: str) -> bool:
+    return counted_expr.match(line) is not None
 
 
 def main(filename: Path) -> None:
     size = 0
+    in_invariant = False
 
     for raw_line in filename.read_text().splitlines():
-        line = raw_line.strip()
-        if "invariant" in line or "conjecture" in line:
+        line, has_comment = clean_line(raw_line)
+        if starts_inv(line):
+            in_invariant = True
             size += line_size(line)
+        elif in_invariant and (has_comment or continuation(line)):
+            size += line_size(line)
+        else:
+            in_invariant = False
 
     print(f"[{filename}] Proof size: {size}")
 
