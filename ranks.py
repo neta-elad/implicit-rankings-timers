@@ -1466,12 +1466,7 @@ class TimerRank(Rank):
         alpha_size = 0
         if self.alpha is not None:
             alpha_size = expr_size(self.alpha(ts))
-        return (
-            1
-            + self.term_size
-            + alpha_size
-            + lemma_size(ts, self.finite_lemma)
-        )
+        return 1 + self.term_size + alpha_size + lemma_size(ts, self.finite_lemma)
 
     def __str__(self) -> str:
         if self.alpha is None:

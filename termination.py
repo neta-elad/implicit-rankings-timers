@@ -236,7 +236,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             name: Invariant(
                 timer_zero(self._compile_timer(f"t_<{nnf(inv.formula)}>")(self)),
                 inv.leaf,
-                expr_size(inv.formula)
+                expr_size(inv.formula),
             )
             for name, inv in self.temporal_invariant_formulas.items()
         }
