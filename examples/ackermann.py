@@ -1,10 +1,10 @@
 from prelude import *
 
-# @status - done, except for soundness
+# @status - done (except for wf check for order - simple)
 
 # Ackermann function implementation using a stack-based approach
 # Based on the implementation in Ivy, see The Power of Temporal Prophecy Paper (unpublished)
-# with removed temporal instrumentation / witness variables
+# with removed temporal instrumentation / witness variables, except for m_init
 
 # The Ackermann function is defined as:
 # A(0, n) = n + 1
@@ -17,7 +17,9 @@ class Nat(Expr): ...
 
 class AckermannSystem(TransitionSystem):
     zero: Immutable[Nat]
-    lt: Immutable[WFRel[Nat]]
+    lt: Immutable[
+        WFRel[Nat]
+    ]  # changed from <= to < but we can change back, it wasn't important
 
     len: Nat
     m: Nat
@@ -25,6 +27,8 @@ class AckermannSystem(TransitionSystem):
     stack: Rel[Nat, Nat]  # one of these is stack index and the other is data
     started: Bool
     finished: Bool
+
+    m_init: Nat  # ghost for what the value of m is at the start
 
     @axiom
     def lt_axioms(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
@@ -48,6 +52,7 @@ class AckermannSystem(TransitionSystem):
             Not(self.stack(X, Y)),
             self.len == self.zero,
             self.m == self.zero,
+            self.m_init == self.zero,
             self.n == self.zero,
             self.started == false,
             self.finished == false,
@@ -63,6 +68,7 @@ class AckermannSystem(TransitionSystem):
             self.len.unchanged(),
             self.started.unchanged(),
             self.finished.unchanged(),
+            self.m_init.unchanged(),
         )
 
     @transition
@@ -75,6 +81,7 @@ class AckermannSystem(TransitionSystem):
             self.len.unchanged(),
             self.started.unchanged(),
             self.finished.unchanged(),
+            self.m_init.unchanged(),
         )
 
     @transition
@@ -87,6 +94,7 @@ class AckermannSystem(TransitionSystem):
             self.stack.unchanged(),
             self.len.unchanged(),
             self.finished.unchanged(),
+            self.m_init.update(self.m),
         )
 
     def finish(self) -> BoolRef:
@@ -100,6 +108,7 @@ class AckermannSystem(TransitionSystem):
             self.n.unchanged(),
             self.stack.unchanged(),
             self.len.unchanged(),
+            self.m_init.unchanged(),
         )
 
     @transition
@@ -116,6 +125,7 @@ class AckermannSystem(TransitionSystem):
             self.succ(self.n, self.next.n),
             self.started.unchanged(),
             self.finished.unchanged(),
+            self.m_init.unchanged(),
         )
 
     @transition
@@ -130,6 +140,7 @@ class AckermannSystem(TransitionSystem):
             self.len.unchanged(),
             self.started.unchanged(),
             self.finished.unchanged(),
+            self.m_init.unchanged(),
         )
 
     @transition
@@ -145,6 +156,7 @@ class AckermannSystem(TransitionSystem):
             self.m.unchanged(),
             self.started.unchanged(),
             self.finished.unchanged(),
+            self.m_init.unchanged(),
         )
 
 
@@ -193,6 +205,20 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def len_zero_when_not_started(self) -> BoolRef:
         return Implies(Not(self.sys.started), self.sys.len == self.sys.zero)
 
+    @invariant
+    def m_bounded_by_m_init(self) -> BoolRef:
+        return Implies(
+            self.sys.started,
+            Or(self.sys.lt(self.sys.m, self.sys.m_init), self.sys.m == self.sys.m_init),
+        )
+
+    @invariant
+    def stack_bounded_by_m_init(self, I: Nat, M: Nat) -> BoolRef:
+        return Implies(
+            self.sys.stack(I, M),
+            Or(self.sys.lt(M, self.sys.m_init), M == self.sys.m_init),
+        )
+
     def timer_rank_start(self) -> Rank:
         return self.timer_rank(self.sys.started, None, None)
 
@@ -217,17 +243,25 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             self.m_minus_one_and_n_pair(index, a, b),
         )
 
-    def finiteness_lemma_for_pairs(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
+    def finiteness_lemma_for_index(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
         return Or(
-            And(self.sys.stack(index, a), b == self.sys.zero, self.sys.lt(index, self.sys.len)),
-            And(index==self.sys.len, self.sys.lt(a,self.sys.m), Or(self.sys.lt(b,self.sys.n),b==self.sys.n))
+            And(
+                self.sys.stack(index, a),
+                b == self.sys.zero,
+                self.sys.lt(index, self.sys.len),
+            ),
+            And(
+                index == self.sys.len,
+                self.sys.lt(a, self.sys.m),
+                Or(self.sys.lt(b, self.sys.n), b == self.sys.n),
+            ),
         )
 
     def number_of_pairs(self) -> Rank:
         return DomainPointwiseRank(
             BinRank(self.any_pair),
             ParamSpec(index=Nat),
-            FiniteLemma(self.finiteness_lemma_for_pairs),
+            FiniteLemma(self.finiteness_lemma_for_index),
         )
 
     def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
@@ -236,10 +270,25 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             And(a1 == a2, self.sys.lt(b1, b2)),
         )
 
+    def finiteness_lemma_for_a_and_b(self, a: Nat, b: Nat) -> BoolRef:
+        return Or(
+            And(
+                Or(
+                    self.sys.lt(a, self.sys.m_init),
+                    a == self.sys.m_init,
+                    a == self.sys.m,
+                    self.sys.lt(a, self.sys.m),
+                ),
+                b == self.sys.zero,
+            ),
+            And(self.sys.succ(a, self.sys.m), b == self.sys.n),
+        )
+
     def multiset_rank(self) -> Rank:
         return DomainLexRank(
             self.number_of_pairs(),
             self.nat_times_nat_lex_order,
+            FiniteLemma(self.finiteness_lemma_for_a_and_b, m=2),
         )
 
     def rank(self) -> Rank:
