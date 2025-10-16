@@ -1,12 +1,10 @@
-from inspect import stack
 from prelude import *
 
-# @status - done, except for soundness which we put away for now
+# @status - done, except for soundness
 
 # Ackermann function implementation using a stack-based approach
-# Slightly modified - removed the finish action, instead we prove termination
-# Additionally removed temporal instrumentation / witness variables
 # Based on the implementation in Ivy, see The Power of Temporal Prophecy Paper (unpublished)
+# with removed temporal instrumentation / witness variables
 
 # The Ackermann function is defined as:
 # A(0, n) = n + 1
@@ -17,19 +15,16 @@ from prelude import *
 class Nat(Expr): ...
 
 
-# class StackType(Enum):
-#     concrete: "StackType"
-#     ghost: "StackType"
-
-
 class AckermannSystem(TransitionSystem):
     zero: Immutable[Nat]
     lt: Immutable[WFRel[Nat]]
 
     len: Nat
-    m: Nat  # initiated arbitrarily
-    n: Nat  # initiated arbitrarily
-    stack: Rel[Nat, Nat]  # one of these is stack variables and the other is data
+    m: Nat
+    n: Nat
+    stack: Rel[Nat, Nat]  # one of these is stack index and the other is data
+    started: Bool
+    finished: Bool
 
     @axiom
     def lt_axioms(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
@@ -52,71 +47,132 @@ class AckermannSystem(TransitionSystem):
         return And(
             Not(self.stack(X, Y)),
             self.len == self.zero,
-        )
-
-    @transition
-    def step1(self, m_pop: Nat, len_pop: Nat) -> BoolRef:
-        return And(
-            # guard
             self.m == self.zero,
-            self.len != self.zero,
-            self.succ(len_pop, self.len),
-            self.stack(len_pop, m_pop),
-            # updates
-            self.next.len == len_pop,
-            self.stack.update({(len_pop, m_pop): false}),
-            self.next.m == m_pop,
-            self.succ(self.n, self.next.n),
+            self.n == self.zero,
+            self.started == false,
+            self.finished == false,
         )
 
     @transition
-    def step2(self) -> BoolRef:
+    def setup_m(self) -> BoolRef:
         return And(
-            # guard
-            self.m != self.zero,
-            self.n == self.zero,
-            # updates
-            self.succ(self.next.m, self.m),
-            self.succ(self.zero, self.next.n),
+            Not(self.started),
+            self.succ(self.m, self.next.m),
+            self.n.unchanged(),
+            self.stack.unchanged(),
+            self.len.unchanged(),
+            self.started.unchanged(),
+            self.finished.unchanged(),
+        )
+
+    @transition
+    def setup_n(self) -> BoolRef:
+        return And(
+            Not(self.started),
+            self.succ(self.n, self.next.n),
+            self.m.unchanged(),
+            self.stack.unchanged(),
+            self.len.unchanged(),
+            self.started.unchanged(),
+            self.finished.unchanged(),
+        )
+
+    @transition
+    def start(self) -> BoolRef:
+        return And(
+            Not(self.started),
+            self.started.update(true),
+            self.m.unchanged(),
+            self.n.unchanged(),
+            self.stack.unchanged(),
+            self.len.unchanged(),
+            self.finished.unchanged(),
+        )
+
+    def finish(self) -> BoolRef:
+        return And(
+            self.started,
+            self.m == self.zero,
+            self.len == self.zero,
+            self.finished.update(true),
+            self.started.unchanged(),
+            self.m.unchanged(),
+            self.n.unchanged(),
             self.stack.unchanged(),
             self.len.unchanged(),
         )
 
     @transition
+    def step1(self, m_pop: Nat, len_pop: Nat) -> BoolRef:
+        return And(
+            self.started,
+            self.m == self.zero,
+            self.len != self.zero,
+            self.succ(len_pop, self.len),
+            self.stack(len_pop, m_pop),
+            self.next.len == len_pop,
+            self.stack.update({(len_pop, m_pop): false}),
+            self.next.m == m_pop,
+            self.succ(self.n, self.next.n),
+            self.started.unchanged(),
+            self.finished.unchanged(),
+        )
+
+    @transition
+    def step2(self) -> BoolRef:
+        return And(
+            self.started,
+            self.m != self.zero,
+            self.n == self.zero,
+            self.succ(self.next.m, self.m),
+            self.succ(self.zero, self.next.n),
+            self.stack.unchanged(),
+            self.len.unchanged(),
+            self.started.unchanged(),
+            self.finished.unchanged(),
+        )
+
+    @transition
     def step3(self, m_push: Nat) -> BoolRef:
         return And(
-            # guard
+            self.started,
             self.m != self.zero,
             self.n != self.zero,
             self.succ(m_push, self.m),
-            # updates
             self.stack.update({(self.len, m_push): true}),
             self.succ(self.len, self.next.len),
             self.succ(self.next.n, self.n),
             self.m.unchanged(),
+            self.started.unchanged(),
+            self.finished.unchanged(),
         )
 
 
 class AckermannProp(Prop[AckermannSystem]):
     def prop(self) -> BoolRef:
-        return false
+        return Implies(F(self.sys.started), F(self.sys.finished))
 
 
 class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
+    @temporal_invariant
+    def never_finished(self) -> BoolRef:
+        return G(Not(self.sys.finished))
+
+    @temporal_invariant
+    def eventually_started(self) -> BoolRef:
+        return F(self.sys.started)
+
     @invariant
     def stack_bounded_by_len(self, X: Nat, Y: Nat) -> BoolRef:
-        # The stack is only populated for elements smaller than len
         return Implies(self.sys.stack(X, Y), self.sys.lt(X, self.sys.len))
 
     @invariant
     def stack_unique_per_position(self, X: Nat, Y: Nat, Z: Nat) -> BoolRef:
-        # The stack contains at most one element on each position
         return Implies(And(self.sys.stack(X, Y), self.sys.stack(X, Z)), Y == Z)
 
     @invariant
     def stack_decreasing(self, X: Nat, Y: Nat, Z: Nat, W: Nat) -> BoolRef:
-        # The stack is always decreasing
         return Implies(
             And(
                 self.sys.stack(X, Y),
@@ -128,14 +184,19 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
 
     @invariant
     def m_bounded_by_stack(self, I: Nat, M: Nat, X: Nat) -> BoolRef:
-        # m is at most the greatest value in the stack + 1
         return Implies(
             And(self.sys.stack(I, M), self.sys.lt(M, X)),
             Or(self.sys.lt(self.sys.m, X), self.sys.m == X),
         )
 
-    # rank based on  "Proving Termination with Multiset Orderings" by Manna and Dershovitz.
+    @invariant
+    def len_zero_when_not_started(self) -> BoolRef:
+        return Implies(Not(self.sys.started), self.sys.len == self.sys.zero)
 
+    def timer_rank_start(self) -> Rank:
+        return self.timer_rank(self.sys.started, None, None)
+
+    # rank based on  "Proving Termination with Multiset Orderings" by Manna and Dershovitz.
     # rank = {(s_k + 1, 0), (s_k-1 + 1, 0) ..... (S_2 + 1, 0), (y,z)} multiset
     # equivalently: {stack_values x {0} union (m-1,n)}
 
@@ -160,7 +221,7 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         return DomainPointwiseRank(
             BinRank(self.any_pair),
             ParamSpec(index=Nat),
-            None,  # we need one - TODO
+            None,  # we need one - TODO -- what we are missing here
             None,  # maybe need hints
         )
 
@@ -177,7 +238,10 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
         )
 
     def rank(self) -> Rank:
-        return self.multiset_rank()
+        return LexRank(
+            self.timer_rank_start(),
+            self.multiset_rank(),
+        )
 
     # alternative idea for a proof: with DomLex over Nat and not Nat*Nat,
     # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
