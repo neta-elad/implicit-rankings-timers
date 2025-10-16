@@ -217,12 +217,17 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             self.m_minus_one_and_n_pair(index, a, b),
         )
 
+    def finiteness_lemma_for_pairs(self, index: Nat, a: Nat, b: Nat) -> BoolRef:
+        return Or(
+            And(self.sys.stack(index, a), b == self.sys.zero, self.sys.lt(index, self.sys.len)),
+            And(index==self.sys.len, self.sys.lt(a,self.sys.m), Or(self.sys.lt(b,self.sys.n),b==self.sys.n))
+        )
+
     def number_of_pairs(self) -> Rank:
         return DomainPointwiseRank(
             BinRank(self.any_pair),
             ParamSpec(index=Nat),
-            None,  # we need one - TODO -- what we are missing here
-            None,  # maybe need hints
+            FiniteLemma(self.finiteness_lemma_for_pairs),
         )
 
     def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
