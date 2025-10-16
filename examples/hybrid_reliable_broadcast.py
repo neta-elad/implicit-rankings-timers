@@ -575,10 +575,7 @@ class RelayHRB(Prop[HybridReliableBroadcast]):
                     )
                 ),
             ),
-            ForAll(N, Implies(
-                self.sys.correct(N),
-                 F(self.sys.accept(N))
-            )),
+            ForAll(N, Implies(self.sys.correct(N), F(self.sys.accept(N)))),
         )
 
 
@@ -613,7 +610,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
     @temporal_invariant
     def property_violation(self) -> BoolRef:
         N = Node("N")
-        return Exists(N, And(self.sys.correct(N),G(Not(self.sys.accept(N)))))
+        return Exists(N, And(self.sys.correct(N), G(Not(self.sys.accept(N)))))
 
     # @temporal_invariant
     # def property_violation_vers(self) -> BoolRef:
@@ -642,7 +639,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             ),
         )
 
-    @temporal_invariant 
+    @temporal_invariant
     def witness_correct_not_accept_def_realized(self) -> BoolRef:
         n1 = self.sys.witness_correct_not_accept
         return And(
@@ -894,7 +891,7 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             self.t(
                 ForAll(N, Or(Not(self.sys.correct(N)), F(self.sys.sent_msg_proj(N))))
             )()
-        ) 
+        )
 
     # this invariant captures the reasoning, maybe not needed
     @system_invariant
@@ -954,11 +951,11 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
     # we can add this with Cond(timer_rank(sent_msg_proj(N)), G(forall(N,correct(N)->sent_msg_proj(N)))
 
     # n1 not accepted ->
-    # there is a b quorum B0 that has all correct nodes 
+    # there is a b quorum B0 that has all correct nodes
     # from relay_invariant_b:
     # exists M. member_b(M,B0) & ~rcv_msg(M,n1)
     # like before we want to show eventually sent_msg(M,n1)
-    
+
     # this captures this case
     def all_correct_eventually_sent(self) -> BoolRef:
         N = Node("N")
@@ -966,24 +963,21 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             self.t(
                 ForAll(N, Or(Not(self.sys.correct(N)), F(self.sys.sent_msg_proj(N))))
             )()
-        ) 
+        )
 
-    #works
+    # works
     def all_correct_sent_n1_not_accept(self) -> BoolRef:
         n1 = self.sys.witness_correct_not_accept
         N = Node("N")
         return And(
             self.sys.correct(n1),
             Not(self.sys.accept(n1)),
-            ForAll(N, Implies(self.sys.correct(N), self.sys.sent_msg_proj(N)))
+            ForAll(N, Implies(self.sys.correct(N), self.sys.sent_msg_proj(N))),
         )
 
     def all_correct_sent(self) -> BoolRef:
         N = Node("N")
-        return And(
-            ForAll(N, Implies(self.sys.correct(N), self.sys.sent_msg_proj(N)))
-        )
-
+        return And(ForAll(N, Implies(self.sys.correct(N), self.sys.sent_msg_proj(N))))
 
     # supporting invariant shows the reasoning
     @system_invariant
@@ -998,17 +992,20 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             And(
                 self.sys.correct(n1),
                 Not(self.sys.accept(n1)),
-                ForAll(N,Implies(self.sys.correct(N),self.sys.sent_msg_proj(N)))
+                ForAll(N, Implies(self.sys.correct(N), self.sys.sent_msg_proj(N))),
             ),
             Exists(
                 B,
                 And(
                     ForAll(N, Implies(self.sys.member_b(N, B), self.sys.correct(N))),
-                    Exists(M1, And(
-                        self.sys.member_b(M1, B), 
-                        Not(self.sys.rcv_msg(M1, n1)),
-                        self.sys.sent_msg(M1, n1),
-                    )),
+                    Exists(
+                        M1,
+                        And(
+                            self.sys.member_b(M1, B),
+                            Not(self.sys.rcv_msg(M1, n1)),
+                            self.sys.sent_msg(M1, n1),
+                        ),
+                    ),
                 ),
             ),
         )
@@ -1020,9 +1017,9 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
                 self.sys.correct(N),
                 self.sys.sent_msg_proj(N),
             ),
-            self.sys.sent_msg(N, M)
+            self.sys.sent_msg(N, M),
         )
-    
+
     def sent_msg_proj(self, N: Node) -> BoolRef:
         return self.sys.sent_msg_proj(N)
 
@@ -1033,8 +1030,9 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
         )
 
     def all_sent_proj_timers(self) -> Rank:
-        return self.timer_rank(self.sent_msg_proj, self.correct_and_all_correct_eventually_sent, None)
-
+        return self.timer_rank(
+            self.sent_msg_proj, self.correct_and_all_correct_eventually_sent, None
+        )
 
     def rank(self) -> Rank:
         # could be PWRank partially at least
