@@ -332,7 +332,7 @@ class AlternatingBitProtocolProof(
             )
         )
 
-    @invariant
+    @system_invariant
     def system_invariant(
         self,
         D1: DataMsg,

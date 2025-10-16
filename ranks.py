@@ -211,7 +211,7 @@ def lemma_size(ts: BaseTransitionSystem, lemma: FiniteLemma | None) -> int:
 @dataclass(frozen=True)
 class FiniteSCByBeta(SoundnessCondition):
     spec: ParamSpec
-    rank: "Rank"  # todo: differently?
+    minimal: TSFormula
     lemma: FiniteLemma
 
     def __post_init__(self) -> None:
@@ -219,7 +219,7 @@ class FiniteSCByBeta(SoundnessCondition):
 
     @cached_property
     def alpha(self) -> TSFormula:
-        theta_min = self.rank.minimal
+        theta_min = self.minimal
         return TSTerm(
             theta_min.spec,
             lambda ts, params: z3.Not(theta_min(ts, params)),
@@ -237,7 +237,7 @@ class FiniteSCByBeta(SoundnessCondition):
             lambda ts, params: z3.Implies(
                 self.alpha(ts, params), self.beta(ts, params)
             ),
-            f"alpha->beta_<{self.rank}>",
+            f"alpha->beta_<{self.minimal.name}>",
         )
 
     def exists_ys_with_hints(
@@ -324,13 +324,13 @@ class FiniteSCByBeta(SoundnessCondition):
         z = ParamSpec(
             {
                 param: sort
-                for param, sort in self.rank.spec.items()
+                for param, sort in self.minimal.spec.items()
                 if param not in self.spec
             }
         )
 
         if not ts.check_and_print(
-            f"init->at most {self.lemma.m} beta_<{self.rank}>",
+            f"init->at most {self.lemma.m} beta_<{self.minimal.name}>",
             ts.init,
             z3.Not(
                 quantify(
@@ -344,7 +344,7 @@ class FiniteSCByBeta(SoundnessCondition):
 
         for name, trans in ts.transitions.items():
             if not ts.check_and_print(
-                f"{name}->at most {self.lemma.m} beta added_<{self.rank}>",
+                f"{name}->at most {self.lemma.m} beta added_<{self.minimal.name}>",
                 invariant,
                 trans,
                 z3.Not(
@@ -787,7 +787,7 @@ class DomainPointwiseRank(Rank):
         if self.finite_lemma is None:
             return FiniteSCBySort(self.quant_spec)
         else:
-            return FiniteSCByBeta(self.quant_spec, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.quant_spec, self.rank.minimal, self.finite_lemma)
 
     @property
     def decreases(self) -> TSFormula:
@@ -1069,7 +1069,7 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
             return FiniteSCBySort(self.quant_spec)
         else:
             # todo: add soundness condition of WF of order as well
-            return FiniteSCByBeta(self.quant_spec, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.quant_spec, self.rank.minimal, self.finite_lemma)
 
     @cached_property
     def decreases_conserved_hints(self) -> DomainLexConservedHints | None:
@@ -1315,7 +1315,7 @@ class DomainPermutedRank(Rank):
         if self.finite_lemma is None:
             return FiniteSCBySort(self.ys)
         else:
-            return FiniteSCByBeta(self.ys, self.rank, self.finite_lemma)
+            return FiniteSCByBeta(self.ys, self.rank.minimal, self.finite_lemma)
 
     @property
     def decreases(self) -> TSFormula:
