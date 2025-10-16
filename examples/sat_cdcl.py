@@ -251,11 +251,11 @@ class CDCLProp(Prop[CDCL]):
 
 
 class CDCLProof(Proof[CDCL], prop=CDCLProp):
-    @invariant
+    @system_invariant
     def m_then_occurs(self, i: Level, X: Variable, b: Bool) -> BoolRef:
         return Implies(self.sys.m_seq(i, X, b), self.sys.occurs_in_clause_of_F(X))
 
-    @invariant
+    @system_invariant
     def consistent_m(
         self, i: Level, j: Level, X: Variable, b1: Bool, b2: Bool
     ) -> BoolRef:
@@ -267,25 +267,25 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
             And(i == j, b1 == b2),
         )
 
-    @invariant
+    @system_invariant
     def every_level_before_curr_assigned(self, i: Level) -> BoolRef:
         return Implies(
             And(self.sys.lvl_order(i, self.sys.curr_lvl), i != self.sys.curr_lvl),
             self.sys.assign_lvl(i),
         )
 
-    @invariant
+    @system_invariant
     def assign_agrees_with_order(self, i: Level, j: Level) -> BoolRef:
         return Implies(
             And(self.sys.lvl_order(i, j), self.sys.assign_lvl(j)),
             self.sys.assign_lvl(i),
         )
 
-    @invariant
+    @system_invariant
     def decision_then_assign(self, i: Level) -> BoolRef:
         return Implies(self.sys.decision_lvl(i), self.sys.assign_lvl(i))
 
-    @invariant
+    @system_invariant
     def assign_then_in_m(self, i: Level) -> BoolRef:
         X = Variable("X")
         b = Bool("b")
@@ -374,6 +374,4 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
         )
 
 
-proof = CDCLProof()
-proof.check()
-proof.print_stats()
+CDCLProof().check()
