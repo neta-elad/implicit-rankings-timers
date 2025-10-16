@@ -291,7 +291,7 @@ class CDCLProof(Proof[CDCL], prop=CDCLProp):
         b = Bool("b")
         return self.sys.assign_lvl(i) == Exists([X, b], self.sys.m_seq(i, X, b))
 
-    @invariant
+    @system_invariant
     def curr_not_assigned(self) -> BoolRef:
         return Not(self.sys.assign_lvl(self.sys.curr_lvl))
 
