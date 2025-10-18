@@ -70,6 +70,7 @@ TIMERS=unint make examples/ticket.py
 - [ ] (?) add modified argument and check to see everything is modified
 
 ## More Examples we can do
+- The rest of the ivy examples: multi_paxos, stoppable_paxos, tlb_shootdown. Possibly model paxos more accurately. 
 - Finish examples from implicit rankings paper - 3 other self-stabilization protocols
 - Shunting Yard and Dutch Flag from Manna & Dershovitz paper
 - Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
