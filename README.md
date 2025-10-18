@@ -56,27 +56,27 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] DomLex generalize to allow formulas that aren't necessarily relations, like last paper 
-  - review this in connection to what raz noted about soundness.
-- [ ] In readme, write list of all features
-- [ ] (optional) optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, and other such optimizations.
-- [ ] (optional) if ParamSpec of DomPW (e.g) is not one of the options, it should give an error.
-- [ ] (optional) toggle between stopping at first failure and continuing after first failure.
-- [ ] (optional) when looping over invariants or transitions, do it not alphabetically but in the given order.
-- [ ] (optional) improve formatter
-- [ ] (optional) option to compute quantifier structure for calls
-- [ ] (?) Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
-- [ ] (?) splitting checks for different cases 
-- [ ] (?) add modified argument and check to see everything is modified
-- [ ] (?) reusing invariants and ranks between proofs
-- [ ] (?) sometimes a rank decreases for some transition only if it decreases for all transitions - annoying conceptually
+- [ ] well-foundedndess check in DomLex
+
+## Optimizations
+- [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, and other such optimizations.
+- [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
 - [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
-- [ ] (stretch) Integration with invariant inference algorithm
-- [ ] (stretch) Sanity: show the system has infinite traces
-- [ ] (stretch) Automation for finding ranking
+
+## For Artifact  
+- [ ] In readme, write list of all features
+- [ ] Improve formatter
+- [ ] if ParamSpec of DomPW (e.g) is not one of the options, it should give an error.
+- [ ] (?) add modified argument and check to see everything is modified
 
 ## More Examples we can do
 - Finish examples from implicit rankings paper - 3 other self-stabilization protocols
 - Shunting Yard and Dutch Flag from Manna & Dershovitz paper
 - Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
 - Rabia Consensus Protocol: https://github.com/haochenpan/rabia/blob/88013ca8369a7ae3adfed44e3c226c8d97f11209/proofs/ivy/weak_mvc.ivy
+
+## Future Research 
+- [ ] Integration with invariant inference algorithm
+- [ ] Sanity: show the system has infinite traces
+- [ ] Automation for finding ranking
+- [ ] Often a rank decreases for some transition only if it decreases for all transitions - annoying conceptually, this is why you need to split based on state properties and not transitions, or what path in the transition took place.
