@@ -74,3 +74,9 @@ TIMERS=unint make examples/ticket.py
 - [ ] (stretch) Integration with invariant inference algorithm
 - [ ] (stretch) Sanity: show the system has infinite traces
 - [ ] (stretch) Automation for finding ranking
+
+## More Examples we can do
+- Finish examples from implicit rankings paper - 3 other self-stabilization protocols
+- Shunting Yard and Dutch Flag from Manna & Dershovitz paper
+- Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
+- Rabia Consensus Protocol: https://github.com/haochenpan/rabia/blob/88013ca8369a7ae3adfed44e3c226c8d97f11209/proofs/ivy/weak_mvc.ivy
