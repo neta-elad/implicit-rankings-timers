@@ -1,9 +1,19 @@
+"""
+Hybrid Reliable Broadcast
+
+In this file we only have the system, the properties and proofs are in
+hybrid_reliable_broadcast_correct.py and hybrid_reliable_broadcast_relay.py
+
+Taken from the Ivy implementation of HRB:
+Berkovits, I., Lazic, M., Losa, G., Padon, O., Shoham, S.: Verification of threshold-based distributed algorithms by decomposition to decidable logics.
+In: Computer Aided Verification - 31st International Conference, CAV 2019 (2019), https://doi.org/10.1007/978-3-030-25543-5_15
+
+Protocol from:
+Widder, J., Schmid, U.: Booting clock synchronization in partially synchronous systems with hybrid process and link failures.
+Distributed Comput. 20(2), 115–140 (2007). https://doi.org/10.1007/S00446-007-0026-0
+"""
+
 from prelude import *
-import temporal
-
-# @status - done (see hybrid_reliable_broadcast_correct.py and hybrid_reliable_broadcast_relay.py)
-
-# HRB from Berkovits' paper (Hybrid Reliable Broadcast)
 
 
 class Node(Finite): ...

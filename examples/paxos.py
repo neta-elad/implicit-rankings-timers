@@ -1,9 +1,17 @@
+"""
+Paxos Consensus Protocol
+
+From liveness to safety:
+Padon, O., Hoenicke, J., Losa, G., Podelski, A., Sagiv, M., Shoham, S.: Reducing liveness to safety in first-order logic.
+Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3158114
+
+Protocol from:
+Lamport, L.: The part-time parliament. ACM Trans. Program. Lang. Syst. 16(2), 133–169 (Mar 1994). https://doi.org/10.1145/174674.174675
+"""
+
+# @status - done
+
 from prelude import *
-
-# @ status - done
-
-# Paxos consensus protocol implementation
-# Based on the Ivy implementation in paxos_liveness.ivy
 
 
 class Node(Finite): ...

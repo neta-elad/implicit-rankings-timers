@@ -1,17 +1,22 @@
+"""
+Shunting Yard Algorithm
+
+Taken from an old Dijkstra note, see Manna & Dershowitz paper
+
+Algorithm:
+loop until the shunting yard is empty
+  select a train
+  if the train consists of only a single car
+    then remove it from the yard
+    else split it into two shorter trains
+  fi
+repeat
+
+Note: maybe we need to add the order on train in the model
+because we want the rank to be the number of cars in train - 1 and i dont know how to do that.
+"""
+
 from prelude import *
-
-# taken from an old dijkstra note, see Manna & Dershovitz paper
-# loop until the shunting yard is empty
-# select a train
-# if the train consists of only a single car
-# then remove it from the yard
-# else split it into two shorter trains
-# fi
-# repeat
-
-
-# maybe we need to add the order on train in the model
-# because we want the rank to be the number of cars in train - 1 and i dont know how to do that.
 
 
 class Train(Finite): ...

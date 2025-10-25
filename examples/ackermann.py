@@ -1,15 +1,22 @@
-from prelude import *
+"""
+Stack-based implementation of the Ackermann function
+
+Based on the implementation in Ivy, see The Power of Temporal Prophecy Paper (unpublished)
+with removed temporal instrumentation / witness variables, except for m_init.
+
+Stack-based implementation of the Ackermann function due to:
+Dershowitz, N., Manna, Z.: Proving termination with multiset orderings. Commun.
+ACM 22(8), 465–476 (Aug 1979), https://doi.org/10.1145/359138.359142
+
+The Ackermann function is defined as:
+A(0, n) = n + 1
+A(m, 0) = A(m - 1, 1)
+A(m, n) = A(m - 1, A(m, n - 1))
+"""
 
 # @status - done (except for wf check for order - simple)
 
-# Ackermann function implementation using a stack-based approach
-# Based on the implementation in Ivy, see The Power of Temporal Prophecy Paper (unpublished)
-# with removed temporal instrumentation / witness variables, except for m_init
-
-# The Ackermann function is defined as:
-# A(0, n) = n + 1
-# A(m, 0) = A(m - 1, 1)
-# A(m, n) = A(m - 1, A(m, n - 1))
+from prelude import *
 
 
 class Nat(Expr): ...

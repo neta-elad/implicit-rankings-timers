@@ -1,3 +1,10 @@
+"""
+SAT Backtracking Algorithm
+from Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+"""
+
+# @status - done
+
 from prelude import *
 
 

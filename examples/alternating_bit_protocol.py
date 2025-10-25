@@ -1,10 +1,25 @@
-from prelude import *
+"""
+Alternating Bit Protocol
+
+From liveness to safety:
+Padon, O., Hoenicke, J., Losa, G., Podelski, A., Sagiv, M., Shoham, S.: Reducing liveness to safety in first-order logic.
+Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3158114
+
+Protocol from:
+Bartlett, K.A., Scantlebury, R.A., Wilkinson, P.T.: A note on reliable full-duplex
+transmission over half-duplex links. Commun. ACM 12(5), 260–261 (May 1969), https://doi.org/10.1145/362946.362970
+
+"""
 
 # @status - done
+# Note: actually there is something problematic with the soundness condition
+# in the submission version we had Index(Finite), but i want to be more precise.
 
 
-# Notice we assume finitely many indices - a bit different from original modeling, we can modify later.
-class Index(Finite): ...
+from prelude import *
+
+
+class Index(Expr): ...
 
 
 class Value(Expr): ...
@@ -514,44 +529,70 @@ class AlternatingBitProtocolProof(
             G(self.sys.bottom == self.sys.receiver_array(self.skolem_index)),
         )
 
+    @invariant
+    def sender_array_non_bottom_downward(self, I: Index, J: Index) -> BoolRef:
+        return Implies(
+            self.sys.le(I, J),
+            Implies(
+                self.sys.sender_array(J) != self.sys.bottom,
+                self.sys.sender_array(I) != self.sys.bottom,
+            ),
+        )
+
+    @track
+    @temporal_invariant
+    def eventually_sender_array_non_bottom_downward(
+        self, I: Index, J: Index
+    ) -> BoolRef:
+        return Implies(
+            self.sys.le(I, J),
+            Implies(
+                F(self.sys.sender_array(J) != self.sys.bottom),
+                F(self.sys.sender_array(I) != self.sys.bottom),
+            ),
+        )
+
     # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
 
     def write_to_skolem(self) -> BoolRef:
         return self.sys.bottom != self.sys.sender_array(self.skolem_index)
 
+    # sk_index - sender_gen_i
     def btw_gen_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.sender_gen_index, i),
         )
 
-    # sk_index - sender_gen_i
+    # finitely many indices satisfy:
+    # def sender_array_non_bottom(self, i: Index) -> BoolRef:
+    #     return timer_zero(self.t(F(self.sys.sender_array(i) != self.sys.bottom))())
+
     def gen_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_gen_skolem), None)
 
+    # sk_index - sender_i
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.sender_index, i),
         )
 
-    # sk_index - sender_i
     def sender_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)
 
+    # sk_index - receiver_i
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.receiver_index, i),
         )
 
-    # sk_index - receiver_i
     def receiver_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_receiver_skolem), None)
 
-    # should be PWRank instead of LexRank
     def primary_rank(self) -> Rank:
-        return LexRank(
+        return PointwiseRank(
             self.timer_rank(self.write_to_skolem, None, None),
             self.gen_minus_sk(),
             self.sender_minus_sk(),

@@ -1,11 +1,14 @@
-from prelude import *
+"""
+Classic Mutex in a Ring
+A token moves around a ring, allowing the holder to enter the critical section.
+
+From: Fang, Y., Piterman, N., Pnueli, A. and Zuck, L., 2004, January. Liveness with invisible ranking.
+In International Workshop on Verification, Model Checking, and Abstract Interpretation (pp. 223-238). Berlin, Heidelberg: Springer Berlin Heidelberg.
+"""
 
 # @status - done
 
-# Classic mutex in a ring - a token moves around a ring, allowing the holder to enter the critical section
-# taken from Fang, Y., Piterman, N., Pnueli, A. and Zuck, L., 2004, January.
-# Liveness with invisible ranking.
-# In International Workshop on Verification, Model Checking, and Abstract Interpretation (pp. 223-238). Berlin, Heidelberg: Springer Berlin Heidelberg.
+from prelude import *
 
 
 class Node(Finite): ...

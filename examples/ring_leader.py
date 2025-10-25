@@ -1,16 +1,17 @@
-from re import S
+"""
+Leader Election in a Ring, due to Chang and Roberts
+Chang, E.J.H., Roberts, R.: An improved algorithm for decentralized extrema-finding in circular configurations of processes.
+Commun. ACM 22(5), 281–283 (1979), https://doi.org/10.1145/359104.359108
+
+We based our modeling and invariants on:
+Feldman, Y.M.Y., Padon, O., Immerman, N., Sagiv, M., Shoham, S.:
+Bounded quantifier instantiation for checking inductive invariants.
+Log. Methods Comput. Sci. 15(3) (2019), https://doi.org/10.23638/LMCS-15(3:18)2019
+"""
+
+# @status - done
+
 from prelude import *
-
-# @status - rank too complex to work, maybe go back to DomLex rank
-
-
-# Leader Election in a Ring, due to Chang and Roberts
-# Chang, E.J.H., Roberts, R.: An improved algorithm for decentralized extremafinding in circular configurations of processes.
-# Commun. ACM 22(5), 281–283 (1979), https://doi.org/10.1145/359104.359108
-# we based our modeling and invariants on
-# Feldman, Y.M.Y., Padon, O., Immerman, N., Sagiv, M., Shoham, S.:
-# Bounded quantifier instantiation for checking inductive invariants.
-# Log. Methods Comput. Sci. 15(3) (2019), https://doi.org/10.23638/LMCS-15(3:18)2019
 
 
 class Node(Finite): ...

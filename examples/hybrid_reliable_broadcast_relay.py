@@ -1,10 +1,16 @@
-from prelude import *
+"""
+Hybrid Reliable Broadcast - Relay Property
 
-from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
+Second Property - Relay:
+Under the same assumptions as correctness, if some correct node accepts,
+then eventually all correct nodes accept.
+"""
 
 # @status - done
 
-# HRB from Berkovits' paper (Hybrid Reliable Broadcast), relay property
+from prelude import *
+
+from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):

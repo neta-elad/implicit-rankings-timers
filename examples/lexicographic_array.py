@@ -1,16 +1,19 @@
-from inspect import stack
-from prelude import *
-import temporal
+"""
+Lexicographic Array Program
 
-# A simple program
-# n := *
-# c[0,...,n-1] := *
-# while(exists i. c[i] > 0):
-#   i := *
-#   assume c[i] > 0
-#   c[i] := c[i] - 1
-#   c[i-1] := *
-# Showing termination of this program requires a ranking to omega^omega
+A simple program:
+n := *
+c[0,...,n-1] := *
+while(exists i. c[i] > 0):
+  i := *
+  assume c[i] > 0
+  c[i] := c[i] - 1
+  c[i-1] := *
+
+Showing termination of this program requires a ranking to omega^omega
+"""
+
+from prelude import *
 
 
 class Index(Expr): ...

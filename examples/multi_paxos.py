@@ -1,9 +1,12 @@
+"""
+Multi-Paxos Consensus Protocol Implementation
+
+Based on the Ivy implementation in multi_paxos_liveness.ivy
+"""
+
+# @status - todo
+
 from prelude import *
-
-# @ status - in progress
-
-# Multi-Paxos consensus protocol implementation
-# Based on the Ivy implementation in multi_paxos_liveness.ivy
 
 
 class Node(Finite): ...

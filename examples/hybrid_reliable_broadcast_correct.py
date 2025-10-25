@@ -1,10 +1,16 @@
-from prelude import *
+"""
+Hybrid Reliable Broadcast - Correctness Property
 
-from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
+First Property - Correctness:
+If all obedient nodes initially hold the message and all correct nodes eventually send and receive
+then eventually some node accepts
+"""
 
 # @status - done
 
-# HRB from Berkovits' paper (Hybrid Reliable Broadcast), correctness property
+from prelude import *
+
+from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
 
 
 class CorrectnessHRB(Prop[HybridReliableBroadcast]):

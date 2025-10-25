@@ -1,10 +1,16 @@
-from prelude import *
+"""
+Dijkstra's k-state Self-stabilization Protocol
+
+From Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+
+Protocol from:
+Dijkstra, E.W.: Self-stabilizing systems in spite of distributed control.
+Commun. ACM 17(11), 643–644 (nov 1974), https://doi.org/10.1145/361179.361202
+"""
 
 # @status - start
 
-# Dijkstra's k-state self-stabilization protocol
-# Dijkstra, E.W.: Self-stabilizing systems in spite of distributed control.
-# Commun. ACM 17(11), 643–644 (nov 1974), https://doi.org/10.1145/361179.361202
+from prelude import *
 
 
 class Node(Finite): ...

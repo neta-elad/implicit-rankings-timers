@@ -1,17 +1,22 @@
-from prelude import *
+"""
+Binary Counter Example
+
+Example 2. from:
+Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+"""
 
 # @status - done
+
+from prelude import *
 
 
 class Index(Finite): ...
 
 
 class BinaryCounter(TransitionSystem):
-    # Immutable constants and relations
     max: Immutable[Index]
     lt: Immutable[Rel[Index, Index]]
 
-    # Mutable state
     ptr: Index
     a: Rel[Index]  # a(i) == True means bit i is 1
 

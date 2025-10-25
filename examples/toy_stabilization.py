@@ -1,9 +1,11 @@
-from prelude import *
+"""
+Example 2. from:
+Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+"""
 
 # @status - done
 
-# Toy stabilization example from the paper Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
-# Inspired by Dijsktra's k-state self-stabilization algorithm.
+from prelude import *
 
 
 class Node(Finite): ...

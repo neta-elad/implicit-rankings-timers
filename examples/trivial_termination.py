@@ -1,6 +1,12 @@
-from prelude import *
+"""
+Trivial Termination System
+
+A simple example demonstrating termination properties.
+"""
 
 # @status - done
+
+from prelude import *
 
 
 class Thread(Finite): ...

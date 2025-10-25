@@ -7,9 +7,9 @@ we also allow clause learning
 The clauses in the formula are those that satisfy in_F
 """
 
-from prelude import *
-
 # @status - done
+
+from prelude import *
 
 
 class Variable(Finite): ...
