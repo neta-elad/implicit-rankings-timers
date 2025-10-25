@@ -9,6 +9,7 @@ Commun. ACM 17(11), 643–644 (nov 1974), https://doi.org/10.1145/361179.361202
 """
 
 # @status - start
+# review this because something didn't make sense to me before, it looked too simple.
 
 from prelude import *
 

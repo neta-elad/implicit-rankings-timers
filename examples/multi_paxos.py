@@ -5,6 +5,7 @@ Based on the Ivy implementation in multi_paxos_liveness.ivy
 """
 
 # @status - todo
+# we want to improve the model to be a bit more accurate, without cheats
 
 from prelude import *
 

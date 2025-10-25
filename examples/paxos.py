@@ -10,6 +10,7 @@ Lamport, L.: The part-time parliament. ACM Trans. Program. Lang. Syst. 16(2), 13
 """
 
 # @status - done
+# we want to improve the model to be a bit more accurate, and remove the small cheat
 
 from prelude import *
 
