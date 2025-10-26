@@ -70,12 +70,13 @@ TIMERS=unint make examples/ticket.py
 - [ ] (?) add modified argument and check to see everything is modified
 
 ## More Examples we can do
-- The rest of the ivy examples: multi_paxos, stoppable_paxos, tlb_shootdown. Possibly model paxos more accurately. 
-- The apple memory model examples.
-- Finish examples from implicit rankings paper - 3 other self-stabilization protocols
-- Shunting Yard and Dutch Flag from Manna & Dershovitz paper
+- The rest of the liveness to safety examples: multi_paxos, stoppable_paxos, tlb_shootdown (huge). Possibly model paxos more accurately. 
+- Motivating examples from Towards Liveness Proofs at Scale, and possibly the apple memory model (huge)
+- Finish examples from implicit rankings paper - 3 other self-stabilization protocols (kind of annoying probably).
+- Shunting Yard and Dutch Flag from Manna & Dershovitz paper (easy)
 - Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
 - Rabia Consensus Protocol: https://github.com/haochenpan/rabia/blob/88013ca8369a7ae3adfed44e3c226c8d97f11209/proofs/ivy/weak_mvc.ivy
+- Stretch: chord.
 
 ## Future Research 
 - [ ] Integration with invariant inference algorithm
