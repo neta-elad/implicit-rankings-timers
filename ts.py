@@ -205,6 +205,9 @@ class ParamSpec(dict[str, Sort]):
     def consts(self, suffix: str = "") -> list[Expr]:
         return [sort(param + suffix) for param, sort in self.items()]
 
+    def __le__(self, other: Self) -> bool:
+        return all(key in other and other[key] is value for key, value in self.items())
+
 
 @dataclass(frozen=True)
 class TSTerm[T]:

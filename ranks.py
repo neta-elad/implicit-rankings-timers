@@ -828,6 +828,11 @@ class DomainLexRank(Rank):
     conserved_hints: DomainLexConservedHints | None = None
     decreases_hints: DomainLexDecreasesHints | None = None
 
+    def __post_init__(self) -> None:
+        assert (
+            self.order_single_spec <= self.rank.spec
+        ), f"{self} has unknown order params"
+
     @cached_property
     def order(self) -> Order:
         if isinstance(self.order_like, Order):
@@ -837,8 +842,6 @@ class DomainLexRank(Rank):
     @cached_property
     def order_formula(self) -> TSFormula:
         return self.order.formula
-
-    # todo: spec of order must be subset of rank spec
 
     def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
         formula = self.order_formula
@@ -1077,29 +1080,33 @@ class DomainLexRank(Rank):
 @dataclass(frozen=True)
 class DomainPermutedRank(Rank):
     rank: Rank
-    ys: ParamSpec
+    quant_spec: ParamSpec
     k: int
     finite_lemma: FiniteLemma | None
     conserved_hints: DomainPermutedConservedHints | None = None
     decreases_hints: DomainPermutedDecreasesHints | None = None
 
     def __post_init__(self) -> None:
+        assert self.quant_spec, "Must quantify over some parameters"
         assert (
-            self.ys.keys() <= self.rank.spec.keys()
+            self.quant_spec.keys() <= self.rank.spec.keys()
         ), f"{self} has unknown quantified params"
 
     @cached_property
     def ys_left_right(self) -> list[tuple[dict[str, Expr], dict[str, Expr]]]:
         return [
-            (self.ys.params("", f"-left-{i}"), self.ys.params("", f"-right-{i}"))
+            (
+                self.quant_spec.params("", f"-left-{i}"),
+                self.quant_spec.params("", f"-right-{i}"),
+            )
             for i in range(1, self.k + 1)
         ]
 
     @cached_property
     def ys_sigma(self) -> Params:
         ys_left_right = self.ys_left_right
-        ys = self.ys.params()
-        ys_sigma = self.ys.params()
+        ys = self.quant_spec.params()
+        ys_sigma = self.quant_spec.params()
         for left, right in ys_left_right:
             ys_sigma = {
                 name: z3.If(
@@ -1117,7 +1124,7 @@ class DomainPermutedRank(Rank):
             {
                 param: sort
                 for param, sort in self.rank.spec.items()
-                if param not in self.ys
+                if param not in self.quant_spec
             }
         )
 
@@ -1141,14 +1148,14 @@ class DomainPermutedRank(Rank):
                     for j, (left_j, right_j) in enumerate(self.ys_left_right)
                     if i < j
                 ),
-                alpha(ts, (params) | self.ys.prime(self.ys_sigma)),
+                alpha(ts, (params) | self.quant_spec.prime(self.ys_sigma)),
             ),
         )
 
     def exists_permutation_conserved(self) -> RawTSTerm[z3.BoolRef]:
         alpha = lambda ts, params: z3.ForAll(
-            self.ys.consts(),
-            self.rank.conserved(ts, params | self.ys.params()),
+            self.quant_spec.consts(),
+            self.rank.conserved(ts, params | self.quant_spec.params()),
         )
 
         def formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
@@ -1190,15 +1197,21 @@ class DomainPermutedRank(Rank):
     def exists_permutation_decreases(self) -> RawTSTerm[z3.BoolRef]:
         alpha = lambda ts, params: z3.And(
             z3.ForAll(
-                self.ys.consts(),
+                self.quant_spec.consts(),
                 self.rank.conserved(
-                    ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                    ts,
+                    params
+                    | self.quant_spec.params()
+                    | self.quant_spec.prime(self.ys_sigma),
                 ),
             ),
             z3.Exists(
-                self.ys.consts(),
+                self.quant_spec.consts(),
                 self.rank.decreases(
-                    ts, params | self.ys.params() | self.ys.prime(self.ys_sigma)
+                    ts,
+                    params
+                    | self.quant_spec.params()
+                    | self.quant_spec.prime(self.ys_sigma),
                 ),
             ),
         )
@@ -1250,8 +1263,8 @@ class DomainPermutedRank(Rank):
         return TSTerm(
             self.spec,
             lambda ts, params: z3.ForAll(
-                self.ys.consts(),
-                self.rank.minimal(ts, params | self.ys.params()),
+                self.quant_spec.consts(),
+                self.rank.minimal(ts, params | self.quant_spec.params()),
             ),
             f"{self}_<minimal>",
         )
@@ -1263,9 +1276,9 @@ class DomainPermutedRank(Rank):
     @property
     def finite_condition(self) -> SoundnessCondition:
         if self.finite_lemma is None:
-            return FiniteSCBySort(self.ys)
+            return FiniteSCBySort(self.quant_spec)
         else:
-            return FiniteSCByBeta(self.ys, self.rank.minimal, self.finite_lemma)
+            return FiniteSCByBeta(self.quant_spec, self.rank.minimal, self.finite_lemma)
 
     @property
     def decreases(self) -> TSFormula:
@@ -1283,7 +1296,7 @@ class DomainPermutedRank(Rank):
         # rank + ys + k + lemma + hints
         return (
             1
-            + len(self.ys)
+            + len(self.quant_spec)
             + 1
             + lemma_size(ts, self.finite_lemma)
             + hint_size(ts, self.conserved_hints)
@@ -1291,7 +1304,7 @@ class DomainPermutedRank(Rank):
         )
 
     def __str__(self) -> str:
-        return f"DomPerm({self.rank}, {self.ys}, {self.k})"
+        return f"DomPerm({self.rank}, {self.quant_spec}, {self.k})"
 
 
 @dataclass(frozen=True)
