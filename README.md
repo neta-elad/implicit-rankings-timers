@@ -56,20 +56,18 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] well-foundedndess check in DomLex
+- [ ] well-foundedness check in DomLex
 
-## Optimizations
-- [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, and other such optimizations.
+### Optimizations
+- [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, 
+      and other such optimizations.
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
-- [ ] (?) Timer semantics: inf > F(p) > 0 implies F(p) = 0
+- [ ] (?) Timer semantics: inf > F(p) >= 0 implies F(p) = 0 ; F(p) in {0, inf}
 
-## For Artifact  
+### For Artifact  
 - [ ] In readme, write list of all features
-- [ ] Improve formatter
-- [ ] if ParamSpec of DomPW (e.g) is not one of the options, it should give an error.
-- [ ] (?) add modified argument and check to see everything is modified
 
-## More Examples we can do
+### More Examples we can do
 - The rest of the liveness to safety examples: multi_paxos, stoppable_paxos, tlb_shootdown (huge). Possibly model paxos more accurately. 
 - Motivating examples from Towards Liveness Proofs at Scale, and possibly the apple memory model (huge)
 - Finish examples from implicit rankings paper - 3 other self-stabilization protocols (kind of annoying probably).
@@ -78,8 +76,10 @@ TIMERS=unint make examples/ticket.py
 - Rabia Consensus Protocol: https://github.com/haochenpan/rabia/blob/88013ca8369a7ae3adfed44e3c226c8d97f11209/proofs/ivy/weak_mvc.ivy
 - Stretch: chord.
 
-## Future Research 
+### Future Research 
 - [ ] Integration with invariant inference algorithm
 - [ ] Sanity: show the system has infinite traces
 - [ ] Automation for finding ranking
-- [ ] Often a rank decreases for some transition only if it decreases for all transitions - annoying conceptually, this is why you need to split based on state properties and not transitions, or what path in the transition took place.
+- [ ] Often a rank decreases for some transition only if it decreases for all transitions - annoying conceptually, 
+      this is why you need to split based on state properties and not transitions, 
+      or what path in the transition took place.

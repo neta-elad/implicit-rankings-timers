@@ -742,6 +742,9 @@ class DomainPointwiseRank(Rank):
 
     def __post_init__(self) -> None:
         assert self.quant_spec, "Must quantify over some parameters"
+        assert (
+            self.quant_spec.keys() <= self.rank.spec.keys()
+        ), f"{self} has unknown quantified params"
 
     @property
     def spec(self) -> ParamSpec:
@@ -880,6 +883,8 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
         if isinstance(self.order_like, tuple):
             return None
         return ts_term(self.order_like)
+
+    # todo: spec of order must be subset of rank spec
 
     def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
         if self.order_as_ts_rel is not None:
@@ -1137,6 +1142,11 @@ class DomainPermutedRank(Rank):
     finite_lemma: FiniteLemma | None
     conserved_hints: DomainPermutedConservedHints | None = None
     decreases_hints: DomainPermutedDecreasesHints | None = None
+
+    def __post_init__(self) -> None:
+        assert (
+            self.ys.keys() <= self.rank.spec.keys()
+        ), f"{self} has unknown quantified params"
 
     @cached_property
     def ys_left_right(self) -> list[tuple[dict[str, Expr], dict[str, Expr]]]:
