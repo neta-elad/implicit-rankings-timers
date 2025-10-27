@@ -3,14 +3,14 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from functools import cached_property
-from typing import ClassVar, cast, Any, Self, overload
+from typing import ClassVar, cast, Any, Self, overload, Literal
 
 import z3
 
 from helpers import expr_size
 from metadata import add_marker, get_methods, has_marker
 from ranks import Rank, FiniteLemma, TimerRank
-from temporal import Prop, nnf
+from temporal import Prop, nnf, contains_temporal
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
     BaseTransitionSystem,
@@ -118,6 +118,13 @@ class TemporalInvariant(Invariant):
     def formula[T: TransitionSystem](self, ts: "Proof[T]") -> z3.BoolRef:
         super_formula = super().formula(ts.reset)
         return timer_zero(ts.compile_timer(f"t_<{nnf(super_formula)}>")(ts))
+
+
+def assert_no_temporal(inv_name: str, formula: z3.BoolRef) -> Literal[True]:
+    assert not contains_temporal(
+        formula
+    ), f"Invariant {inv_name} must not contain temporal operators"
+    return True
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
@@ -230,6 +237,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
             )
             for name, method in _get_methods(self, _PROOF_SYSTEM_INVARIANT)
+            if assert_no_temporal(name, method(self))
         }
 
     @cached_property
@@ -240,6 +248,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
             )
             for name, method in _get_methods(self, _PROOF_INVARIANT)
+            if assert_no_temporal(name, method(self))
         }
 
     @cached_property

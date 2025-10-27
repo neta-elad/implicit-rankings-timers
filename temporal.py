@@ -26,6 +26,16 @@ def is_F(formula: z3.ExprRef) -> bool:
     return z3.is_app(formula) and formula.decl().eq(_F)
 
 
+def contains_temporal(formula: z3.ExprRef) -> bool:
+    if z3.is_quantifier(formula):
+        variables, body = unpack_quantifier(formula)
+        return contains_temporal(body)
+    elif is_F(formula) or is_G(formula):
+        return True
+    else:
+        return any(contains_temporal(child) for child in formula.children())
+
+
 def nnf(formula: z3.ExprRef, negated: bool = False) -> z3.BoolRef:
     if z3.is_false(formula):
         if negated:
