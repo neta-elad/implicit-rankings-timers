@@ -113,4 +113,39 @@ class LexOrder(Order):
         return f"LexOrder({", ".join(f"{name}={order}" for name, order in self.orders.items())})"
 
 
-# todo: PointwiseOrder
+@dataclass(frozen=True)
+class PointwiseOrder(Order):
+    orders: dict[str, Order]
+
+    def __init__(self, **kwargs: BinaryRel[Expr]) -> None:
+        object.__setattr__(
+            self, "orders", {name: RelOrder(rel, name) for name, rel in kwargs.items()}
+        )
+
+    @property
+    def formula(self) -> TSFormula:
+        spec = reduce(
+            operator.or_, [order.formula.spec for order in self.orders.values()]
+        )
+
+        def actual_formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
+            clauses = []
+            guards = []
+            for name, order in self.orders.items():
+                clauses.append(order.formula(ts, params))
+                guards.append(
+                    z3.Or(
+                        order.formula(ts, params),
+                        params[name + "1"] == params[name + "2"],
+                    )
+                )
+
+            return z3.And(*guards, z3.Or(*clauses))
+
+        return TSTerm(spec, actual_formula, str(self))
+
+    def check_well_founded(self, ts: BaseTransitionSystem) -> bool:
+        return all(order.check_well_founded(ts) for order in self.orders.values())
+
+    def __str__(self) -> str:
+        return f"PointwiseOrder({", ".join(f"{name}={order}" for name, order in self.orders.items())})"

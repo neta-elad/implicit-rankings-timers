@@ -56,7 +56,6 @@ TIMERS=unint make examples/ticket.py
 
 
 ## TODOs
-- [ ] well-foundedness check in DomLex
 
 ### Optimizations
 - [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, 

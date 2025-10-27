@@ -15,6 +15,7 @@ from orders import (
     RelOrder,
     FormulaOrder,
     LexOrder,
+    PointwiseOrder,
 )
 from ranks import (
     ClosedRank,
@@ -97,6 +98,7 @@ __all__ = [
     "RelOrder",
     "FormulaOrder",
     "LexOrder",
+    "PointwiseOrder",
     "Proof",
     "system_invariant",
     "invariant",
