@@ -3,7 +3,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence, Iterable
 from dataclasses import dataclass
 from functools import cached_property, reduce
-from typing import cast, Any, overload, Self
+from typing import cast, Any, overload
 
 import z3
 
@@ -14,9 +14,9 @@ from helpers import (
     instantiate,
     Predicate,
     strict_partial_immutable_order_axioms,
-    Instances,
     expr_size,
 )
+from orders import Order, RelOrder, FormulaOrder
 from timers import Time, timer_zero, timer_order
 from ts import (
     BaseTransitionSystem,
@@ -53,36 +53,6 @@ def hint_size(ts: BaseTransitionSystem, hint: Iterable[Any] | None) -> int:
     if hasattr(hint, "values") and callable(hint.values):
         return sum(expr_size(ts_term(term)(ts)) for term in hint.values())
     return sum(hint_size(ts, sub_hint) for sub_hint in hint)
-
-
-#
-# def hints_size(ts: BaseTransitionSystem, hints: Iterable[Hint] | None) -> int:
-#     if hints is None:
-#         return 0
-#     return sum(hint_size(ts, hint) for hint in hints)
-#
-#
-# def m_hints_size(
-#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Hint]] | None
-# ) -> int:
-#     if multi_hints is None:
-#         return 0
-#     return sum(hints_size(ts, hints) for hints in multi_hints)
-#
-#
-# def mm_hints_size(
-#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Iterable[Hint]]] | None
-# ) -> int:
-#     if multi_hints is None:
-#         return 0
-#     return sum(m_hints_size(ts, hints) for hints in multi_hints)
-#
-# def mmm_hints_size(
-#     ts: BaseTransitionSystem, multi_hints: Iterable[Iterable[Iterable[Iterable[Hint]]]] | None
-# ) -> int:
-#     if multi_hints is None:
-#         return 0
-#     return sum(mm_hints_size(ts, hints) for hints in multi_hints)
 
 
 @dataclass(frozen=True)
@@ -168,6 +138,14 @@ class WellFoundedSC[T: Expr](SoundnessCondition):
             return True
         print(f"{sort.ref()} not finite and {rel.fun} not well-founded")
         return False
+
+
+@dataclass(frozen=True)
+class WellFoundedOrderSC(SoundnessCondition):
+    order: Order
+
+    def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
+        return self.order.check_well_founded(ts)
 
 
 @dataclass(frozen=True)
@@ -839,137 +817,92 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.quant_spec.keys())}])"
 
 
-type BinaryDomLexOrder[T: Expr] = tuple[RelLike[T, T], T]
-type QuaternaryDomLexOrder[T1: Expr, T2: Expr] = tuple[RelLike[T1, T2, T1, T2], T1, T2]
-type SenaryDomLexOrder[T1: Expr, T2: Expr, T3: Expr] = tuple[
-    RelLike[T1, T2, T3, T1, T2, T3], T1, T2, T3
-]
-type OctonaryDomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = tuple[
-    RelLike[T1, T2, T3, T4, T1, T2, T3, T4], T1, T2, T3, T4
-]
-
-type DomLexOrder[T1: Expr, T2: Expr, T3: Expr, T4: Expr] = (
-    BinaryDomLexOrder[T1]
-    | QuaternaryDomLexOrder[T1, T2]
-    | SenaryDomLexOrder[T1, T2, T3]
-    | OctonaryDomLexOrder[T1, T2, T3, T4]
-)
+type OrderLike = Order | TermLike[z3.BoolRef]
 
 
 @dataclass(frozen=True)
-class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
+class DomainLexRank(Rank):
     rank: Rank
-    order_like: DomLexOrder[T1, T2, T3, T4] | TermLike[z3.BoolRef]
+    order_like: OrderLike
     finite_lemma: FiniteLemma | None = None
     conserved_hints: DomainLexConservedHints | None = None
     decreases_hints: DomainLexDecreasesHints | None = None
 
     @cached_property
-    def order_as_ts_rel(
-        self,
-    ) -> (
-        None
-        | TSRel[T1, T1]
-        | TSRel[T1, T2, T1, T2]
-        | TSRel[T1, T2, T3, T1, T2, T3]
-        | TSRel[T1, T2, T3, T4, T1, T2, T3, T4]
-    ):
-        if isinstance(self.order_like, tuple):
-            return ts_rel(self.order_like[0])  # type ignore
-        return None
+    def order(self) -> Order:
+        if isinstance(self.order_like, Order):
+            return self.order_like
+        return FormulaOrder(ts_term(self.order_like))
 
     @cached_property
-    def order_as_ts_formula(self) -> TSFormula | None:
-        if isinstance(self.order_like, tuple):
-            return None
-        return ts_term(self.order_like)
+    def order_formula(self) -> TSFormula:
+        return self.order.formula
 
     # todo: spec of order must be subset of rank spec
 
     def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
-        if self.order_as_ts_rel is not None:
-            return cast(Predicate, self.order_as_ts_rel(ts))
-
-        formula = self.order_as_ts_formula
-        assert formula is not None, f"Unsupported order like {self.order_like}"
+        formula = self.order_formula
 
         def predicate(*args: z3.ExprRef) -> z3.BoolRef:
-            params = {name: arg for name, arg in zip(formula.spec.keys(), args)}
+            params = {name: arg for name, arg in zip(self.double_names, args)}
             return formula(ts, params)
 
         return predicate
 
     @cached_property
     def order_name(self) -> str:
-        if self.order_as_ts_rel is not None:
-            return self.order_as_ts_rel.name
+        return self.order_formula.name
 
-        assert (
-            self.order_as_ts_formula is not None
-        ), f"Unsupported order like {self.order_like}"
-        return self.order_as_ts_formula.name
+    @cached_property
+    def order_single_spec(self) -> ParamSpec:
+        name = self.order_formula.name
+        spec = self.order_formula.spec
+        spec_keys = list(spec.keys())
+        assert len(spec_keys) % 2 == 0, f"Non-even order formula {name}"
+
+        single_spec: dict[str, Sort] = {}
+        for name, sort in spec.items():
+            assert name.endswith("1") or name.endswith(
+                "2"
+            ), f"Bad param {name} to order formula"
+            trunc_name = name[:-1]
+            if name.endswith("1"):
+                paired_name = trunc_name + "2"
+                assert (
+                    paired_name
+                ) in spec, f"Missing paired param {paired_name} for {name}"
+                paired_sort = spec[paired_name]
+                assert (
+                    paired_sort is sort
+                ), f"Bad paired sort for {paired_name}: expected {sort.ref()} (like {name}), but got {paired_sort.ref()}"
+                single_spec[trunc_name] = sort
+            if name.endswith("2"):
+                paired_name = trunc_name + "1"
+                assert (
+                    paired_name
+                ) in spec, f"Missing paired param {paired_name} to {name}"
+                paired_sort = spec[paired_name]
+                assert (
+                    paired_sort is sort
+                ), f"Bad paired sort for {paired_name}: expected {sort.ref()} (like {name}), but got {paired_sort.ref()}"
+
+        return ParamSpec(single_spec)
 
     @cached_property
     def sorts(self) -> list[Sort]:
-        if isinstance(self.order_like, tuple):
-            return [
-                cast(Sort, self.order_like[i].__class__)
-                for i in range(1, len(self.order_like))
-            ]
-
-        assert (
-            self.order_as_ts_formula is not None
-        ), f"Unsupported order like {self.order_like}"
-        name = self.order_as_ts_formula.name
-        spec = self.order_as_ts_formula.spec
-        spec_values = list(spec.values())
-        assert len(spec_values) % 2 == 0, f"Non-even order formula {name}"
-        half_len = len(spec_values) // 2
-
-        sorts = []
-        for i in range(half_len):
-            sort1 = spec_values[i]
-            sort2 = spec_values[i + half_len]
-            assert sort1 is sort2, (
-                f"Mismatched sorts in order formula {name}, "
-                f"{sort1.ref()} at {i} but {sort2.ref()} at {i + half_len}"
-            )
-
-            sorts.append(sort1)
-
-        return sorts
+        return list(self.order_single_spec.values())
 
     @cached_property
     def sort_refs(self) -> list[z3.SortRef]:
         return [sort.ref() for sort in self.sorts]
 
     @cached_property
+    def double_names(self) -> list[str]:
+        return [name + "1" for name in self.names] + [name + "2" for name in self.names]
+
+    @cached_property
     def names(self) -> list[str]:
-        if isinstance(self.order_like, tuple):
-            return [str(self.order_like[i]) for i in range(1, len(self.order_like))]
-
-        assert (
-            self.order_as_ts_formula is not None
-        ), f"Unsupported order like {self.order_like}"
-        name = self.order_as_ts_formula.name
-        spec = self.order_as_ts_formula.spec
-        spec_keys = list(spec.keys())
-        assert len(spec_keys) % 2 == 0, f"Non-even order formula {name}"
-        half_len = len(spec_keys) // 2
-
-        names = []
-        for i in range(half_len):
-            name1 = spec_keys[i]
-            name2 = spec_keys[i + half_len]
-            assert (
-                name1.endswith("1") and name2.endswith("2") and name1[:-1] == name2[:-1]
-            ), (
-                f"Mismatched names in order formula {name}, "
-                f"{name1} at {i} but {name2} at {i + half_len}"
-            )
-
-            names.append(name1[:-1])
-        return names
+        return list(self.order_single_spec.keys())
 
     @cached_property
     def primed_names(self) -> list[str]:
@@ -1070,11 +1003,18 @@ class DomainLexRank[T1: Expr, T2: Expr, T3: Expr, T4: Expr](Rank):
 
     @property
     def finite_condition(self) -> SoundnessCondition:
+        order_condition = WellFoundedOrderSC(self.order)
         if self.finite_lemma is None:
-            return FiniteSCBySort(self.quant_spec)
+            return ConjunctionSC((order_condition, FiniteSCBySort(self.quant_spec)))
         else:
-            # todo: add soundness condition of WF of order as well
-            return FiniteSCByBeta(self.quant_spec, self.rank.minimal, self.finite_lemma)
+            return ConjunctionSC(
+                (
+                    order_condition,
+                    FiniteSCByBeta(
+                        self.quant_spec, self.rank.minimal, self.finite_lemma
+                    ),
+                )
+            )
 
     @cached_property
     def decreases_conserved_hints(self) -> DomainLexConservedHints | None:

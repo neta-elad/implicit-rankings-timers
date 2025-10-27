@@ -271,22 +271,22 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             FiniteLemma(self.finiteness_lemma_for_index),
         )
 
-    def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
-        return Or(
-            self.sys.lt(a1, a2),
-            And(a1 == a2, self.sys.lt(b1, b2)),
-            # And(a1 == a2, b1 == b2, lt(c1, c2))
-        )
-        # TODO
-        # pw
-        # And(
-        #     Or(lt(a1, a2), a1 == a2),
-        #     Or(lt(b1, b2), b1 == b2),
-        #     Or(lt(c1, c2), c1 == c2),
-        #     Or(
-        #         lt(a1, a2), lt(b1, b2), lt(c1, c2)
-        #     )
-        # )
+    # def nat_times_nat_lex_order(self, a1: Nat, b1: Nat, a2: Nat, b2: Nat) -> BoolRef:
+    #     return Or(
+    #         self.sys.lt(a1, a2),
+    #         And(a1 == a2, self.sys.lt(b1, b2)),
+    #         # And(a1 == a2, b1 == b2, lt(c1, c2))
+    #     )
+    # TODO
+    # pw
+    # And(
+    #     Or(lt(a1, a2), a1 == a2),
+    #     Or(lt(b1, b2), b1 == b2),
+    #     Or(lt(c1, c2), c1 == c2),
+    #     Or(
+    #         lt(a1, a2), lt(b1, b2), lt(c1, c2)
+    #     )
+    # )
 
     def finiteness_lemma_for_a_and_b(self, a: Nat, b: Nat) -> BoolRef:
         return Or(
@@ -312,7 +312,8 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
     def multiset_rank(self) -> Rank:
         return DomainLexRank(
             self.number_of_pairs(),
-            self.nat_times_nat_lex_order,
+            LexOrder(a=self.sys.lt, b=self.sys.lt),
+            # self.nat_times_nat_lex_order,
             FiniteLemma(self.finiteness_lemma_for_a_and_b, m=2),
         )
 

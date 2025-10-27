@@ -11,6 +11,11 @@ from z3 import (
     EnumSort,
 )
 
+from orders import (
+    RelOrder,
+    FormulaOrder,
+    LexOrder,
+)
 from ranks import (
     ClosedRank,
     Rank,
@@ -25,6 +30,7 @@ from ranks import (
     FiniteLemma,
     TSRel,
 )
+from temporal import G, F, Prop
 from termination import (
     Proof,
     system_invariant,
@@ -42,7 +48,6 @@ from timers import (
     timer_nonzero,
     timer_decreasable,
 )
-from temporal import G, F, Prop
 from ts import (
     TransitionSystem,
     Immutable,
@@ -89,6 +94,9 @@ __all__ = [
     "DomainPermutedRank",
     "FiniteLemma",
     "TSRel",
+    "RelOrder",
+    "FormulaOrder",
+    "LexOrder",
     "Proof",
     "system_invariant",
     "invariant",

@@ -157,7 +157,7 @@ class ToyAckermannProof(Proof[ToyAckermannSystem], prop=ToyAckermannProp):
     def lexicographic_rank(self) -> Rank:
         return DomainLexRank(
             self.pos_value_of_i(),
-            (self.sys.lt_index, Index("i")),
+            RelOrder(self.sys.lt_index, "i"),
             FiniteLemma(self.finiteness_lemma_indices),
         )
 
