@@ -1,9 +1,3 @@
-"""
-This module defines a type-safe interface for Z3,
-so that well-sortedness of expressions can be *statically* checked
-by tools for checking Python type annotations (e.g., `mypy`).
-"""
-
 from abc import ABC
 from collections.abc import Callable, Mapping
 from functools import cached_property
@@ -18,6 +12,11 @@ if not TYPE_CHECKING:
         A representation of a Z3 logical sort at the type-level.
         New type-safe sorts are defined by sub-classing this class
         (either directly or through the `Finite` class).
+
+        This allows us to define a type-safe interface for Z3,
+        so that well-sortedness of expressions can be *statically* checked
+        by tools for checking Python type annotations (e.g., `mypy`).
+
         An instance of the class represents a (transition-system) constant
         of this sort.
         """
