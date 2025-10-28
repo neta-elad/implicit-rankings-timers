@@ -9,7 +9,7 @@ The **Implicit Ranking Timers** library supports two modes of timers:
 
 Time expressions (of sort `Time`) are never created directly,
 but through temporal formulas
-(see `termination.Proof.t`).
+(see `proofs.Proof.t`).
 
 When running an example the mode can be configured
 by setting the environment variable `TIMERS`:

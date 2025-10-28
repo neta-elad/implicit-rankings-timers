@@ -1,3 +1,18 @@
+"""
+This module contains the framework
+for proving temporal properties
+over transition systems.
+A temporal-property proof is a subclass of the `Proof` class,
+which,
+given a transition system (`ts.TransitionSystem`)
+and a temporal property (`temporal.Prop`),
+constructs the intersection transition system between the original system
+and the timer transition system for the negated property.
+Validity of the temporal property is then shown by proving termination
+of the intersection system with a rank function
+(constructed using implicit rankings).
+"""
+
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
@@ -27,6 +42,16 @@ from ts import (
     ts_term,
 )
 from typed_z3 import Expr, Sort, true
+
+__all__ = [
+    "Proof",
+    "system_invariant",
+    "temporal_invariant",
+    "invariant",
+    "witness",
+    "temporal_witness",
+    "track",
+]
 
 
 class WitnessSystem(BaseTransitionSystem):

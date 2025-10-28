@@ -38,7 +38,7 @@ from ranks import (
     SoundnessCondition,
 )
 from temporal import G, F, Prop
-from termination import (
+from proofs import (
     Proof,
     system_invariant,
     invariant,
@@ -117,8 +117,8 @@ __all__ = [
     # Termination proof
     "Proof",
     "system_invariant",
-    "invariant",
     "temporal_invariant",
+    "invariant",
     "witness",
     "temporal_witness",
     "track",
