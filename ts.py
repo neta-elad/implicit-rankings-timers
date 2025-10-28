@@ -47,6 +47,7 @@ __all__ = [
     "ParamSpec",
     "TSTerm",
     "TSFormula",
+    "Immutable",
     "TransitionSystem",
     "axiom",
 ]
@@ -268,6 +269,7 @@ class TSTerm[T]:
 
 
 type TSFormula = TSTerm[z3.BoolRef]
+"""Shorthand for a `TSTerm` the returns a formula (`z3.BoolRef`)."""
 
 
 def universal_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
@@ -279,11 +281,21 @@ def existential_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.Bool
 
 
 type Immutable[T] = Annotated[T, "immutable"]
+"""
+Annotation for immutable symbols in a user-defined transition system
+(see `TransitionSystem`).
+"""
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
     """
     User-defined transition system.
+    A transition system is defined by subclassing this class,
+    declaring the signature using fields,
+    and annotating methods as
+    axioms ([`@axiom`](#axiom)),
+    transitions ([`@transition`](#transition))
+    or conjuncts in the initial state ([`@init`](#init)).
     """
 
     def __init__(self, suffix: str = "") -> None:
@@ -513,13 +525,14 @@ def axiom[T: BaseTransitionSystem, *Ts](
 ) -> TypedFormula[T, *Ts]:
     """
     Annotation (decorator) for defining a transition-system axiom.
-    Should only be used inside a subclass of `TransitionSystem`:
+    Should only be used inside a subclass of `TransitionSystem`.
+    Parameters to the decorated method are implicitly universally quantified.
 
     ```python
     class TicketSystem(TransitionSystem):
         @axiom
-        def always_true() -> BoolRef:
-            return true
+        def always_true(X: Ticket) -> BoolRef:
+            return X == X
     ```
     """
     return add_marker(fun, _TS_AXIOM)
