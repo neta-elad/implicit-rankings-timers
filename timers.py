@@ -287,7 +287,7 @@ class ForallTimer(Timer):
     vars: ParamSpec
 
     def axiom(self, sym: "TimerTransitionSystem", params: Params) -> z3.BoolRef:
-        vars_params = {var: sort.const(var) for var, sort in self.vars.items()}
+        vars_params = {var: sort(var) for var, sort in self.vars.items()}
         all_params = params | vars_params
         return z3.ForAll(
             list(vars_params.values()), timer_zero(self.body.term(sym, all_params))
@@ -300,7 +300,7 @@ class ExistsTimer(Timer):
     vars: ParamSpec
 
     def axiom(self, sym: "TimerTransitionSystem", params: Params) -> z3.BoolRef:
-        vars_params = {var: sort.const(var) for var, sort in self.vars.items()}
+        vars_params = {var: sort(var) for var, sort in self.vars.items()}
         all_params = params | vars_params
         return z3.Exists(
             list(vars_params.values()), timer_zero(self.body.term(sym, all_params))
@@ -309,6 +309,10 @@ class ExistsTimer(Timer):
 
 @dataclass(frozen=True)
 class TimerTransitionSystem(BaseTransitionSystem):
+    """
+    Transition system for a set of timers.
+    """
+
     ts: BaseTransitionSystem
     timers: dict[TimerId, Timer]
     root: Timer
@@ -344,7 +348,7 @@ class TimerTransitionSystem(BaseTransitionSystem):
         axioms = {"order_axioms": timer_order_axioms()}
 
         for timer in self.timers.values():
-            params = {param: sort.const(param) for param, sort in timer.params.items()}
+            params = {param: sort(param) for param, sort in timer.params.items()}
             body = z3.And(
                 timer_zero(timer.term(self, params)) == timer.axiom(self, params),
                 timer_valid(timer.term(self, params)),
@@ -383,7 +387,7 @@ class TimerTransitionSystem(BaseTransitionSystem):
         transitions: list[z3.BoolRef] = []
 
         for timer in self.timers.values():
-            params = {param: sort.const(param) for param, sort in timer.params.items()}
+            params = {param: sort(param) for param, sort in timer.params.items()}
             trans = timer.complete_transition(self, self.next, params)
             if params:
                 trans = z3.ForAll(list(params.values()), trans)

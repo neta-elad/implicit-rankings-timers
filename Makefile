@@ -1,5 +1,6 @@
 VENV = .venv
 STAMP = $(VENV)/.stamp
+LIB_INTERFACE = typed_z3 ts temporal timers
 
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
@@ -31,6 +32,15 @@ format: $(VENV)
 .PRECIOUS: %.py
 %.py: $(VENV) check
 	$(PYTHON) $@
+
+.PHONY: docs/examples/ticket.md
+.PRECIOUS: docs/examples/ticket.md
+docs/examples/ticket.md:
+	make literate.py FILE=examples/ticket.py
+
+.PHONY: docs
+docs: docs/examples/ticket.md
+	$(PYTHON) -m pdoc -n -t docs --no-include-undocumented --no-show-source $(LIB_INTERFACE)
 
 
 .PHONY: $(VENV)

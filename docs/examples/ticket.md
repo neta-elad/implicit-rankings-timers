@@ -1,5 +1,4 @@
-"""
-# <>!
+
 ## Ticket protocol example
 Running example from
 "*Verifying First-Order Temporal Properties
@@ -10,36 +9,30 @@ a variant of Lamport's bakery algorithm.
 From liveness to safety:
 Padon, O., Hoenicke, J., Losa, G., Podelski, A., Sagiv, M., Shoham, S.: Reducing liveness to safety in first-order logic.
 Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3158114
-# </>
-"""
 
-import z3
+We start by importing all symbols from the `prelude` module:
+```python
+from prelude import *  
+```
 
-# @status - done
-
-# <>
-# | We start by importing all symbols from the `prelude` module:
-from prelude import *  # </>
-
-
-# <>
-# | We declare the Thread and Ticket sorts of the system
-# | (both of which might be infinite).
-# | Instances of the class represent constants in the signature of the transition system,
-# | or variables of the sort.
+We declare the Thread and Ticket sorts of the system
+(both of which might be infinite).
+Instances of the class represent constants in the signature of the transition system,
+or variables of the sort.
+```python
 class Thread(Expr): ...
 
 
-class Ticket(Expr): ...  # </>
+class Ticket(Expr): ...  
+```
 
-
-# <>
-# | The transition system of the protocol.
-# | The signature (constants, functions and relations) of the system
-# | is defined by annotated fields in the class.
-# | Constants are annotated by their sort,
-# | functions and relations use the `Fun[...]` and `Rel[...]` annotations respectively.
-# | Any symbol can be marked immutable by wrapping it with `Immutable[...]`.
+The transition system of the protocol.
+The signature (constants, functions and relations) of the system
+is defined by annotated fields in the class.
+Constants are annotated by their sort,
+functions and relations use the `Fun[...]` and `Rel[...]` annotations respectively.
+Any symbol can be marked immutable by wrapping it with `Immutable[...]`.
+```python
 class TicketSystem(TransitionSystem):
     zero: Immutable[Ticket]  # Immutable, first ticket
     service: Ticket  # Mutable, currently serviced ticket
@@ -55,13 +48,14 @@ class TicketSystem(TransitionSystem):
     pc3: Rel[Thread]
     m: Rel[Thread, Ticket]
     scheduled: Rel[Thread]
-    # </>
+    
+```
 
-    # <>
-    # | We define axioms as methods on the transition-system class,
-    # | annotated by `@axiom`.
-    # | The signature of the transition system is available through `self`.
-    # | All parameters are implicitly universally quantified.
+We define axioms as methods on the transition-system class,
+annotated by `@axiom`.
+The signature of the transition system is available through `self`.
+All parameters are implicitly universally quantified.
+```python
     @axiom
     def order_le(self, X: Ticket, Y: Ticket, Z: Ticket) -> BoolRef:
         return And(
@@ -70,12 +64,13 @@ class TicketSystem(TransitionSystem):
             Implies(And(self.le(X, Y), self.le(Y, X)), X == Y),
             Or(self.le(X, Y), self.le(Y, X)),
             self.le(self.zero, X),
-        )  # </>
+        )  
+```
 
-    # <>
-    # | We define the initial state by methods annotated with `@init`.
-    # | Parameters are universally quantified.
-    # | The initial state is given by the conjunction of all `@init` methods.
+We define the initial state by methods annotated with `@init`.
+Parameters are universally quantified.
+The initial state is given by the conjunction of all `@init` methods.
+```python
     @init
     def initial(self, T: Thread, X: Ticket) -> BoolRef:
         return And(
@@ -85,30 +80,32 @@ class TicketSystem(TransitionSystem):
             self.service == self.zero,
             self.next_ticket == self.zero,
             self.m(T, X) == (X == self.zero),
-        )  # </>
+        )  
+```
 
-    # <>
-    # | Since the transition system is just a Python class,
-    # | we can define helper methods that automatically have access
-    # | to the signature.
-    # | This helper method is used in several transitions (below).
+Since the transition system is just a Python class,
+we can define helper methods that automatically have access
+to the signature.
+This helper method is used in several transitions (below).
+```python
     def succ(self, u: Ticket, v: Ticket) -> BoolRef:
         X = Ticket("X")
         return And(
             self.le(u, v),
             Not(u == v),
             ForAll(X, Implies(self.le(u, X), Or(self.le(v, X), X == u))),
-        )  # </>
+        )  
+```
 
-    # <>
-    # | Transitions are defined with the `@transition` decorator.
-    # | Parameters are implicitly existentially quantified.
-    # | The double signature of the system is represented by two copies of the class:
-    # | `self` (pre-state) and `self.next` (post-state).
-    # | In their core, transitions are just formulas over the double signature,
-    # | that relate the pre-state and the post-state.
-    # | These formulas can be completely expressed using just `self` and `self.next`.
-    # | However, we provide some syntactic sugar for common kinds of updates.
+Transitions are defined with the `@transition` decorator.
+Parameters are implicitly existentially quantified.
+The double signature of the system is represented by two copies of the class:
+`self` (pre-state) and `self.next` (post-state).
+In their core, transitions are just formulas over the double signature,
+that relate the pre-state and the post-state.
+These formulas can be completely expressed using just `self` and `self.next`.
+However, we provide some syntactic sugar for common kinds of updates.
+```python
     @transition
     def step12(self, t: Thread) -> BoolRef:
         T = Thread("T")
@@ -191,15 +188,15 @@ class TicketSystem(TransitionSystem):
             self.next_ticket.unchanged(),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
-        )  # </>
+        )  
+```
 
-
-# <>
-# | Once the system is defined, we can write temporal properties for it
-# | by extending the `Prop` class.
-# | The temporal property is given by the `prop` method.
-# | Within the temporal property,
-# | we can freely use the temporal operators `G` and `F`.
+Once the system is defined, we can write temporal properties for it
+by extending the `Prop` class.
+The temporal property is given by the `prop` method.
+Within the temporal property,
+we can freely use the temporal operators `G` and `F`.
+```python
 class TicketProp(Prop[TicketSystem]):
     def prop(self) -> BoolRef:
         T = Thread("T")
@@ -214,7 +211,7 @@ class TicketProp(Prop[TicketSystem]):
                     )
                 ),
             ),
-        )  # </>
+        )
 
 
 class TicketProof(Proof[TicketSystem], prop=TicketProp):
@@ -407,3 +404,4 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
 
 
 TicketProof().check()
+```

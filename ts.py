@@ -32,6 +32,12 @@ from typed_z3 import Fun, Expr, Sort
 
 
 class BaseTransitionSystem(ABC):
+    """
+    Base class for all transition-system implementation:
+    user-defined (via `TransitionSystem`) or programmatically built
+    (like `TimerTransitionSystem` or `IntersectionTransitionSystem`).
+    """
+
     suffix: str
 
     def __init__(self, suffix: str) -> None:
@@ -476,6 +482,7 @@ def init[T: BaseTransitionSystem, *Ts](
 def axiom[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
+    """Annotation for defining a transition-system axiom."""
     return add_marker(fun, _TS_AXIOM)
 
 

@@ -1,3 +1,9 @@
+"""
+The `prelude` module re-exports all necessary symbols
+so one can simple write `from prelude import *`
+and starting working with the library.
+"""
+
 from z3 import (
     BoolRef,
     ExprRef,
@@ -58,7 +64,8 @@ from ts import (
     ParamSpec,
     TSTerm,
     ts_term,
-    TSFormula, BaseTransitionSystem,
+    TSFormula,
+    BaseTransitionSystem,
 )
 from typed_z3 import (
     Expr,

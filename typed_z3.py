@@ -5,6 +5,11 @@ from typing import TYPE_CHECKING, Self, ClassVar, cast, get_type_hints, Any, Lit
 
 import z3
 
+__all__ = [
+    "Expr",
+    "Finite",
+]
+
 if not TYPE_CHECKING:
 
     class Expr(z3.ExprRef, ABC):
@@ -15,10 +20,23 @@ if not TYPE_CHECKING:
 
         This allows us to define a type-safe interface for Z3,
         so that well-sortedness of expressions can be *statically* checked
-        by tools for checking Python type annotations (e.g., `mypy`).
+        by tools for checking Python type annotations
+        (e.g., `mypy`).
 
         An instance of the class represents a (transition-system) constant
         of this sort.
+
+        For example, we can declare a `Ticket` sort by writing:
+        ```python
+        class Thread(Expr): ...
+        ```
+        Note the ellipsis (`...`) are not a placeholder ---
+        this is the literal code for defining a type-level sort.
+
+        To create a variable (equivalent to `z3.Const`) use:
+        ```python
+        t = Thread("t")
+        ```
         """
 
         const_name: str
@@ -27,7 +45,7 @@ if not TYPE_CHECKING:
         _cache: ClassVar[dict[str, type["Expr"]]] = {}
 
         def __init__(
-            self, name: str, mutable: bool = True, *, const: z3.ExprRef | None = None
+            self, name: str, mutable: bool = False, *, const: z3.ExprRef | None = None
         ) -> None:
             if const is None:
                 const = z3.Const(name, self.__class__.ref())
@@ -43,14 +61,6 @@ if not TYPE_CHECKING:
         @classmethod
         def ref(cls) -> z3.SortRef:
             return z3.DeclareSort(cls.__name__)
-
-        @classmethod
-        def const(cls, name: str) -> Self:
-            return z3.Const(name, cls.ref())
-
-        @classmethod
-        def consts(cls, names: str) -> tuple[Self, ...]:
-            return z3.Consts(names, cls.ref())
 
         @classmethod
         def declare(cls, name: str) -> "Sort":
@@ -95,6 +105,10 @@ if not TYPE_CHECKING:
                 return false
             else:
                 return cast(Self, z3.Not(self))
+
+        @classmethod
+        def finite(cls) -> Literal[True]:
+            return True
 
     class Int(Expr):
         @classmethod
@@ -159,7 +173,7 @@ class Finite(Expr, ABC):
     ```python
     class Thread(Finite): ...
     ```
-    declares the `Thread` sort to be finite.
+    declares the `Thread` sort as finite.
     """
 
     @classmethod

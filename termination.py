@@ -127,12 +127,15 @@ def assert_no_temporal(inv_name: str, formula: z3.BoolRef) -> Literal[True]:
     return True
 
 
+type PropProvider[T: TransitionSystem] = type[Prop[T]]
+
+
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
-    prop_type: type[Prop[T]]
+    prop_type: PropProvider[T]
     ts: ClassVar[type[TransitionSystem]]
     _cache: ClassVar[dict[type[BaseTransitionSystem], type]] = {}
 
-    def __init_subclass__(cls, prop: type[Prop[T]], **kwargs: Any) -> None:
+    def __init_subclass__(cls, prop: PropProvider[T], **kwargs: Any) -> None:
         super().__init_subclass__(**kwargs)
         cls.prop_type = prop
 
@@ -188,8 +191,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return UnionTransitionSystem(self.suffix, self.sys, self.witness_system)
 
     @cached_property
-    def prop(self) -> Prop[T]:
-        return self.prop_type(self.sys)
+    def prop(self) -> z3.BoolRef:
+        return self.prop_type(self.sys).prop()
 
     @cached_property
     def timers(self) -> TimerTransitionSystem:
@@ -203,7 +206,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     def negated_prop(self) -> z3.BoolRef:
         return nnf(
             z3.And(
-                z3.Not(self.prop.prop()),
+                z3.Not(self.prop),
                 *(w.implication(self) for w in self.temporal_witnesses.values()),
             )
         )
