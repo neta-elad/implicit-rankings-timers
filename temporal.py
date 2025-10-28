@@ -11,10 +11,12 @@ _F = z3.Function("F", z3.BoolSort(), z3.BoolSort())
 
 
 def G(formula: z3.BoolRef) -> z3.BoolRef:
+    """The globally (G, ☐) temporal operator."""
     return _G(formula)  # type: ignore
 
 
 def F(formula: z3.BoolRef) -> z3.BoolRef:
+    """The eventually (F, ♢) temporal operator."""
     return _F(formula)  # type: ignore
 
 
@@ -109,10 +111,28 @@ def nnf(formula: z3.ExprRef, negated: bool = False) -> z3.BoolRef:
 
 
 class Prop[T: TransitionSystem](ABC):
+    """
+    Subclasses of this class represent a temporal property we wish to prove.
+    They must implement the abstract method `prop`:
+    ```python
+    class Terminating(Prop[TerminationSystem]):
+        def prop(self) -> BoolRef:
+            T = Thread("T")
+            return F(ForAll(T, Not(self.sys.on(T))))
+    ```
+    """
+
     sys: T
+    """
+    Field holding a reference to the transition system,
+    so that the temporal property can have access to symbols from the signature.
+    """
 
     @abstractmethod
-    def prop(self) -> z3.BoolRef: ...
+    def prop(self) -> z3.BoolRef:
+        """
+        :return: temporal property we wish to prove.
+        """
 
     def __init__(self, sys: T) -> None:
         self.sys = sys
