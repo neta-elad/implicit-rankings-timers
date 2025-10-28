@@ -28,6 +28,7 @@ __all__ = [
     "Enum",
     "Fun",
     "Rel",
+    "BiRel",
     "WFRel",
 ]
 
@@ -464,6 +465,10 @@ class Rel[*Ts](Fun[*Ts, Bool]):
 
     def set_next(self, fun: Callable[[Self, *Ts], z3.BoolRef]) -> z3.BoolRef:
         return super().set_next(cast(Callable[[Self, *Ts], Bool], fun))
+
+
+type BiRel[T] = Rel[T, T]
+"""Shorthand for declaring a binary relation."""
 
 
 class WFRel[T: Expr](Rel[T, T]):

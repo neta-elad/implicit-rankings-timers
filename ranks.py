@@ -145,7 +145,7 @@ class WellFoundedOrderSC(SoundnessCondition):
     order: Order
 
     def check(self, ts: BaseTransitionSystem, invariant: z3.BoolRef) -> bool:
-        return self.order.check_well_founded(ts)
+        return self.order.check_well_founded()
 
 
 @dataclass(frozen=True)

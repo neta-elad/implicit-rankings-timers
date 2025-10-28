@@ -48,6 +48,7 @@ __all__ = [
     "TSTerm",
     "TSFormula",
     "TermLike",
+    "FormulaLike",
     "Immutable",
     "TransitionSystem",
     "init",
@@ -539,6 +540,9 @@ def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm
 
 type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
 """Any value that can be converted to a `TSTerm`."""
+
+type FormulaLike = TermLike[z3.BoolRef]
+"""Any value that can be converted to a `TSFormula`."""
 
 
 def unbind[T: BaseTransitionSystem, *Ts, R](

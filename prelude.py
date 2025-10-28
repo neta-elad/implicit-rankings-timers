@@ -17,6 +17,7 @@ from z3 import (
 )
 
 from orders import (
+    Order,
     RelOrder,
     FormulaOrder,
     LexOrder,
@@ -65,11 +66,14 @@ from ts import (
     ParamSpec,
     TSTerm,
     TSFormula,
+    TermLike,
+    FormulaLike,
     BaseTransitionSystem,
 )
 from typed_z3 import (
     Expr,
     Rel,
+    BiRel,
     Fun,
     Finite,
     WFRel,
@@ -84,6 +88,7 @@ __all__ = [
     # typed Z3
     "Expr",
     "Rel",
+    "BiRel",
     "Fun",
     "Finite",
     "WFRel",
@@ -102,6 +107,8 @@ __all__ = [
     "ParamSpec",
     "TSTerm",
     "TSFormula",
+    "TermLike",
+    "FormulaLike",
     # Temporal
     "G",
     "F",
@@ -123,6 +130,7 @@ __all__ = [
     "temporal_witness",
     "track",
     # Order constructors
+    "Order",
     "RelOrder",
     "FormulaOrder",
     "LexOrder",
