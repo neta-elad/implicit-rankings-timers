@@ -14,6 +14,8 @@ else
     TOUCH = touch $(STAMP)
 endif
 
+DOCS = $(PYTHON) -m pdoc -t docs --no-include-undocumented --no-show-source $(LIB_INTERFACE)
+
 .PHONY: precommit
 precommit: check format
 
@@ -40,7 +42,11 @@ docs/examples/ticket.md:
 
 .PHONY: docs
 docs: docs/examples/ticket.md
-	$(PYTHON) -m pdoc -n -t docs --no-include-undocumented --no-show-source $(LIB_INTERFACE)
+	$(DOCS) -n
+
+.PHONY: open_docs
+open-docs: docs/examples/ticket.md
+	$(DOCS)
 
 
 .PHONY: $(VENV)

@@ -32,6 +32,10 @@
     ```
   
 For a simple example, check out the `examples/trivial_termination.py` file.
+Open full docs by running
+```shell
+make open-docs
+```
 
 ## Features
 ### Timeout
