@@ -1,3 +1,15 @@
+"""
+This module provides a type-level representation of various Z3 constructs,
+allowing us to define a type-safe interface for Z3,
+so that well-sortedness of expressions can be *statically* checked
+by tools for checking Python type annotations
+(e.g., `mypy`).
+Additionally, the various objects created by this module are
+*transition-system-aware*: they can be declared mutable,
+and produce "next" (post-state) versions of themselves.
+See examples below.
+"""
+
 from abc import ABC
 from collections.abc import Callable, Mapping
 from functools import cached_property
@@ -24,15 +36,10 @@ if not TYPE_CHECKING:
         """
         A representation of a Z3 logical sort at the type-level.
         New type-safe sorts are defined by sub-classing this class
-        (either directly or through the `Finite` class).
-
-        This allows us to define a type-safe interface for Z3,
-        so that well-sortedness of expressions can be *statically* checked
-        by tools for checking Python type annotations
-        (e.g., `mypy`).
+        (either directly or through the `Finite`, `Enum` classes).
 
         An instance of the class represents a (transition-system) constant
-        of this sort.
+        of this sort or a variable.
 
         For example, we can declare a `Ticket` sort by writing:
         >>> class Ticket(Expr): ...
