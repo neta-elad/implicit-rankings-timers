@@ -107,9 +107,9 @@ __all__ = [
     "F",
     "Prop",
     # Timers
+    "Time",
     "timer_zero",
     "timer_finite",
-    "Time",
     "timer_infinite",
     "timer_nonzero",
     "timer_decreasable",

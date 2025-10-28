@@ -1,3 +1,21 @@
+"""
+This module provides the interface to talk about timers.
+The **Implicit Ranking Timers** library supports two modes of timers:
+- Uninterpreted (`unint`, `u`):
+    `Time` is an uninterpreted sort with axioms that make it behave
+    as expected.
+- Interpreted (`int`, `i`):
+    `Time` is expressed with interpreted integers, with infinity represented as -1.
+
+When running an example the mode can be configured
+by setting the environment variable `TIMERS`:
+```sh
+make examples/ticket.py TIMERS=<mode>
+```
+where `<mode>` is either `unint` or `int`.
+The default mode is `int` (interpreted integers).
+"""
+
 import operator
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -12,7 +30,18 @@ from temporal import is_G, is_F, nnf
 from ts import BaseTransitionSystem, ParamSpec, Params
 from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
 
-_DEFAULT_TIMERS_MODE = "int"  # change to "int" for integer / interpreted timers
+__all__ = [
+    "Time",
+    "timer_zero",
+    "timer_finite",
+    "timer_infinite",
+    "timer_nonzero",
+    "timer_decreasable",
+]
+
+__pdoc__ = {}
+
+_DEFAULT_TIMERS_MODE = "int"
 _UNINTERPRETED_TIMERS = "uninterpreted".startswith(
     getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower()
 )
@@ -30,9 +59,10 @@ if not TYPE_CHECKING:
         _inf = z3.IntVal(-1)
 else:
     type Time = Int
-    TimeSort: z3.SortRef
     _zero: Time
     _inf: Time
+
+__pdoc__["Time"] = True
 
 
 class TimeFun(Protocol):

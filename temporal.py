@@ -1,3 +1,8 @@
+"""
+This module provides the basics for defining
+temporal properties for transition systems.
+"""
+
 from abc import ABC, abstractmethod
 
 import z3
