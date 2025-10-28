@@ -83,7 +83,7 @@ class TemporalWitness:
 
     @cached_property
     def symbol(self) -> Expr:
-        return self.sort(self.name, False)
+        return self.sort(self.name)
 
     def source(self, sys: BaseTransitionSystem) -> z3.BoolRef:
         return existential_closure(self.formula, sys)

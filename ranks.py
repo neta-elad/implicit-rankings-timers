@@ -95,7 +95,7 @@ def _ts_rel_from_rel[*Ts](rel: Rel[*Ts]) -> TSRel[*Ts]:
 
     def fun(ts: BaseTransitionSystem) -> Rel[*Ts]:
         if name in ts.symbols:
-            return rel.__class__(name, rel.mutable, ts.symbols[name])
+            return rel.__class__(name, mutable=rel.mutable, fun=ts.symbols[name])
         return rel
 
     return TSRel(fun, name)

@@ -253,6 +253,10 @@ def existential_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.Bool
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
+    """
+    User-defined transition system.
+    """
+
     def __init__(self, suffix: str = "") -> None:
         super().__init__(suffix)
         _ = self.symbols  # init self.symbols
@@ -275,10 +279,10 @@ class TransitionSystem(BaseTransitionSystem, ABC):
                 name += self.suffix
 
             if issubclass(origin, Expr):
-                symbol = origin(name, mutable)
+                symbol = origin(name, mutable=mutable)
                 symbols[field] = symbol.fun_ref
             elif issubclass(origin, Fun):
-                symbol = origin(name, mutable)
+                symbol = origin(name, mutable=mutable)
                 symbols[field] = symbol.fun
             else:
                 continue
