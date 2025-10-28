@@ -9,7 +9,7 @@ Protocol from:
 Lamport, L.: The part-time parliament. ACM Trans. Program. Lang. Syst. 16(2), 133–169 (Mar 1994). https://doi.org/10.1145/174674.174675
 """
 
-# @status - everything works except for 2 annoying invariant checks in init because of the quantifier altenration in init 
+# @status - everything works except for 2 annoying invariant checks in init because of the quantifier altenration in init
 
 from prelude import *
 
@@ -357,11 +357,9 @@ class PaxosProperty(Prop[PaxosSystem]):
 
 class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
-
     @temporal_invariant(leaf=True)
     def eventually_one_r0(self) -> BoolRef:
         return F(self.sys.one_a(self.sys.r0))
-
 
     @temporal_invariant(leaf=True)
     def fairness2(self) -> BoolRef:
@@ -401,11 +399,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             ),
         )
 
-
     @temporal_invariant(leaf=True)
     def eventually_proposed_r0(self) -> BoolRef:
         return F(self.sys.proposed(self.sys.r0))
-
 
     @invariant
     def proposal_uniqueness(self, R: Round, V1: Value, V2: Value) -> BoolRef:
@@ -525,14 +521,13 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             FiniteLemma(self.value_proposed_in_r0),
         )
 
-
     def rank(self) -> Rank:
         return PointwiseRank(
             self.one_a_r0_timer_rank(),
             self.one_a_received_timer_rank(),
             self.one_b_received_timer_rank(),
             LexRank(self.proposed_r0_timer_rank(), self.proposal_received_timer_rank()),
-            self.proposal_eventually_proposed_value_timer_rank()
+            self.proposal_eventually_proposed_value_timer_rank(),
         )
 
     # simplifying assumptions for debugging - don't affect final proof.
@@ -574,21 +569,20 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
                 Not(self.sys.proposal_received(N, self.sys.r0, V)),
             ),
         )
-    
+
     # we add this temporal witness, which we use to instantiate the negated property.
     @temporal_witness
     @track
-    def eventually_proposed_value(self, V:Value) -> BoolRef:
+    def eventually_proposed_value(self, V: Value) -> BoolRef:
         return F(self.sys.proposal(self.sys.r0, V))
 
-    
     @temporal_invariant(leaf=True)
     @track
     def eventually_proposed_value_definition(self) -> BoolRef:
         V = Value("V")
         return Implies(
             Exists(V, F(self.sys.proposal(self.sys.r0, V))),
-            F(self.sys.proposal(self.sys.r0, self.eventually_proposed_value))
+            F(self.sys.proposal(self.sys.r0, self.eventually_proposed_value)),
         )
 
     @temporal_invariant(leaf=True)
@@ -602,9 +596,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
     def proposal_eventually_proposed_value_timer_rank(self) -> Rank:
         return self.timer_rank(
-            self.sys.proposal(self.sys.r0, self.eventually_proposed_value),
-            None,
-            None
+            self.sys.proposal(self.sys.r0, self.eventually_proposed_value), None, None
         )
 
     # we should have this invariant only for some witness value as it introduces a quantifer altenrnation
@@ -625,30 +617,42 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         V = Value("V")
         return timer_zero(
             self.t(
-                G(Exists(N, And(self.sys.member(N, Q), Not(self.sys.vote(N, self.sys.r0, V)))))
+                G(
+                    Exists(
+                        N,
+                        And(
+                            self.sys.member(N, Q), Not(self.sys.vote(N, self.sys.r0, V))
+                        ),
+                    )
+                )
             )(self.sys.q0, self.eventually_proposed_value)
         )
-        
 
     # works for some of the transtions with the violation temporal invariant
     def all_nodes_in_q0_proposal_received(self) -> BoolRef:
         N = Node("N")
         return And(
-                self.sys.proposal(self.sys.r0, self.eventually_proposed_value),
-                ForAll(N,
-                    Implies(
-                        self.sys.member(N, self.sys.q0),
-                        self.sys.proposal_received(N, self.sys.r0, self.eventually_proposed_value)
-                    )
-                )
-            )
+            self.sys.proposal(self.sys.r0, self.eventually_proposed_value),
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    self.sys.proposal_received(
+                        N, self.sys.r0, self.eventually_proposed_value
+                    ),
+                ),
+            ),
+        )
 
     def exists_proposal_not_skolem(self) -> BoolRef:
         V = Value("V")
-        return Exists(V, And(
-            self.sys.proposal(self.sys.r0, V),
-            Not(self.sys.proposal(self.sys.r0, self.eventually_proposed_value))
-        ))
+        return Exists(
+            V,
+            And(
+                self.sys.proposal(self.sys.r0, V),
+                Not(self.sys.proposal(self.sys.r0, self.eventually_proposed_value)),
+            ),
+        )
 
 
 proof = PaxosProof()
@@ -657,7 +661,7 @@ proof._check_conserved()
 proof._check_decreases()
 # print("no one_a_r0")
 # proof._check_decreases(proof.no_one_a_r0())
-# print("not proposed_r0") 
+# print("not proposed_r0")
 # proof._check_decreases(proof.not_proposed_r0())
 # print("exists_N_in_q0_not_received_one_a")
 # proof._check_decreases(proof.exists_N_in_q0_not_received_one_a())

@@ -19,6 +19,7 @@ import z3
 
 __all__ = [
     "Expr",
+    "Sort",
     "Bool",
     "false",
     "true",
@@ -104,7 +105,8 @@ if not TYPE_CHECKING:
         @cached_property
         def next(self) -> Self:
             """
-            Returns post-state copy of a constant.
+            :return: post-state copy of a constant.
+
             The constant must be mutable.
 
             >>> Ticket("service", mutable=True).next
@@ -117,7 +119,7 @@ if not TYPE_CHECKING:
 
         def unchanged(self) -> z3.BoolRef:
             """
-            Produces a formula expressing
+            :return: a formula expressing
             that a mutable constant is unchanged during a transition.
 
             For example, given mutable
@@ -137,7 +139,7 @@ if not TYPE_CHECKING:
 
         def update(self, val: Self) -> z3.BoolRef:
             """
-            Produces a formula expressing
+            :return: a formula expressing
             that a mutable constant is equal to `val` in the post-state.
 
             For example, given
@@ -309,6 +311,8 @@ class Enum(Expr, ABC):
 
 
 type Sort = type[Expr]
+"""Any class derived from `Expr`."""
+
 type Signature = tuple[Sort, ...]
 
 
@@ -382,7 +386,7 @@ class Fun[*Ts, T: z3.ExprRef]:
 
     def unchanged(self) -> z3.BoolRef:
         """
-        Produces a universal formula expressing that for all inputs,
+        :return: a universal formula expressing that for all inputs,
         the output of the function remains unchanged between the pre-state
         and the post-state.
 
@@ -410,7 +414,7 @@ class Fun[*Ts, T: z3.ExprRef]:
 
     def update(self, places: Mapping[tuple[*Ts], T]) -> z3.BoolRef:
         """
-        Produces a universal formula expressing that for all inputs,
+        :return: a universal formula expressing that for all inputs,
         the output of the function remains unchanged between the pre-state
         and the post-state,
         except for inputs equal to keys of `places`,

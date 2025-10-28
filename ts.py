@@ -1,3 +1,14 @@
+"""
+This module provides the framework for easily defining
+transition systems and transition-system (parameteric) terms/formulas.
+
+A transition-system term (`TSTerm`) can be thought of
+as a term (or formula) with "holes"
+for transition-system symbols
+(constants, functions, relations)
+and free variables.
+"""
+
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
 from dataclasses import dataclass
@@ -30,12 +41,23 @@ from helpers import (
 from metadata import get_methods, add_marker
 from typed_z3 import Fun, Expr, Sort
 
+__all__ = [
+    "BaseTransitionSystem",
+    "Params",
+    "ParamSpec",
+    "TSTerm",
+    "TSFormula",
+    "TransitionSystem",
+    "axiom",
+]
+
 
 class BaseTransitionSystem(ABC):
     """
-    Base class for all transition-system implementation:
+    Abstract base class for all transition-system implementation:
     user-defined (via `TransitionSystem`) or programmatically built
-    (like `TimerTransitionSystem` or `IntersectionTransitionSystem`).
+    (like `timers.TimerTransitionSystem`).
+    The fields of a `BaseTransitionSystem` represent a state in the system.
     """
 
     suffix: str
@@ -55,6 +77,9 @@ class BaseTransitionSystem(ABC):
 
     @cached_property
     def next(self) -> Self:
+        """
+        :return: a post-state version of the transition system.
+        """
         return self.clone(self.suffix + "'")
 
     @cached_property
@@ -125,14 +150,21 @@ class BaseTransitionSystem(ABC):
             return False
 
     def sanity_check(self) -> bool:
-        if not self._check_sat("init", self.axiom, self.init):
+        """
+        Provides a simple sanity check for the system:
+        - Checking the initial state is satisfiable
+        - Checking every transition is satisfiable
+        - Checking the initial state & disjunction of all transitions is satisfiable
+        :return: whether the system is sane
+        """
+        if not _check_sat("init", self.axiom, self.init):
             return False
 
         for name, tr in self.transitions.items():
-            if not self._check_sat(name, self.axiom, self.next.axiom, tr):
+            if not _check_sat(name, self.axiom, self.next.axiom, tr):
                 return False
 
-        if not self._check_sat(
+        if not _check_sat(
             f"init and tr",
             self.axiom,
             self.next.axiom,
@@ -143,33 +175,20 @@ class BaseTransitionSystem(ABC):
 
         return True
 
-    def _check_sat(self, name: str, *args: z3.BoolRef) -> bool:
-        result = sat_check(args)
-        if result.sat:
-            print(f"Checking sat {name}: passed")
-            return True
-        else:
-            print(f"Checking sat {name}: failed")
-            print_unsat_core(result, name)
-            return False
-
 
 type TypedTerm[TR: BaseTransitionSystem, *Ts, E: z3.ExprRef] = Callable[[TR, *Ts], E]
-type BoundTypedTerm[*Ts, E: z3.ExprRef] = Callable[[*Ts], E]
-type ErasedBoundTypedTerm[E: z3.ExprRef] = Callable[..., E]
-
 type TypedFormula[TR: BaseTransitionSystem, *Ts] = TypedTerm[TR, *Ts, z3.BoolRef]
-type BoundTypedFormula[*Ts] = BoundTypedTerm[*Ts, z3.BoolRef]
-
-type ErasedBoundTypedFormula = ErasedBoundTypedTerm[z3.BoolRef]
-
 type RawTSTerm[T] = Callable[[BaseTransitionSystem, Params], T]
 
 
-type Immutable[T] = Annotated[T, "immutable"]
-
-
 class Params(Protocol):
+    """
+    A protocol representing parameters
+    (free variables)
+    of a parametric term.
+    Can be thought of as a mapping of names (`str`) to Z3 expressions (`z3.ExprRef`).
+    """
+
     def items(self) -> Iterable[tuple[str, z3.ExprRef]]: ...
 
     def __getitem__(self, item: str) -> z3.ExprRef: ...
@@ -180,6 +199,11 @@ class Params(Protocol):
 
 
 class ParamSpec(dict[str, Sort]):
+    """
+    A specification of parameters:
+    a mapping of names (`str`) to sorts (`typed_z3.Sort`, classes derived from `typed_z3.Expr`).
+    """
+
     def primed(self) -> Self:
         return self.__class__({f"{param}'": sort for param, sort in self.items()})
 
@@ -217,17 +241,19 @@ class ParamSpec(dict[str, Sort]):
 
 @dataclass(frozen=True)
 class TSTerm[T]:
+    """
+    A transition-system term, producing a term of type `T`.
+    """
+
     spec: ParamSpec
+    """The specification for the parameters (free variables) of the term."""
+
     fun: RawTSTerm[T]
     name: str
 
     @cached_property
     def params(self) -> Params:
         return self.spec.params()
-
-    @cached_property
-    def closed(self) -> bool:
-        return not self.spec
 
     @cached_property
     def next(self) -> Self:
@@ -250,6 +276,9 @@ def universal_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRe
 
 def existential_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
     return quantify(False, formula.spec.consts(), formula(ts), qid=formula.name)
+
+
+type Immutable[T] = Annotated[T, "immutable"]
 
 
 class TransitionSystem(BaseTransitionSystem, ABC):
@@ -289,10 +318,6 @@ class TransitionSystem(BaseTransitionSystem, ABC):
             object.__setattr__(self, field, symbol)
 
         return symbols
-
-    @cached_property
-    def next(self) -> Self:
-        return self.__class__(self.suffix + "'")
 
     @cached_property
     def inits(self) -> dict[str, z3.BoolRef]:
@@ -486,7 +511,17 @@ def init[T: BaseTransitionSystem, *Ts](
 def axiom[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
-    """Annotation for defining a transition-system axiom."""
+    """
+    Annotation (decorator) for defining a transition-system axiom.
+    Should only be used inside a subclass of `TransitionSystem`:
+
+    ```python
+    class TicketSystem(TransitionSystem):
+        @axiom
+        def always_true() -> BoolRef:
+            return true
+    ```
+    """
     return add_marker(fun, _TS_AXIOM)
 
 
@@ -601,3 +636,14 @@ def _disjoint_merge[T](dict1: dict[str, T], dict2: dict[str, T]) -> dict[str, T]
             key = "right-" + key
         result[key] = value
     return result
+
+
+def _check_sat(name: str, *args: z3.BoolRef) -> bool:
+    result = sat_check(args)
+    if result.sat:
+        print(f"Checking sat {name}: passed")
+        return True
+    else:
+        print(f"Checking sat {name}: failed")
+        print_unsat_core(result, name)
+        return False
