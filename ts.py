@@ -47,8 +47,11 @@ __all__ = [
     "ParamSpec",
     "TSTerm",
     "TSFormula",
+    "TermLike",
     "Immutable",
     "TransitionSystem",
+    "init",
+    "transition",
     "axiom",
 ]
 
@@ -293,9 +296,39 @@ class TransitionSystem(BaseTransitionSystem, ABC):
     A transition system is defined by subclassing this class,
     declaring the signature using fields,
     and annotating methods as
-    axioms ([`@axiom`](#axiom)),
-    transitions ([`@transition`](#transition))
-    or conjuncts in the initial state ([`@init`](#init)).
+    conjuncts of the initial state ([`@init`](#init)),
+    transitions ([`@transition`](#transition)),
+    or axioms ([`@axiom`](#axiom)).
+
+    Symbols (constants, functions, relations)
+    in the vocabulary of the transition system's state
+    are declared with fields, annotated with their sort:
+    ```python
+    class Thread(Finite): ...
+
+    class TerminationSystem(TransitionSystem):
+        # A mutable constant of sort Thread
+        running: Thread
+
+        # An immutable constant of sort Thread
+        first: Immutable[Thread]
+
+        # A mutable unary relation over threads
+        on: Rel[Thread]
+
+        # An immutable binary relation
+        gt: Immutable[Rel[Thread, Thread]]
+
+        # An immutable binary relation, declared to be well-founded
+        lt: Immutable[WFRel[Thread]]
+
+        # An immutable function from threads to threads
+        prev: Immutable[Fun[Thread, Thread]]
+    ```
+
+    See also:
+    `typed_z3.Expr`, `typed_z3.Fun`, `typed_z3.Rel`, `typed_z3.WFRel`,
+    `axiom`, `init`, `transition`.
     """
 
     def __init__(self, suffix: str = "") -> None:
@@ -505,6 +538,7 @@ def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm
 
 
 type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
+"""Any value that can be converted to a `TSTerm`."""
 
 
 def unbind[T: BaseTransitionSystem, *Ts, R](
@@ -517,6 +551,20 @@ def unbind[T: BaseTransitionSystem, *Ts, R](
 def init[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
+    """
+    Annotation (decorator) for defining a initial-state conjunct.
+    Should only be used inside a subclass of `TransitionSystem`.
+    Parameters to the decorated method are implicitly universally quantified.
+
+    ```python
+    class TerminationSystem(TransitionSystem):
+        # snip...
+
+        @init
+        def initially_all_on(T: Thread) -> BoolRef:
+            return self.on(T)
+    ```
+    """
     return add_marker(fun, _TS_INIT)
 
 
@@ -524,15 +572,17 @@ def axiom[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
     """
-    Annotation (decorator) for defining a transition-system axiom.
+    Annotation (decorator) for defining a axiom.
     Should only be used inside a subclass of `TransitionSystem`.
     Parameters to the decorated method are implicitly universally quantified.
 
     ```python
-    class TicketSystem(TransitionSystem):
+    class TerminationSystem(TransitionSystem):
+        # snip...
+
         @axiom
-        def always_true(X: Ticket) -> BoolRef:
-            return X == X
+        def first_is_minimal(T: Thread) -> BoolRef:
+            return Or(self.first == X, self.lt(self.first, X))
     ```
     """
     return add_marker(fun, _TS_AXIOM)
@@ -541,6 +591,20 @@ def axiom[T: BaseTransitionSystem, *Ts](
 def transition[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
+    """
+    Annotation (decorator) for defining a transition.
+    Should only be used inside a subclass of `TransitionSystem`.
+    Parameters to the decorated method are implicitly existentially quantified.
+
+    ```python
+    class TerminationSystem(TransitionSystem):
+        # snip...
+
+        @transition
+        def turn_off(t: Thread) -> BoolRef:
+            return self.on.update({(t,): false})
+    ```
+    """
     return add_marker(fun, _TS_TRANSITION)
 
 

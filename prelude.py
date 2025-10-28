@@ -101,7 +101,6 @@ __all__ = [
     "transition",
     "ParamSpec",
     "TSTerm",
-    "ts_term",
     "TSFormula",
     # Temporal
     "G",

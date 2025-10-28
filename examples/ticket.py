@@ -13,8 +13,6 @@ Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3
 # </>
 """
 
-import z3
-
 # @status - done
 
 # <>
@@ -23,18 +21,20 @@ from prelude import *  # </>
 
 
 # <>
+# | ### Sorts
 # | We declare the Thread and Ticket sorts of the system
 # | (both of which might be infinite).
-# | Instances of the class represent constants in the signature of the transition system,
-# | or variables of the sort.
+# | Instances of these classes
+# | represent constants in the signature of the transition system,
+# | or variables of the sort
+# | (see [`Expr`](typed_z3#Expr)).
 class Thread(Expr): ...
 
 
-class Ticket(Expr): ...  # </>
+class Ticket(Expr): ...
 
 
-# <>
-# | The transition system of the protocol.
+# | ### The Transition System of the Protocol
 # | The signature (constants, functions and relations) of the system
 # | is defined by annotated fields in the class.
 # | Constants are annotated by their sort,
@@ -195,6 +195,7 @@ class TicketSystem(TransitionSystem):
 
 
 # <>
+# | ### Temporal Property
 # | Once the system is defined, we can write temporal properties for it
 # | by extending the `Prop` class.
 # | The temporal property is given by the `prop` method.

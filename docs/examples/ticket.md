@@ -15,18 +15,23 @@ We start by importing all symbols from the `prelude` module:
 from prelude import *  
 ```
 
+### Sorts
 We declare the Thread and Ticket sorts of the system
 (both of which might be infinite).
-Instances of the class represent constants in the signature of the transition system,
-or variables of the sort.
+Instances of these classes
+represent constants in the signature of the transition system,
+or variables of the sort
+(see [`Expr`](typed_z3#Expr)).
 ```python
 class Thread(Expr): ...
 
 
-class Ticket(Expr): ...  
+class Ticket(Expr): ...
+
+
 ```
 
-The transition system of the protocol.
+### The Transition System of the Protocol
 The signature (constants, functions and relations) of the system
 is defined by annotated fields in the class.
 Constants are annotated by their sort,
@@ -191,6 +196,7 @@ However, we provide some syntactic sugar for common kinds of updates.
         )  
 ```
 
+### Temporal Property
 Once the system is defined, we can write temporal properties for it
 by extending the `Prop` class.
 The temporal property is given by the `prop` method.
