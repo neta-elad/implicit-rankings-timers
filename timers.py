@@ -47,9 +47,9 @@ _UNINTERPRETED_TIMERS = "uninterpreted".startswith(
 )
 
 if not TYPE_CHECKING:
-    if _UNINTERPRETED_TIMERS:
+    if _UNINTERPRETED_TIMERS:  # uninterpreted time
 
-        class Time(Expr): ...  # uninterpreted time
+        class Time(Expr): ...
 
         _zero = Time("zero")
         _inf = Time("inf")
@@ -108,6 +108,9 @@ def timer_valid(timer_expr: Time) -> z3.BoolRef:
 
 
 def timer_zero(timer_expr: Time) -> z3.BoolRef:
+    """
+    :return: formula for `timer_expr` being zero.
+    """
     return timer_expr == _zero
 
 
