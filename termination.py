@@ -228,9 +228,12 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             self.suffix, self.sys_with_witnesses, self.timers
         )
 
-    def t(self, name: z3.BoolRef) -> TimeFun:
-        name = nnf(name)
-        return self.timers.t(f"t_<{str(name).replace("'", "")}>")
+    def t(self, temporal_formula: z3.BoolRef) -> TimeFun:
+        """
+        :return: matching timer function for `temporal_formula`.
+        """
+        temporal_formula = nnf(temporal_formula)
+        return self.timers.t(f"t_<{str(temporal_formula).replace("'", "")}>")
 
     @cached_property
     def system_invariants(self) -> dict[str, Invariant]:

@@ -48,9 +48,10 @@ from termination import (
     track,
 )
 from timers import (
+    Time,
+    TimeFun,
     timer_zero,
     timer_finite,
-    Time,
     timer_infinite,
     timer_nonzero,
     timer_decreasable,
@@ -63,7 +64,6 @@ from ts import (
     transition,
     ParamSpec,
     TSTerm,
-    ts_term,
     TSFormula,
     BaseTransitionSystem,
 )
@@ -108,6 +108,7 @@ __all__ = [
     "Prop",
     # Timers
     "Time",
+    "TimeFun",
     "timer_zero",
     "timer_finite",
     "timer_infinite",

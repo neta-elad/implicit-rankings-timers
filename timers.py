@@ -7,6 +7,10 @@ The **Implicit Ranking Timers** library supports two modes of timers:
 - Interpreted (`int`, `i`):
     `Time` is expressed with interpreted integers, with infinity represented as -1.
 
+Time expressions (of sort `Time`) are never created directly,
+but through temporal formulas
+(see `termination.Proof.t`).
+
 When running an example the mode can be configured
 by setting the environment variable `TIMERS`:
 ```sh
@@ -28,10 +32,11 @@ import z3
 from helpers import unpack_quantifier, find_substitution, quantify
 from temporal import is_G, is_F, nnf
 from ts import BaseTransitionSystem, ParamSpec, Params
-from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool
+from typed_z3 import Rel, Fun, Sort, Expr, Int, Bool, Signature
 
 __all__ = [
     "Time",
+    "TimeFun",
     "timer_zero",
     "timer_finite",
     "timer_infinite",
@@ -46,19 +51,27 @@ _UNINTERPRETED_TIMERS = "uninterpreted".startswith(
     getenv("TIMERS", _DEFAULT_TIMERS_MODE).lower()
 )
 
+
+class Time(Expr):
+    """
+    Time sort.
+    Should not be instantiated directly.
+    """
+
+
 if not TYPE_CHECKING:
     if _UNINTERPRETED_TIMERS:  # uninterpreted time
 
-        class Time(Expr): ...
+        class _Time(Expr): ...
 
-        _zero = Time("zero")
-        _inf = Time("inf")
+        _zero = _Time("zero")
+        _inf = _Time("inf")
     else:  # integer time
-        Time = Int
+        _Time = Int
         _zero = z3.IntVal(0)
         _inf = z3.IntVal(-1)
 else:
-    type Time = Int
+    type _Time = Time
     _zero: Time
     _inf: Time
 
@@ -66,12 +79,22 @@ __pdoc__["Time"] = True
 
 
 class TimeFun(Protocol):
+    """
+    Variadic callable returning a `Time` expression.
+    A function with signature:
+    ```python
+    def time_fun(*args: z3.ExprRef) -> Time: ...
+    ```
+    """
+
     def __call__(self, *args: z3.ExprRef) -> Time: ...
 
 
 def timer_order_axioms() -> z3.BoolRef:
     if _UNINTERPRETED_TIMERS:
-        x, y, z = Time.consts("x y z")  # type: ignore
+        x = _Time("x")  # type: ignore
+        y = _Time("y")  # type: ignore
+        z = _Time("z")  # type: ignore
         return z3.And(
             z3.ForAll(
                 [x, y, z],
@@ -88,7 +111,7 @@ def timer_order_axioms() -> z3.BoolRef:
     return z3.BoolVal(True)
 
 
-_timer_order = Rel[Time, Time]("timer_order")
+_timer_order = Rel[_Time, _Time]("timer_order")
 
 
 def timer_order(t1: Time, t2: Time) -> z3.BoolRef:
@@ -97,14 +120,14 @@ def timer_order(t1: Time, t2: Time) -> z3.BoolRef:
 
     return z3.Or(
         z3.And(timer_finite(t1), timer_infinite(t2)),
-        z3.And(timer_finite(t1), timer_finite(t2), t1 < t2),
+        z3.And(timer_finite(t1), timer_finite(t2), t1 < t2),  # type: ignore
     )
 
 
 def timer_valid(timer_expr: Time) -> z3.BoolRef:
     if _UNINTERPRETED_TIMERS:
         return z3.BoolVal(True)
-    return timer_expr >= _inf
+    return timer_expr >= _inf  # type: ignore
 
 
 def timer_zero(timer_expr: Time) -> z3.BoolRef:
@@ -115,32 +138,44 @@ def timer_zero(timer_expr: Time) -> z3.BoolRef:
 
 
 def timer_nonzero(timer_expr: Time) -> z3.BoolRef:
+    """
+    :return: formula for `timer_expr` being non-zero.
+    """
     return timer_expr != _zero
 
 
 def timer_finite(timer_expr: Time) -> z3.BoolRef:
+    """
+    :return: formula for `timer_expr` being finite.
+    """
     if _UNINTERPRETED_TIMERS:
         return timer_expr != _inf
 
-    return timer_expr >= 0
+    return timer_expr >= 0  # type: ignore
 
 
 def timer_infinite(timer_expr: Time) -> z3.BoolRef:
+    """
+    :return: formula for `timer_expr` being infinite.
+    """
     return timer_expr == _inf
 
 
 def timer_decreasable(timer_expr: Time) -> z3.BoolRef:
+    """
+    :return: formula for `timer_expr` being decreasable (finite and non-zero).
+    """
     if _UNINTERPRETED_TIMERS:
         return z3.And(timer_expr != _zero, timer_expr != _inf)
 
-    return timer_expr > 0
+    return timer_expr > 0  # type: ignore
 
 
 def timer_decrease(pre_timer_expr: Time, post_timer_expr: Time) -> z3.BoolRef:
     if _UNINTERPRETED_TIMERS:
         return timer_order(post_timer_expr, pre_timer_expr)
 
-    return post_timer_expr == pre_timer_expr - 1
+    return post_timer_expr == pre_timer_expr - 1  # type: ignore
 
 
 @dataclass(frozen=True)
@@ -184,7 +219,7 @@ class Timer(ABC):
         return tuple(self.params.keys())
 
     def to_fun(self, suffix: str) -> z3.FuncDeclRef:
-        signature = self.signature + (cast(Sort, Time),)
+        signature: Signature = self.signature + (cast(Sort, _Time),)
         return cast(
             z3.FuncDeclRef,
             Fun.declare(signature)(self.name + suffix).fun,
@@ -431,7 +466,7 @@ class TimerTransitionSystem(BaseTransitionSystem):
     @property
     def inits(self) -> dict[str, z3.BoolRef]:
         params: Params = {
-            param: sort.const(param) for param, sort in self.root.params.items()
+            param: sort(param) for param, sort in self.root.params.items()
         }
         assert not params, "root timer should have no free variables"
         return {"timers": timer_zero(self.root.term(self, params))}
