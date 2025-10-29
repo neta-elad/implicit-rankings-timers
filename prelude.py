@@ -24,7 +24,6 @@ from orders import (
     PointwiseOrder,
 )
 from ranks import (
-    ClosedRank,
     Rank,
     BinRank,
     PosInOrderRank,
@@ -136,7 +135,6 @@ __all__ = [
     "LexOrder",
     "PointwiseOrder",
     # Ranks
-    "ClosedRank",
     "Rank",
     "BinRank",
     "PosInOrderRank",

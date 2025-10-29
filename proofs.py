@@ -410,6 +410,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             print("fail: inv")
             return False
 
+        if not self.rank().closed:
+            print(f"fail: rank not closed (has parameters)")
+            return False
+
         if check_conserved and not self._check_conserved():
             print("fail: conserved")
             return False

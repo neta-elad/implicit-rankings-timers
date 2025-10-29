@@ -339,7 +339,7 @@ class FiniteSCByBeta(SoundnessCondition):
         return True
 
 
-class ClosedRank(ABC):
+class Rank(ABC):
     @property
     @abstractmethod
     def condition(self) -> SoundnessCondition: ...
@@ -355,8 +355,6 @@ class ClosedRank(ABC):
     @abstractmethod
     def expr_size(self, ts: BaseTransitionSystem) -> int: ...
 
-
-class Rank(ClosedRank, ABC):
     @property
     @abstractmethod
     def spec(self) -> ParamSpec: ...
@@ -368,6 +366,10 @@ class Rank(ClosedRank, ABC):
     @property
     @abstractmethod
     def minimal(self) -> TSFormula: ...
+
+    @property
+    def closed(self) -> bool:
+        return not self.spec
 
 
 @dataclass(frozen=True)
