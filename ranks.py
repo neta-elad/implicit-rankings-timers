@@ -405,7 +405,7 @@ class Rank(ABC):
 @dataclass(frozen=True)
 class BinRank(Rank):
     """
-    Binary implicit ranking.
+    Binary implicit ranking constructor.
     Corresponds to a rank function
     that maps states where the formula `alpha_src` holds to 1
     and states where it does not to 0.
@@ -471,8 +471,15 @@ class BinRank(Rank):
 
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
+    """
+    Position-in-order implicit ranking constructor.
+    """
+
     term: TermLike[T]
+    """term for element in order."""
+
     order: RelLike[T, T]
+    """@public"""
 
     @cached_property
     def ts_term(self) -> TSTerm[T]:
@@ -680,8 +687,17 @@ class PointwiseRank(Rank):
 
 @dataclass(frozen=True)
 class CondRank(Rank):
+    """
+    Conditional rank.
+    Uses `rank` when `alpha` is true,
+    otherwise maps to minimum.
+    """
+
     rank: Rank
+    """inner rank."""
+
     alpha: FormulaLike
+    """condition."""
 
     @cached_property
     def ts_alpha(self) -> TSFormula:
