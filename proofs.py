@@ -40,6 +40,7 @@ from ts import (
     existential_closure,
     TermLike,
     ts_term,
+    FormulaLike,
 )
 from typed_z3 import Expr, Sort, true
 
@@ -374,8 +375,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     def timer_rank(
         self,
-        phi: TermLike[z3.BoolRef],
-        alpha: TermLike[z3.BoolRef] | None,
+        phi: FormulaLike,
+        alpha: FormulaLike | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
         ts_phi = ts_term(phi)

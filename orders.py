@@ -1,5 +1,5 @@
 """
-This module provides constructors to build verifiable
+This module provides constructors to build verifiably
 well-founded orders.
 """
 

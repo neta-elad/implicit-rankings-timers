@@ -1,3 +1,7 @@
+"""
+This module provides constructors for implicit rankings.
+"""
+
 import operator
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Mapping, Sequence, Iterable
@@ -16,7 +20,7 @@ from helpers import (
     strict_partial_immutable_order_axioms,
     expr_size,
 )
-from orders import Order, RelOrder, FormulaOrder
+from orders import Order, FormulaOrder
 from timers import Time, timer_zero, timer_order
 from ts import (
     BaseTransitionSystem,
@@ -28,8 +32,22 @@ from ts import (
     universal_closure,
     TermLike,
     ts_term,
+    FormulaLike,
 )
 from typed_z3 import Expr, Rel, Sort
+
+__all__ = [
+    "Rank",
+    "BinRank",
+    "PosInOrderRank",
+    "CondRank",
+    "DomainPointwiseRank",
+    "DomainLexRank",
+    "LexRank",
+    "PointwiseRank",
+    "DomainPermutedRank",
+    "FiniteLemma",
+]
 
 type Hint = Mapping[str, TermLike[z3.ExprRef]]
 type DomainPointwiseHints = Sequence[Hint]
@@ -170,8 +188,16 @@ class FiniteSCBySort(SoundnessCondition):
 
 @dataclass(frozen=True)
 class FiniteLemma:
-    beta_src: TermLike[z3.BoolRef]
-    m: int = 1  # number of elements added initially and in each transition
+    """
+    Helper lemma for proving finiteness of sets.
+    """
+
+    beta_src: FormulaLike
+    """formula over-approximating added elements."""
+
+    m: int = 1
+    """number of elements added initially and in each transition."""
+
     init_hints: FiniteSCHints | None = None
     tr_hints: FiniteSCHints | None = None
 
@@ -340,6 +366,10 @@ class FiniteSCByBeta(SoundnessCondition):
 
 
 class Rank(ABC):
+    """
+    Abstract base class for all ranking constructors.
+    """
+
     @property
     @abstractmethod
     def condition(self) -> SoundnessCondition: ...
@@ -374,7 +404,15 @@ class Rank(ABC):
 
 @dataclass(frozen=True)
 class BinRank(Rank):
-    alpha_src: TermLike[z3.BoolRef]
+    """
+    Binary implicit ranking.
+    Corresponds to a rank function
+    that maps states where the formula `alpha_src` holds to 1
+    and states where it does not to 0.
+    """
+
+    alpha_src: FormulaLike
+    """formula for binary rank."""
 
     @cached_property
     def alpha(self) -> TSFormula:
@@ -638,7 +676,7 @@ class PointwiseRank(Rank):
 @dataclass(frozen=True)
 class CondRank(Rank):
     rank: Rank
-    alpha_src: TermLike[z3.BoolRef]
+    alpha_src: FormulaLike
 
     @cached_property
     def alpha(self) -> TSFormula:
@@ -819,7 +857,7 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.quant_spec.keys())}])"
 
 
-type OrderLike = Order | TermLike[z3.BoolRef]
+type OrderLike = Order | FormulaLike
 
 
 @dataclass(frozen=True)
@@ -1373,7 +1411,7 @@ class TimerPosInOrderRank(Rank):
 class TimerRank(Rank):
     term_like: TermLike[Time]
     term_size: int
-    alpha_like: TermLike[z3.BoolRef] | None = None
+    alpha_like: FormulaLike | None = None
     finite_lemma: FiniteLemma | None = None
 
     @cached_property

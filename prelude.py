@@ -23,6 +23,15 @@ from orders import (
     LexOrder,
     PointwiseOrder,
 )
+from proofs import (
+    Proof,
+    system_invariant,
+    invariant,
+    temporal_invariant,
+    witness,
+    temporal_witness,
+    track,
+)
 from ranks import (
     Rank,
     BinRank,
@@ -34,19 +43,8 @@ from ranks import (
     PointwiseRank,
     DomainPermutedRank,
     FiniteLemma,
-    TSRel,
-    SoundnessCondition,
 )
 from temporal import G, F, Prop
-from proofs import (
-    Proof,
-    system_invariant,
-    invariant,
-    temporal_invariant,
-    witness,
-    temporal_witness,
-    track,
-)
 from timers import (
     Time,
     TimeFun,
@@ -145,8 +143,6 @@ __all__ = [
     "PointwiseRank",
     "DomainPermutedRank",
     "FiniteLemma",
-    "TSRel",
-    "SoundnessCondition",
     # re-exported Z3
     "BoolRef",
     "ExprRef",
