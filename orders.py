@@ -36,7 +36,7 @@ class Order(ABC):
 
     @property
     @abstractmethod
-    def formula(self) -> TSFormula: ...
+    def ts_formula(self) -> TSFormula: ...
 
     @abstractmethod
     def check_well_founded(self) -> bool: ...
@@ -62,7 +62,7 @@ class RelOrder[T: Expr](Order):
         return self.rel.signature[0]
 
     @property
-    def formula(self) -> TSFormula:
+    def ts_formula(self) -> TSFormula:
         name = self.param
         name1 = name + "1"
         name2 = name + "2"
@@ -97,16 +97,16 @@ class FormulaOrder(Order):
     when all its input sorts are declared finite (see `typed_z3.Finite`).
     """
 
-    src_formula: FormulaLike
+    formula: FormulaLike
     """Source formula that can be converted to a `ts.TSFormula`."""
 
     @cached_property
-    def formula(self) -> TSFormula:
-        return ts_term(self.src_formula)
+    def ts_formula(self) -> TSFormula:
+        return ts_term(self.formula)
 
     def check_well_founded(self) -> bool:
         print(f"Checking {self} well-founded: ", end="", flush=True)
-        for sort in self.formula.spec.values():
+        for sort in self.ts_formula.spec.values():
             if not sort.finite():
                 print(f"{sort.ref()} not finite")
                 return False
@@ -114,7 +114,7 @@ class FormulaOrder(Order):
         return True
 
     def __str__(self) -> str:
-        return self.formula.name
+        return self.ts_formula.name
 
 
 @dataclass(frozen=True)
@@ -143,16 +143,16 @@ class LexOrder(Order):
         )
 
     @property
-    def formula(self) -> TSFormula:
+    def ts_formula(self) -> TSFormula:
         spec = reduce(
-            operator.or_, [order.formula.spec for order in self.orders.values()]
+            operator.or_, [order.ts_formula.spec for order in self.orders.values()]
         )
 
         def actual_formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
             clauses = []
             guard = z3.BoolVal(True)
             for name, order in self.orders.items():
-                clauses.append(z3.And(guard, order.formula(ts, params)))
+                clauses.append(z3.And(guard, order.ts_formula(ts, params)))
                 guard = z3.And(guard, params[name + "1"] == params[name + "2"])
 
             return z3.Or(*clauses)
@@ -192,19 +192,19 @@ class PointwiseOrder(Order):
         )
 
     @property
-    def formula(self) -> TSFormula:
+    def ts_formula(self) -> TSFormula:
         spec = reduce(
-            operator.or_, [order.formula.spec for order in self.orders.values()]
+            operator.or_, [order.ts_formula.spec for order in self.orders.values()]
         )
 
         def actual_formula(ts: BaseTransitionSystem, params: Params) -> z3.BoolRef:
             clauses = []
             guards = []
             for name, order in self.orders.items():
-                clauses.append(order.formula(ts, params))
+                clauses.append(order.ts_formula(ts, params))
                 guards.append(
                     z3.Or(
-                        order.formula(ts, params),
+                        order.ts_formula(ts, params),
                         params[name + "1"] == params[name + "2"],
                     )
                 )

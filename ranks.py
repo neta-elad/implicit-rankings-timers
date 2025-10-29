@@ -192,7 +192,7 @@ class FiniteLemma:
     Helper lemma for proving finiteness of sets.
     """
 
-    beta_src: FormulaLike
+    beta: FormulaLike
     """formula over-approximating added elements."""
 
     m: int = 1
@@ -202,14 +202,14 @@ class FiniteLemma:
     tr_hints: FiniteSCHints | None = None
 
     @cached_property
-    def beta(self) -> TSFormula:
-        return ts_term(self.beta_src)
+    def ts_beta(self) -> TSFormula:
+        return ts_term(self.beta)
 
 
 def lemma_size(ts: BaseTransitionSystem, lemma: FiniteLemma | None) -> int:
     if lemma is None:
         return 0
-    return expr_size(lemma.beta(ts))
+    return expr_size(lemma.ts_beta(ts))
 
 
 @dataclass(frozen=True)
@@ -232,7 +232,7 @@ class FiniteSCByBeta(SoundnessCondition):
 
     @cached_property
     def beta(self) -> TSFormula:
-        return self.lemma.beta
+        return self.lemma.ts_beta
 
     @cached_property
     def alpha_implies_beta(self) -> TSFormula:
@@ -411,23 +411,24 @@ class BinRank(Rank):
     and states where it does not to 0.
     """
 
-    alpha_src: FormulaLike
+    alpha: FormulaLike
     """formula for binary rank."""
 
     @cached_property
-    def alpha(self) -> TSFormula:
-        return ts_term(self.alpha_src)
+    def ts_alpha(self) -> TSFormula:
+        return ts_term(self.alpha)
 
     @property
     def spec(self) -> ParamSpec:
-        return self.alpha.spec
+        return self.ts_alpha.spec
 
     @property
     def conserved(self) -> TSFormula:
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Implies(
-                z3.Not(self.alpha(ts, params)), z3.Not(self.alpha.next(ts, params))
+                z3.Not(self.ts_alpha(ts, params)),
+                z3.Not(self.ts_alpha.next(ts, params)),
             ),
             f"{self}_<conserved>",
         )
@@ -436,7 +437,7 @@ class BinRank(Rank):
     def minimal(self) -> TSFormula:
         return TSTerm(
             self.spec,
-            lambda ts, params: z3.Not(self.alpha(ts, params)),
+            lambda ts, params: z3.Not(self.ts_alpha(ts, params)),
             f"{self}_<minimal>",
         )
 
@@ -449,8 +450,8 @@ class BinRank(Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                self.alpha(ts, params),
-                z3.Not(self.alpha.next(ts, params)),
+                self.ts_alpha(ts, params),
+                z3.Not(self.ts_alpha.next(ts, params)),
                 self.conserved(ts, params),
             ),
             f"{self}_<decreases>",
@@ -462,41 +463,41 @@ class BinRank(Rank):
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + alpha
-        return 1 + expr_size(self.alpha(ts))
+        return 1 + expr_size(self.ts_alpha(ts))
 
     def __str__(self) -> str:
-        return f"Bin({self.alpha.name})"
+        return f"Bin({self.ts_alpha.name})"
 
 
 @dataclass(frozen=True)
 class PosInOrderRank[T: Expr](Rank):
-    term_src: TermLike[T]
-    order_like: RelLike[T, T]
+    term: TermLike[T]
+    order: RelLike[T, T]
 
     @cached_property
-    def term(self) -> TSTerm[T]:
-        return ts_term(self.term_src)
+    def ts_term(self) -> TSTerm[T]:
+        return ts_term(self.term)
 
     @cached_property
-    def order(self) -> TSRel[T, T]:
-        return ts_rel(self.order_like)
+    def ts_order(self) -> TSRel[T, T]:
+        return ts_rel(self.order)
 
     @property
     def spec(self) -> ParamSpec:
-        return self.term.spec
+        return self.ts_term.spec
 
     @property
     def conserved(self) -> TSFormula:
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                strict_partial_immutable_order(self.order(ts)),
+                strict_partial_immutable_order(self.ts_order(ts)),
                 z3.Or(
-                    self.order(ts)(
-                        self.term.next(ts, params),
-                        self.term(ts, params),
+                    self.ts_order(ts)(
+                        self.ts_term.next(ts, params),
+                        self.ts_term(ts, params),
                     ),
-                    self.term.next(ts, params) == self.term(ts, params),
+                    self.ts_term.next(ts, params) == self.ts_term(ts, params),
                 ),
             ),
             f"{self}_<conserved>",
@@ -506,21 +507,25 @@ class PosInOrderRank[T: Expr](Rank):
     def minimal(self) -> TSFormula:
         return TSTerm(
             self.spec,
-            lambda ts, params: minimal_in_order(self.term(ts, params), self.order(ts)),
+            lambda ts, params: minimal_in_order(
+                self.ts_term(ts, params), self.ts_order(ts)
+            ),
             f"{self}_<minimal>",
         )
 
     @property
     def condition(self) -> SoundnessCondition:
-        return WellFoundedSC(self.order)
+        return WellFoundedSC(self.ts_order)
 
     @property
     def decreases(self) -> TSFormula:
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.And(
-                strict_partial_immutable_order(self.order(ts)),
-                self.order(ts)(self.term.next(ts, params), self.term(ts, params)),
+                strict_partial_immutable_order(self.ts_order(ts)),
+                self.ts_order(ts)(
+                    self.ts_term.next(ts, params), self.ts_term(ts, params)
+                ),
             ),
             f"{self}_<decreases>",
         )
@@ -531,10 +536,10 @@ class PosInOrderRank[T: Expr](Rank):
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + order + term
-        return 1 + 1 + expr_size(self.term(ts))
+        return 1 + 1 + expr_size(self.ts_term(ts))
 
     def __str__(self) -> str:
-        return f"Pos({self.term.name})"
+        return f"Pos({self.ts_term.name})"
 
 
 @dataclass(frozen=True)
@@ -676,15 +681,15 @@ class PointwiseRank(Rank):
 @dataclass(frozen=True)
 class CondRank(Rank):
     rank: Rank
-    alpha_src: FormulaLike
+    alpha: FormulaLike
 
     @cached_property
-    def alpha(self) -> TSFormula:
-        return ts_term(self.alpha_src)
+    def ts_alpha(self) -> TSFormula:
+        return ts_term(self.alpha)
 
     def __post_init__(self) -> None:
         assert (
-            self.rank.spec == self.alpha.spec
+            self.rank.spec == self.ts_alpha.spec
         ), "Rank and condition must use the same params"
 
     @property
@@ -696,10 +701,10 @@ class CondRank(Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
-                z3.Not(self.alpha.next(ts, params)),
+                z3.Not(self.ts_alpha.next(ts, params)),
                 z3.And(
-                    self.alpha(ts, params),
-                    self.alpha.next(ts, params),
+                    self.ts_alpha(ts, params),
+                    self.ts_alpha.next(ts, params),
                     self.rank.conserved(ts, params),
                 ),
             ),
@@ -710,7 +715,7 @@ class CondRank(Rank):
     def minimal(self) -> TSFormula:
         return TSTerm(
             self.spec,
-            lambda ts, params: z3.Not(self.alpha(ts, params)),
+            lambda ts, params: z3.Not(self.ts_alpha(ts, params)),
             f"{self}_<minimal>",
         )
 
@@ -723,10 +728,12 @@ class CondRank(Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: z3.Or(
-                z3.And(self.alpha(ts, params), z3.Not(self.alpha.next(ts, params))),
                 z3.And(
-                    self.alpha(ts, params),
-                    self.alpha.next(ts, params),
+                    self.ts_alpha(ts, params), z3.Not(self.ts_alpha.next(ts, params))
+                ),
+                z3.And(
+                    self.ts_alpha(ts, params),
+                    self.ts_alpha.next(ts, params),
                     self.rank.decreases(ts, params),
                 ),
             ),
@@ -739,10 +746,10 @@ class CondRank(Rank):
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + sub-rank + alpha
-        return 1 + self.rank.expr_size(ts) + expr_size(self.alpha(ts))
+        return 1 + self.rank.expr_size(ts) + expr_size(self.ts_alpha(ts))
 
     def __str__(self) -> str:
-        return f"Cond({self.rank}, {self.alpha.name})"
+        return f"Cond({self.rank}, {self.ts_alpha.name})"
 
 
 @dataclass(frozen=True)
@@ -863,7 +870,7 @@ type OrderLike = Order | FormulaLike
 @dataclass(frozen=True)
 class DomainLexRank(Rank):
     rank: Rank
-    order_like: OrderLike
+    order: OrderLike
     finite_lemma: FiniteLemma | None = None
     conserved_hints: DomainLexConservedHints | None = None
     decreases_hints: DomainLexDecreasesHints | None = None
@@ -874,14 +881,14 @@ class DomainLexRank(Rank):
         ), f"{self} has unknown order params"
 
     @cached_property
-    def order(self) -> Order:
-        if isinstance(self.order_like, Order):
-            return self.order_like
-        return FormulaOrder(ts_term(self.order_like))
+    def compiled_order(self) -> Order:
+        if isinstance(self.order, Order):
+            return self.order
+        return FormulaOrder(ts_term(self.order))
 
     @cached_property
     def order_formula(self) -> TSFormula:
-        return self.order.formula
+        return self.compiled_order.ts_formula
 
     def order_pred(self, ts: BaseTransitionSystem) -> Predicate:
         formula = self.order_formula
@@ -1046,7 +1053,7 @@ class DomainLexRank(Rank):
 
     @property
     def finite_condition(self) -> SoundnessCondition:
-        order_condition = WellFoundedOrderSC(self.order)
+        order_condition = WellFoundedOrderSC(self.compiled_order)
         if self.finite_lemma is None:
             return ConjunctionSC((order_condition, FiniteSCBySort(self.quant_spec)))
         else:
@@ -1349,15 +1356,15 @@ class DomainPermutedRank(Rank):
 
 @dataclass(frozen=True)
 class TimerPosInOrderRank(Rank):
-    term_like: TermLike[Time]
+    term: TermLike[Time]
 
     @cached_property
-    def term(self) -> TSTerm[Time]:
-        return ts_term(self.term_like)
+    def ts_term(self) -> TSTerm[Time]:
+        return ts_term(self.term)
 
     @property
     def spec(self) -> ParamSpec:
-        return self.term.spec
+        return self.ts_term.spec
 
     @property
     def conserved(self) -> TSFormula:
@@ -1365,10 +1372,10 @@ class TimerPosInOrderRank(Rank):
             self.spec.doubled(),
             lambda ts, params: z3.Or(
                 timer_order(
-                    self.term.next(ts, params),
-                    self.term(ts, params),
+                    self.ts_term.next(ts, params),
+                    self.ts_term(ts, params),
                 ),
-                self.term.next(ts, params) == self.term(ts, params),
+                self.ts_term.next(ts, params) == self.ts_term(ts, params),
             ),
             f"{self}_<conserved>",
         )
@@ -1377,7 +1384,7 @@ class TimerPosInOrderRank(Rank):
     def minimal(self) -> TSFormula:
         return TSTerm(
             self.spec,
-            lambda ts, params: timer_zero(self.term(ts, params)),
+            lambda ts, params: timer_zero(self.ts_term(ts, params)),
             f"{self}_<minimal>",
         )
 
@@ -1390,7 +1397,7 @@ class TimerPosInOrderRank(Rank):
         return TSTerm(
             self.spec.doubled(),
             lambda ts, params: timer_order(
-                self.term.next(ts, params), self.term(ts, params)
+                self.ts_term.next(ts, params), self.ts_term(ts, params)
             ),
             f"{self}_<decreases>",
         )
@@ -1401,42 +1408,42 @@ class TimerPosInOrderRank(Rank):
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + term
-        return 1 + expr_size(self.term(ts))
+        return 1 + expr_size(self.ts_term(ts))
 
     def __str__(self) -> str:
-        return f"TimerPos({self.term.name})"
+        return f"TimerPos({self.ts_term.name})"
 
 
 @dataclass(frozen=True)
 class TimerRank(Rank):
-    term_like: TermLike[Time]
+    term: TermLike[Time]
     term_size: int
-    alpha_like: FormulaLike | None = None
+    alpha: FormulaLike | None = None
     finite_lemma: FiniteLemma | None = None
 
     @cached_property
-    def term(self) -> TSTerm[Time]:
-        return ts_term(self.term_like)
+    def ts_term(self) -> TSTerm[Time]:
+        return ts_term(self.term)
 
     @cached_property
-    def alpha(self) -> TSFormula | None:
-        if self.alpha_like is None:
+    def ts_alpha(self) -> TSFormula | None:
+        if self.alpha is None:
             return None
-        return ts_term(self.alpha_like)
+        return ts_term(self.alpha)
 
     def __post_init__(self) -> None:
         assert (
-            self.alpha is None or self.term.spec == self.alpha.spec
+            self.ts_alpha is None or self.ts_term.spec == self.ts_alpha.spec
         ), f"Mismatch in params"
 
     @cached_property
     def rank(self) -> Rank:
-        if self.alpha is None:
+        if self.ts_alpha is None:
             return DomainPointwiseRank.close(
-                TimerPosInOrderRank(self.term), self.finite_lemma
+                TimerPosInOrderRank(self.ts_term), self.finite_lemma
             )
         return DomainPointwiseRank.close(
-            CondRank(TimerPosInOrderRank(self.term), self.alpha),
+            CondRank(TimerPosInOrderRank(self.ts_term), self.ts_alpha),
             self.finite_lemma,
         )
 
@@ -1467,14 +1474,14 @@ class TimerRank(Rank):
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + term + alpha + lemma
         alpha_size = 0
-        if self.alpha is not None:
-            alpha_size = expr_size(self.alpha(ts))
+        if self.ts_alpha is not None:
+            alpha_size = expr_size(self.ts_alpha(ts))
         return 1 + self.term_size + alpha_size + lemma_size(ts, self.finite_lemma)
 
     def __str__(self) -> str:
-        if self.alpha is None:
-            return f"TimerRank({self.term.name})"
-        return f"TimerRank({self.term.name}, {self.alpha.name})"
+        if self.ts_alpha is None:
+            return f"TimerRank({self.ts_term.name})"
+        return f"TimerRank({self.ts_term.name}, {self.ts_alpha.name})"
 
 
 def _hint_to_params(
