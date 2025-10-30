@@ -47,13 +47,13 @@ __all__ = [
     "ParamSpec",
     "TSTerm",
     "TSFormula",
-    "TermLike",
-    "FormulaLike",
     "Immutable",
     "TransitionSystem",
     "init",
     "transition",
     "axiom",
+    "TermLike",
+    "FormulaLike",
 ]
 
 
@@ -247,7 +247,10 @@ class ParamSpec(dict[str, Sort]):
 @dataclass(frozen=True)
 class TSTerm[T]:
     """
-    A transition-system term, producing a term of type `T`.
+    A transition-system term.
+    Given a transition system state (instance of `BaseTransitionSystem`)
+    and values for its parameters (see `spec`),
+    produces a term of type `T`.
     """
 
     spec: ParamSpec
@@ -539,10 +542,44 @@ def _ts_term_from_fun[*Ts, E: Expr](fun: Fun[*Ts, E], spec: ParamSpec) -> TSTerm
 
 
 type TermLike[E: z3.ExprRef] = TSTerm[E] | Callable[..., E] | E
-"""Any value that can be converted to a `TSTerm`."""
+"""
+Any value that can be converted to a `TSTerm`.
+Usually not used directly, but as input for different objects 
+that expect terms and formulas
+that are parametric by the transition system state and free variables
+(like [orders](orders) and [ranks](ranks)).
+ 
+#### Examples
+1. A Z3 term with no free variables:
+    ```python
+    class Thread(Expr): ...
+    class MyTS(TransitionSystem):
+        c: Thread
+        f: Fun[Thread, Thread, Thread]
+            
+    ts = MyTS()
+    example1: TermLike[Thread] = ts.f(ts.c, ts.c)
+    ```
+2. Free functions that explicitly receive a transition system and parameters:
+    ```python
+    def example2(ts: MyTS, x: Thread) -> Thread:
+        return ts.f(ts.c, x)
+    ```
+3. Bound methods on transition systems:
+    ```python
+    class MyTS(TransitionSystem):
+        # snip...
+    
+        def example3(self, x: Thread) -> Thread:
+            return self.f(self.c, x)
+    ```
+"""
 
 type FormulaLike = TermLike[z3.BoolRef]
-"""Any value that can be converted to a `TSFormula`."""
+"""
+Any value that can be converted to a `TSFormula`,
+shorthand for `TermLike` for formulas (`z3.BoolRef`).
+"""
 
 
 def unbind[T: BaseTransitionSystem, *Ts, R](
