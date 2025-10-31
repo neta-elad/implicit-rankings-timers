@@ -493,23 +493,21 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     #     )
 
     @invariant(leaf=True)
-    #notice that because this talks about r0 it can't be a system_invariant
+    # notice that because this talks about r0 it can't be a system_invariant
     def one_a_received_then_one_b_max_vote(self, N: Node) -> BoolRef:
         R = Round("R")
         V = Value("V")
         return Implies(
             self.sys.one_a_received(N, self.sys.r0),
-            Exists(
-                [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
-            )
+            Exists([R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)),
         )
-        
+
     @invariant(leaf=True)
-    #notice that because this talks about r0 it can't be a system_invariant
+    # notice that because this talks about r0 it can't be a system_invariant
     def proposal_received_then_vote(self, N: Node, V: Value) -> BoolRef:
         return Implies(
             self.sys.proposal_received(N, self.sys.r0, V),
-            self.sys.vote(N, self.sys.r0, V)
+            self.sys.vote(N, self.sys.r0, V),
         )
 
     def one_a_r0_timer_rank(self) -> Rank:
@@ -591,7 +589,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     #             Not(self.sys.proposal_received(N, self.sys.r0, V)),
     #         ),
     #     )
-    
+
     # we add this temporal witness, which we use to instantiate the negated property.
     @temporal_witness
     @track
