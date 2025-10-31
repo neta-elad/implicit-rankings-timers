@@ -459,35 +459,57 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def projection_proposal_one_sided(self, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.proposal(R, V), self.sys.proposed(R))
 
-    @invariant
+    @system_invariant
     def proposal_received_implies_proposed(
         self, N: Node, R: Round, V: Value
     ) -> BoolRef:
         return Implies(self.sys.proposal_received(N, R, V), self.sys.proposed(R))
 
-    @invariant
+    @system_invariant
     def proposal_received_implies_proposal(
         self, N: Node, R: Round, V: Value
     ) -> BoolRef:
         return Implies(self.sys.proposal_received(N, R, V), self.sys.proposal(R, V))
 
-    @invariant
+    @system_invariant
     def projection_proposal(self, R: Round) -> BoolRef:
         V = Value("V")
         return self.sys.proposed(R) == Exists(V, self.sys.proposal(R, V))
 
-    @invariant(leaf=True)
-    def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
-        R = Round("R")
-        V = Value("V")
-        return self.sys.one_a_received(N, self.sys.r0) == Exists(
-            [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
-        )
+    # @invariant(leaf=True)
+    # #notice that because this talks about r0 it can't be a system_invariant
+    # def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
+    #     R = Round("R")
+    #     V = Value("V")
+    #     return self.sys.one_a_received(N, self.sys.r0) == Exists(
+    #         [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
+    #     )
+
+    # @invariant(leaf=True)
+    # #notice that because this talks about r0 it can't be a system_invariant
+    # def proposal_received_iff_vote(self, N: Node, V: Value) -> BoolRef:
+    #     return self.sys.proposal_received(N, self.sys.r0, V) == self.sys.vote(
+    #         N, self.sys.r0, V
+    #     )
 
     @invariant(leaf=True)
-    def proposal_received_iff_vote(self, N: Node, V: Value) -> BoolRef:
-        return self.sys.proposal_received(N, self.sys.r0, V) == self.sys.vote(
-            N, self.sys.r0, V
+    #notice that because this talks about r0 it can't be a system_invariant
+    def one_a_received_then_one_b_max_vote(self, N: Node) -> BoolRef:
+        R = Round("R")
+        V = Value("V")
+        return Implies(
+            self.sys.one_a_received(N, self.sys.r0),
+            Exists(
+                [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
+            )
+        )
+        
+    @invariant(leaf=True)
+    #notice that because this talks about r0 it can't be a system_invariant
+    def proposal_received_then_vote(self, N: Node, V: Value) -> BoolRef:
+        return Implies(
+            self.sys.proposal_received(N, self.sys.r0, V),
+            self.sys.vote(N, self.sys.r0, V)
         )
 
     def one_a_r0_timer_rank(self) -> Rank:
@@ -532,44 +554,44 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
     # simplifying assumptions for debugging - don't affect final proof.
 
-    def no_one_a_r0(self) -> BoolRef:
-        return Not(self.sys.one_a(self.sys.r0))
+    # def no_one_a_r0(self) -> BoolRef:
+    #     return Not(self.sys.one_a(self.sys.r0))
 
-    def not_proposed_r0(self) -> BoolRef:
-        return Not(self.sys.proposed(self.sys.r0))
+    # def not_proposed_r0(self) -> BoolRef:
+    #     return Not(self.sys.proposed(self.sys.r0))
 
-    def exists_N_in_q0_not_received_one_a(self) -> BoolRef:
-        N = Node("N")
-        return Exists(
-            N,
-            And(
-                self.sys.member(N, self.sys.q0),
-                Not(self.sys.one_a_received(N, self.sys.r0)),
-            ),
-        )
+    # def exists_N_in_q0_not_received_one_a(self) -> BoolRef:
+    #     N = Node("N")
+    #     return Exists(
+    #         N,
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             Not(self.sys.one_a_received(N, self.sys.r0)),
+    #         ),
+    #     )
 
-    def exists_N_in_q0_not_received_one_b(self) -> BoolRef:
-        N = Node("N")
-        return Exists(
-            N,
-            And(
-                self.sys.member(N, self.sys.q0),
-                Not(self.sys.one_b_received(self.sys.r0, N)),
-            ),
-        )
+    # def exists_N_in_q0_not_received_one_b(self) -> BoolRef:
+    #     N = Node("N")
+    #     return Exists(
+    #         N,
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             Not(self.sys.one_b_received(self.sys.r0, N)),
+    #         ),
+    #     )
 
-    def exists_N_in_q0_not_received_proposal(self) -> BoolRef:
-        N = Node("N")
-        V = Value("V")
-        return Exists(
-            [N, V],
-            And(
-                self.sys.member(N, self.sys.q0),
-                self.sys.proposal(self.sys.r0, V),
-                Not(self.sys.proposal_received(N, self.sys.r0, V)),
-            ),
-        )
-
+    # def exists_N_in_q0_not_received_proposal(self) -> BoolRef:
+    #     N = Node("N")
+    #     V = Value("V")
+    #     return Exists(
+    #         [N, V],
+    #         And(
+    #             self.sys.member(N, self.sys.q0),
+    #             self.sys.proposal(self.sys.r0, V),
+    #             Not(self.sys.proposal_received(N, self.sys.r0, V)),
+    #         ),
+    #     )
+    
     # we add this temporal witness, which we use to instantiate the negated property.
     @temporal_witness
     @track
@@ -629,30 +651,24 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         )
 
     # works for some of the transtions with the violation temporal invariant
-    def all_nodes_in_q0_proposal_received(self) -> BoolRef:
-        N = Node("N")
-        return And(
-            self.sys.proposal(self.sys.r0, self.eventually_proposed_value),
-            ForAll(
-                N,
-                Implies(
-                    self.sys.member(N, self.sys.q0),
-                    self.sys.proposal_received(
-                        N, self.sys.r0, self.eventually_proposed_value
-                    ),
-                ),
-            ),
-        )
+    # def all_nodes_in_q0_proposal_received(self) -> BoolRef:
+    #     N = Node("N")
+    #     return And(
+    #             self.sys.proposal(self.sys.r0, self.eventually_proposed_value),
+    #             ForAll(N,
+    #                 Implies(
+    #                     self.sys.member(N, self.sys.q0),
+    #                     self.sys.proposal_received(N, self.sys.r0, self.eventually_proposed_value)
+    #                 )
+    #             )
+    #         )
 
-    def exists_proposal_not_skolem(self) -> BoolRef:
-        V = Value("V")
-        return Exists(
-            V,
-            And(
-                self.sys.proposal(self.sys.r0, V),
-                Not(self.sys.proposal(self.sys.r0, self.eventually_proposed_value)),
-            ),
-        )
+    # def exists_proposal_not_skolem(self) -> BoolRef:
+    #     V = Value("V")
+    #     return Exists(V, And(
+    #         self.sys.proposal(self.sys.r0, V),
+    #         Not(self.sys.proposal(self.sys.r0, self.eventually_proposed_value))
+    #     ))
 
 
 proof = PaxosProof()
