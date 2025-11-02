@@ -416,11 +416,7 @@ class BinRank(Rank):
     class System(TransitionSystem):
         zero: Immutable[Ticket]
 
-    class SysProp(Prop[System]):
-        def prop(self) -> BoolRef:
-            return false
-
-    class SysProof(Proof[System], prop=SysProp):
+    class SysProof(Proof[System], prop=...):
         def my_formula(self, a: Ticket) -> BoolRef:
             return a == self.sys.zero
 
@@ -491,6 +487,19 @@ class BinRank(Rank):
 class PosInOrderRank[T: Expr](Rank):
     """
     Position-in-order implicit ranking constructor.
+
+    Example:
+    ```python
+    class Index(Finite): ...
+
+    class System(TransitionSystem):
+        lt: Immutable[Rel[Index, Index]]
+        ptr: Index
+
+    class SysProof(Proof[System], prop=...):
+        def my_pos_rank(self) -> Rank:
+            return PosInOrderRank(self.sys.ptr, self.sys.lt)
+    ```
     """
 
     term: TermLike[T]
@@ -709,6 +718,21 @@ class CondRank(Rank):
     Conditional rank.
     Uses `rank` when `alpha` is true,
     otherwise maps to minimum.
+
+    Example:
+    ```python
+    class Index(Finite): ...
+
+    class System(TransitionSystem):
+        lt: Immutable[Rel[Index, Index]]
+        ptr: Index
+
+        waiting: Bool
+
+    class SysProof(Proof[System], prop=...):
+        def my_cond_rank(self) -> Rank:
+            return CondRank(PosInOrderRank(self.sys.ptr, self.sys.lt), self.sys.waiting)
+    ```
     """
 
     rank: Rank
@@ -788,16 +812,66 @@ class CondRank(Rank):
 
 @dataclass(frozen=True)
 class DomainPointwiseRank(Rank):
+    """
+    Domain-pointwise rank,
+    decreases whenever the inner rank decreases for any tuple of elements
+    (that we quantify over, see `quant_spec`).
+
+    Example:
+    ```python
+    class Thread(Finite): ...
+    class System(TransitionSystem):
+        on: Rel[Thread]
+
+    class SysProof(Proof[System], prop=...):
+        def is_on(self, t: Thread) -> BoolRef:
+            return self.sys.on(t)
+
+        def dom_pw_rank(self) -> Rank:
+            return DomainPointwiseRank(BinRank(self.is_on), ParamSpec(t=Thread))
+    ```
+    """
+
     rank: Rank
+    """inner rank."""
+
     quant_spec: ParamSpec
+    """which parameters are quantified (not left free)."""
+
     finite_lemma: FiniteLemma | None
+    """
+    lemma that proves finiteness of domain 
+    (should be provided unless all sorts in `quant_spec` are declared finite).
+    """
+
     decreases_hints: DomainPointwiseHints | None = None
+    """
+    hints for instantiating the existential quantification over `quant_spec`.
+    """
 
     @classmethod
-    def close(cls, rank: Rank, finite_lemma: FiniteLemma | None) -> Rank:
+    def close(cls, rank: Rank, finite_lemma: FiniteLemma | None, decreases_hints: DomainPointwiseHints | None = None) -> Rank:
+        """
+        Shorthand for creating a `DomainPointwiseRank` that closes over all free variables in `rank`.
+
+
+        Example:
+        ```python
+        class Thread(Finite): ...
+        class System(TransitionSystem):
+            on: Rel[Thread]
+
+        class SysProof(Proof[System], prop=...):
+            def is_on(self, t: Thread) -> BoolRef:
+                return self.sys.on(t)
+
+            def dom_pw_rank(self) -> Rank:
+                return DomainPointwiseRank.close(BinRank(self.is_on))
+        ```
+        """
         if not rank.spec:
             return rank
-        return cls(rank, rank.spec, finite_lemma)
+        return cls(rank, rank.spec, finite_lemma, decreases_hints)
 
     def __post_init__(self) -> None:
         assert self.quant_spec, "Must quantify over some parameters"
