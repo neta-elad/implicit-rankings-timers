@@ -573,6 +573,8 @@ that are parametric by the transition system state and free variables
         def example3(self, x: Thread) -> Thread:
             return self.f(self.c, x)
     ```
+    
+See additional examples in [ranks](ranks).
 """
 
 type FormulaLike = TermLike[z3.BoolRef]

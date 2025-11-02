@@ -87,6 +87,8 @@ class TimeFun(Protocol):
     ```python
     def time_fun(*args: z3.ExprRef) -> Time: ...
     ```
+
+    The usual way of producing a `TimeFun` is by calling `proofs.Proof.t`.
     """
 
     def __call__(self, *args: z3.ExprRef) -> Time: ...

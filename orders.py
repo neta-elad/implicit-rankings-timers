@@ -1,6 +1,7 @@
 """
 This module provides constructors to build verifiably
-well-founded orders.
+well-founded orders,
+used in `ranks.DomainLexRank`.
 """
 
 import operator
@@ -24,6 +25,7 @@ from typed_z3 import Expr, Sort, BiRel
 
 __all__ = [
     "Order",
+    "OrderLike",
     "RelOrder",
     "FormulaOrder",
     "LexOrder",
@@ -42,13 +44,29 @@ class Order(ABC):
     def check_well_founded(self) -> bool: ...
 
 
+type OrderLike = Order | FormulaLike
+"""
+Any value that can be converted to `Order`:
+an already constructed `Order` or a formula-like
+that would be converted to a `FormulaOrder`.
+"""
+
+
 @dataclass(frozen=True)
 class RelOrder[T: Expr](Order):
     """
     Order constructed from a binary relation.
     Considered well-founded
     when it is declared so (see `typed_z3.WFRel`)
-    or its input sort is declared finite (see `typed_z3.Finite`).
+    or when its input sort is declared finite (see `typed_z3.Finite`).
+
+    Constructed by giving a binary relation and a parameter name:
+    ```python
+    class Thread(Expr): ...
+    lt: WFRel[Thread]
+
+    rel_order = RelOrder(lt, "a")
+    ```
     """
 
     rel: BiRel[T]
@@ -95,6 +113,23 @@ class FormulaOrder(Order):
     Order constructed from a `ts.TSFormula`.
     Considered well-founded
     when all its input sorts are declared finite (see `typed_z3.Finite`).
+
+    Constructed from any formula-like value:
+    ```python
+    class Thread(Finite): ...
+    class System(TransitionSystem):
+        gt: BiRel[Thread]
+
+    def lt_formula(ts: System, a1: Thread, a2: Thread, b1: Thread, b2: Thread) -> BoolRef:
+        return Or(ts.gt(a2, a1), And(a1 == a2, ts.gt(b2, b1))
+
+    formula_order = FormulaOrder(lt_formula)
+    ```
+
+    Note that the parameter names for the formula must be of the form
+    `<name>1 <name>2 <other_name>1 <other_name>2`.
+    Order does not matter, but every parameter must end in `1` or `2`,
+    and must have a matching parameter ending in `2` or `1` (respectively).
     """
 
     formula: FormulaLike

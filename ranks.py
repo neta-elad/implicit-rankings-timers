@@ -20,7 +20,7 @@ from helpers import (
     strict_partial_immutable_order_axioms,
     expr_size,
 )
-from orders import Order, FormulaOrder
+from orders import Order, FormulaOrder, OrderLike
 from timers import Time, timer_zero, timer_order
 from ts import (
     BaseTransitionSystem,
@@ -880,11 +880,12 @@ class DomainPointwiseRank(Rank):
         return f"DomPW({self.rank}, [{", ".join(self.quant_spec.keys())}])"
 
 
-type OrderLike = Order | FormulaLike
-
-
 @dataclass(frozen=True)
 class DomainLexRank(Rank):
+    """
+    DomLex constructor.
+    """
+
     rank: Rank
     order: OrderLike
     finite_lemma: FiniteLemma | None = None

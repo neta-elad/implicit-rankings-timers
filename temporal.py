@@ -136,7 +136,7 @@ class Prop[T: TransitionSystem](ABC):
     @abstractmethod
     def prop(self) -> z3.BoolRef:
         """
-        :return: temporal property we wish to prove.
+        :return: temporal property we wish to prove (non-negated).
         """
 
     def __init__(self, sys: T) -> None:

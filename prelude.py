@@ -22,6 +22,7 @@ from orders import (
     FormulaOrder,
     LexOrder,
     PointwiseOrder,
+    OrderLike,
 )
 from proofs import (
     Proof,
@@ -132,6 +133,7 @@ __all__ = [
     "FormulaOrder",
     "LexOrder",
     "PointwiseOrder",
+    "OrderLike",
     # Ranks
     "Rank",
     "BinRank",
