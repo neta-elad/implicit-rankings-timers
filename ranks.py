@@ -407,8 +407,26 @@ class BinRank(Rank):
     """
     Binary implicit ranking constructor.
     Corresponds to a rank function
-    that maps states where the formula `alpha_src` holds to 1
+    that maps states where the formula `alpha` holds to 1
     and states where it does not to 0.
+
+    Example:
+    ```python
+    class Ticket(Expr): ...
+    class System(TransitionSystem):
+        zero: Immutable[Ticket]
+
+    class SysProp(Prop[System]):
+        def prop(self) -> BoolRef:
+            return false
+
+    class SysProof(Proof[System], prop=SysProp):
+        def my_formula(self, a: Ticket) -> BoolRef:
+            return a == self.sys.zero
+
+        def my_bin_rank(self) -> Rank:
+            return BinRank(self.my_formula)  # rank with free variable "a"
+    ```
     """
 
     alpha: FormulaLike
