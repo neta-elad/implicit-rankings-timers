@@ -190,16 +190,42 @@ class FiniteSCBySort(SoundnessCondition):
 class FiniteLemma:
     """
     Helper lemma for proving finiteness of sets.
+    
+    Provides a formula `beta` that over-approximates elements that can be
+    added to a set, and bounds the number of elements that can be added
+    initially and in each transition.
+    
+    Example:
+    ```python
+    class Thread(Finite): ...
+    class System(TransitionSystem):
+        queue: Rel[Thread]
+    
+    class SysProof(Proof[System], prop=...):
+        def in_queue(self, t: Thread) -> BoolRef:
+            return self.sys.queue(t)
+        
+        def finite_lemma(self) -> FiniteLemma:
+            return FiniteLemma(
+                beta=self.in_queue,
+                m=2,  # at most 2 threads added initially and per transition
+                init_hints=[...],  # optional hints
+                tr_hints=[...]  # optional hints
+            )
+    ```
     """
-
+    
     beta: FormulaLike
-    """formula over-approximating added elements."""
-
+    """Formula over-approximating added elements."""
+    
     m: int = 1
-    """number of elements added initially and in each transition."""
-
+    """Number of elements added initially and in each transition."""
+    
     init_hints: FiniteSCHints | None = None
+    """Hints for initial state finiteness check."""
+    
     tr_hints: FiniteSCHints | None = None
+    """Hints for transition finiteness check."""
 
     @cached_property
     def ts_beta(self) -> TSFormula:
@@ -368,6 +394,31 @@ class FiniteSCByBeta(SoundnessCondition):
 class Rank(ABC):
     """
     Abstract base class for all ranking constructors.
+    
+    A ranking constructor defines how to rank states in a transition system,
+    typically used for proving termination or other liveness properties.
+    Each rank has:
+    - A `spec` defining free parameters
+    - A `conserved` formula describing when the rank doesn't increase
+    - A `decreases` formula describing when the rank decreases
+    - A `minimal` formula describing minimal states
+    - A `condition` for soundness checking
+    
+    Example:
+    ```python
+    class Ticket(Expr): ...
+    
+    class System(TransitionSystem):
+        zero: Immutable[Ticket]
+        service: Ticket
+    
+    class SysProof(Proof[System], prop=...):
+        def is_zero(self, t: Ticket) -> BoolRef:
+            return t == self.sys.zero
+        
+        def my_rank(self) -> Rank:
+            return BinRank(self.is_zero)
+    ```
     """
 
     @property
@@ -426,7 +477,7 @@ class BinRank(Rank):
     """
 
     alpha: FormulaLike
-    """formula for binary rank."""
+    """Formula that determines when rank is 1 (True) vs 0 (False)."""
 
     @cached_property
     def ts_alpha(self) -> TSFormula:
@@ -503,10 +554,10 @@ class PosInOrderRank[T: Expr](Rank):
     """
 
     term: TermLike[T]
-    """term for element in order."""
-
+    """Term representing the element whose position in the order is ranked."""
+    
     order: RelLike[T, T]
-    """@public"""
+    """Binary relation defining the order over elements."""
 
     @cached_property
     def ts_term(self) -> TSTerm[T]:
@@ -578,7 +629,32 @@ class PosInOrderRank[T: Expr](Rank):
 
 @dataclass(frozen=True)
 class LexRank(Rank):
+    """
+    Lexicographic combination of multiple ranks.
+    
+    The rank decreases when the first rank decreases, or when the first rank
+    is conserved and the second decreases, and so on.
+    All ranks must use the same parameter specification.
+    
+    Example:
+    ```python
+    class Index(Finite): ...
+    
+    class System(TransitionSystem):
+        lt: Immutable[Rel[Index, Index]]
+        ptr1: Index
+        ptr2: Index
+    
+    class SysProof(Proof[System], prop=...):
+        def my_lex_rank(self) -> Rank:
+            rank1 = PosInOrderRank(self.sys.ptr1, self.sys.lt)
+            rank2 = PosInOrderRank(self.sys.ptr2, self.sys.lt)
+            return LexRank(rank1, rank2)
+    ```
+    """
+    
     ranks: tuple[Rank, ...]
+    """The component ranks combined lexicographically."""
 
     @property
     def spec(self) -> ParamSpec:
@@ -651,7 +727,31 @@ class LexRank(Rank):
 
 @dataclass(frozen=True)
 class PointwiseRank(Rank):
+    """
+    Pointwise combination of multiple ranks.
+    
+    The rank decreases when any component rank decreases (and all are conserved).
+    All ranks must use the same parameter specification.
+    
+    Example:
+    ```python
+    class Thread(Finite): ...
+    class System(TransitionSystem):
+        on: Rel[Thread]
+    
+    class SysProof(Proof[System], prop=...):
+        def is_on(self, t: Thread) -> BoolRef:
+            return self.sys.on(t)
+        
+        def my_pw_rank(self) -> Rank:
+            rank1 = BinRank(lambda t: self.is_on(t))
+            rank2 = BinRank(lambda t: Not(self.is_on(t)))
+            return PointwiseRank(rank1, rank2)
+    ```
+    """
+    
     ranks: tuple[Rank, ...]
+    """The component ranks combined pointwise."""
 
     @property
     def spec(self) -> ParamSpec:
@@ -736,10 +836,10 @@ class CondRank(Rank):
     """
 
     rank: Rank
-    """inner rank."""
-
+    """The inner rank used when condition is true."""
+    
     alpha: FormulaLike
-    """condition."""
+    """Conditional formula: when true, use `rank`; when false, rank is minimal."""
 
     @cached_property
     def ts_alpha(self) -> TSFormula:
@@ -833,20 +933,20 @@ class DomainPointwiseRank(Rank):
     """
 
     rank: Rank
-    """inner rank."""
-
+    """The inner rank applied to each element in the quantified domain."""
+    
     quant_spec: ParamSpec
-    """which parameters are quantified (not left free)."""
-
+    """Parameters to quantify over (domain elements), removed from free parameters."""
+    
     finite_lemma: FiniteLemma | None
     """
-    lemma that proves finiteness of domain 
-    (should be provided unless all sorts in `quant_spec` are declared finite).
+    Lemma for proving finiteness of the domain.
+    Should be provided unless all sorts in `quant_spec` are declared finite.
     """
-
+    
     decreases_hints: DomainPointwiseHints | None = None
     """
-    hints for instantiating the existential quantification over `quant_spec`.
+    Hints for instantiating the existential quantification over `quant_spec`.
     """
 
     @classmethod
@@ -975,14 +1075,44 @@ class DomainPointwiseRank(Rank):
 @dataclass(frozen=True)
 class DomainLexRank(Rank):
     """
-    DomLex constructor.
+    Domain lexicographic ranking constructor.
+    
+    Quantifies over a domain ordered by `order`, and uses lexicographic
+    ordering based on the order relation. The inner rank is evaluated
+    at all domain elements, ordered lexicographically.
+    
+    Example:
+    ```python
+    class Thread(Finite): ...
+    class Ticket(Expr): ...
+    
+    class System(TransitionSystem):
+        ticket: Rel[Thread, Ticket]
+        lt: Immutable[WFRel[Ticket]]
+    
+    class SysProof(Proof[System], prop=...):
+        def has_ticket(self, t: Thread, tick: Ticket) -> BoolRef:
+            return self.sys.ticket(t, tick)
+        
+        def my_dom_lex_rank(self) -> Rank:
+            return DomainLexRank(BinRank(self.has_ticket), self.sys.lt)
+    ```
     """
-
+    
     rank: Rank
+    """The inner rank to apply at each domain element."""
+    
     order: OrderLike
+    """The order relation over the domain elements."""
+    
     finite_lemma: FiniteLemma | None = None
+    """Lemma for proving finiteness if domain sorts are not declared finite."""
+    
     conserved_hints: DomainLexConservedHints | None = None
+    """Hints for instantiating conserved formulas."""
+    
     decreases_hints: DomainLexDecreasesHints | None = None
+    """Hints for instantiating decreases formulas."""
 
     def __post_init__(self) -> None:
         assert (
@@ -1235,12 +1365,51 @@ class DomainLexRank(Rank):
 
 @dataclass(frozen=True)
 class DomainPermutedRank(Rank):
+    """
+    Domain permuted ranking constructor.
+    
+    Quantifies over domain elements and allows permutation of `k` pairs
+    of elements. The rank decreases if there exists a permutation where
+    the inner rank decreases.
+    
+    Example:
+    ```python
+    class Thread(Finite): ...
+    class System(TransitionSystem):
+        on: Rel[Thread]
+    
+    class SysProof(Proof[System], prop=...):
+        def is_on(self, t: Thread) -> BoolRef:
+            return self.sys.on(t)
+        
+        def my_perm_rank(self) -> Rank:
+            inner_rank = BinRank(self.is_on)
+            return DomainPermutedRank(
+                inner_rank,
+                ParamSpec(t=Thread),
+                k=2,  # allow permuting 2 pairs
+                finite_lemma=None
+            )
+    ```
+    """
+    
     rank: Rank
+    """The inner rank to apply."""
+    
     quant_spec: ParamSpec
+    """The parameters to quantify over (domain elements)."""
+    
     k: int
+    """Number of pairs of elements that can be permuted."""
+    
     finite_lemma: FiniteLemma | None
+    """Lemma for proving finiteness if domain sorts are not declared finite."""
+    
     conserved_hints: DomainPermutedConservedHints | None = None
+    """Hints for instantiating conserved formulas."""
+    
     decreases_hints: DomainPermutedDecreasesHints | None = None
+    """Hints for instantiating decreases formulas."""
 
     def __post_init__(self) -> None:
         assert self.quant_spec, "Must quantify over some parameters"
