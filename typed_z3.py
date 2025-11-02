@@ -44,18 +44,22 @@ if not TYPE_CHECKING:
         of this sort or a variable.
 
         For example, we can declare a `Ticket` sort by writing:
-        >>> class Ticket(Expr): ...
+        ```python
+        class Ticket(Expr): ...
+        ```
 
         Note the ellipsis (`...`) are not a placeholder ---
         this is the literal code for defining a type-level sort.
 
         To create a variable (equivalent to `z3.Const`) use:
-        >>> t = Ticket("t")
-        t
+        ```python
+        t = Ticket("t")
+        ```
 
         To create a mutable constant use:
-        >>> t = Ticket("t", mutable=True)
-        t
+        ```python
+        t = Ticket("t", mutable=True)
+        ```
 
         Note though that this is never needed
         when creating user-defined transition systems
@@ -106,12 +110,17 @@ if not TYPE_CHECKING:
         @cached_property
         def next(self) -> Self:
             """
-            :return: post-state copy of a constant.
+            Get the post-state copy of a mutable constant.
 
             The constant must be mutable.
 
-            >>> Ticket("service", mutable=True).next
-            service'
+            :return: Post-state copy of the constant.
+
+            Example:
+            ```python
+            service = Ticket("service", mutable=True)
+            service_next = service.next  # service'
+            ```
             """
             assert (
                 self.mutable
@@ -120,19 +129,16 @@ if not TYPE_CHECKING:
 
         def unchanged(self) -> z3.BoolRef:
             """
-            :return: a formula expressing
-            that a mutable constant is unchanged during a transition.
+            Return a formula expressing that a mutable constant is unchanged during a transition.
 
-            For example, given mutable
-            >>> service = Ticket("service", mutable=True)
+            :return: Formula expressing that the constant is unchanged.
 
-            the code
-            >>> service.unchanged()
-            service' == service
-
-            produces the same formula as
-            >>> service.next == service
-            service' == service
+            Example:
+            ```python
+            service = Ticket("service", mutable=True)
+            service.unchanged()  # service' == service
+            # Same as: service.next == service
+            ```
             """
             if not self.mutable:
                 return z3.BoolVal(True)
@@ -140,28 +146,26 @@ if not TYPE_CHECKING:
 
         def update(self, val: Self) -> z3.BoolRef:
             """
-            :return: a formula expressing
-            that a mutable constant is equal to `val` in the post-state.
+            Return a formula expressing that a mutable constant equals `val` in the post-state.
 
-            For example, given
-            >>> service: Ticket
-            >>> next_service: Ticket
+            :param val: The value the constant should equal in the post-state.
+            :return: Formula expressing the update.
 
-            the code
-            >>> service.update(next_service)
-            service' == next_service
-
-            produces the same formula as
-            >>> service.next == next_service
-            service' == next_service
+            Example:
+            ```python
+            service = Ticket("service", mutable=True)
+            next_service = Ticket("next", mutable=True)
+            service.update(next_service)  # service' == next_service
+            # Same as: service.next == next_service
+            ```
             """
             assert self.mutable, f"Trying to update immutable constant {self}"
             return self.next == val
 
     class Bool(Expr):
         """
-        Type-level Bool sort, for transition-system symbols
-        that operate with Booleans.
+        Type-level Bool sort for transition-system symbols that operate with Booleans.
+
         Known to be finite.
         """
 
@@ -170,7 +174,11 @@ if not TYPE_CHECKING:
             return z3.BoolSort()
 
         def neg(self) -> Self:
-            """Type-safe version of `z3.Not` for type-level Bools."""
+            """
+            Type-safe version of `z3.Not` for type-level Bools.
+
+            :return: Negated boolean value.
+            """
             if self is false:
                 return true
             elif self is true:
@@ -184,8 +192,7 @@ if not TYPE_CHECKING:
 
     class Int(Expr):
         """
-        Type-level Int sort, for transition-system symbols
-        that operate with integers.
+        Type-level Int sort for transition-system symbols that operate with integers.
         """
 
         @classmethod
@@ -232,13 +239,14 @@ if TYPE_CHECKING:
 
 class Finite(Expr, ABC):
     """
-    A subclass of `Expr` for defining sorts that are
-    *assumed by the user* to be finite.
+    Subclass of `Expr` for defining sorts that are *assumed by the user* to be finite.
 
-    For example,
-    >>> class Process(Finite): ...
+    Example:
+    ```python
+    class Process(Finite): ...
+    ```
 
-    declares the `Process` sort as finite.
+    This declares the `Process` sort as finite.
     """
 
     @classmethod
@@ -248,28 +256,25 @@ class Finite(Expr, ABC):
 
 class Enum(Expr, ABC):
     """
-    A subclass of `Expr` for defining enumerated sorts.
+    Subclass of `Expr` for defining enumerated sorts.
     A type-level equivalent of `z3.EnumSort`.
 
-    For example, we can represent the state of
-    a Process in a system with a `State` sort:
-    >>> class State(Enum):
-    ...     waiting: "State"
-    ...     critical: "State"
-    ...     neutral: "State"
+    Example:
+    ```python
+    class State(Enum):
+        waiting: "State"
+        critical: "State"
+        neutral: "State"
+    ```
 
-    Each field annotated with the class's type
-    is one variant of the EnumSort,
+    Each field annotated with the class's type is one variant of the EnumSort,
     and can be accessed directly as a class field.
 
-    For example, assuming `server_state` is mutable constant
-    of sort `State`
-    >>> server_state = State("server_state", mutable=True)
-    server_state
-
-    we can update it to the `waiting` state:
-    >>> server_state.update(State.waiting)
-    server_state == waiting
+    Example usage:
+    ```python
+    server_state = State("server_state", mutable=True)
+    server_state.update(State.waiting)  # server_state' == waiting
+    ```
 
     All sorts defined by subclasses of `Enum` are known to be finite.
     """
@@ -322,17 +327,14 @@ class Fun[*Ts, T: z3.ExprRef]:
     Instead, it should only be used as annotations inside
     transition systems (see `ts.TransitionSystem`).
 
-    For example, a `has_ticket` function of type
-    `Fun[Process, Ticket, Bool]`
-    >>> has_ticket: Fun[Process, Ticket, Bool]
+    Example:
+    ```python
+    class Process(Expr): ...
+    class Ticket(Expr): ...
 
-    can be called like so
-    >>> result = has_ticket(p, t)
-
-    and will be type-checked,
-    ensuring that `p` is of type `Process`,
-    `t` is of type `Ticket`,
-    and `result` is of type `Bool`.
+    has_ticket: Fun[Process, Ticket, Bool]
+    result = has_ticket(p, t)  # type-checked: p: Process, t: Ticket, result: Bool
+    ```
     """
 
     name: str
@@ -381,14 +383,16 @@ class Fun[*Ts, T: z3.ExprRef]:
 
     def unchanged(self) -> z3.BoolRef:
         """
-        :return: a universal formula expressing that for all inputs,
-        the output of the function remains unchanged between the pre-state
-        and the post-state.
+        Return a universal formula expressing that for all inputs,
+        the output of the function remains unchanged between the pre-state and the post-state.
 
-        For example, given the `has_ticket: Fun[Process, Ticket, Bool]` object:
-        >>> has_ticket.unchanged()
-        ForAll([Process1, Ticket2],
-                has_ticket'(Process1, Ticket2) == has_ticket(Process1, Ticket2))
+        :return: Universal formula expressing the function is unchanged.
+
+        Example:
+        ```python
+        has_ticket: Fun[Process, Ticket, Bool]
+        has_ticket.unchanged()  # ForAll([Process1, Ticket2], has_ticket'(Process1, Ticket2) == has_ticket(Process1, Ticket2))
+        ```
         """
         return self.update_with_lambda(lambda old, new, *args: old(*args) == new(*args))
 
@@ -409,19 +413,21 @@ class Fun[*Ts, T: z3.ExprRef]:
 
     def update(self, places: Mapping[tuple[*Ts], T]) -> z3.BoolRef:
         """
-        :return: a universal formula expressing that for all inputs,
-        the output of the function remains unchanged between the pre-state
-        and the post-state,
+        Return a universal formula expressing that for all inputs,
+        the output of the function remains unchanged between the pre-state and the post-state,
         except for inputs equal to keys of `places`,
         where the post-state function returns the matching value in `places`.
 
-        For example,
-        >>> has_ticket.update({(p1, t1): true, (p2, t2): false})
-        ForAll([Process1, Ticket2],
-                has_ticket'(Process1, Ticket2) ==
-                If(And(Process1 == p1, Ticket2 == t1), true,
-                    If(And(Process1 == p2, Ticket2 == t2), false,
-                        has_ticket(Process1, Ticket2))))
+        :param places: Mapping of input tuples to new output values.
+        :return: Universal formula expressing the function update.
+
+        Example:
+        ```python
+        has_ticket: Fun[Process, Ticket, Bool]
+        has_ticket.update({(p1, t1): true, (p2, t2): false})
+        # Updates has_ticket'(p1, t1) = true and has_ticket'(p2, t2) = false,
+        # all other values unchanged
+        ```
         """
 
         def update(old: Self, new: Self, *args: *Ts) -> z3.BoolRef:
@@ -439,7 +445,7 @@ def _pairwise_equal[*Ts](args1: tuple[*Ts], args2: tuple[*Ts]) -> z3.BoolRef:
 
 class Rel[*Ts](Fun[*Ts, Bool]):
     """
-    A type-level representation of relations, function that return Booleans.
+    Type-level representation of relations, functions that return Booleans.
     """
 
     @classmethod
@@ -458,8 +464,10 @@ class Rel[*Ts](Fun[*Ts, Bool]):
 
     def update(self, places: Mapping[tuple[*Ts], z3.BoolRef]) -> z3.BoolRef:
         """
-        Overrides `Fun.update` to allow arbitrary `z3` formulas
-        (`z3.BoolRef`) in updated values.
+        Overrides `Fun.update` to allow arbitrary `z3` formulas (`z3.BoolRef`) in updated values.
+
+        :param places: Mapping of input tuples to new output formulas.
+        :return: Universal formula expressing the relation update.
         """
         return super().update(cast(Mapping[tuple[*Ts], Bool], places))
 
@@ -473,7 +481,7 @@ type BiRel[T] = Rel[T, T]
 
 class WFRel[T: Expr](Rel[T, T]):
     """
-    A binary relation, *assumed by the user* to be well-founded.
+    Binary relation, *assumed by the user* to be well-founded.
     """
 
     @classmethod
