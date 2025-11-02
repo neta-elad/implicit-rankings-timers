@@ -110,6 +110,14 @@ In their core, transitions are just formulas over the double signature,
 that relate the pre-state and the post-state.
 These formulas can be completely expressed using just `self` and `self.next`.
 However, we provide some syntactic sugar for common kinds of updates.
+
+Transition `step12`: a thread in pc1 takes a ticket and moves to pc2.
+This transition:
+- Requires the thread `t` to be in pc1 (initial state)
+- Assigns `next_ticket` as the thread's ticket in the `m` relation
+- Advances `next_ticket` to the next available ticket using `succ`
+- Updates the program counter: pc1 becomes false, pc2 becomes true
+- Includes a fairness constraint ensuring `t` is scheduled
 ```python
     @transition
     def step12(self, t: Thread) -> BoolRef:
@@ -138,8 +146,12 @@ However, we provide some syntactic sugar for common kinds of updates.
             self.succ(self.next_ticket, self.next.next_ticket),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
-        )
+        )  
+```
 
+Transition `step22`: a thread waits in pc2 when its ticket is not ready.
+The thread remains in pc2, checking if its ticket `k` is ready to be serviced.
+```python
     @transition
     def step22(self, t: Thread, k: Ticket) -> BoolRef:
         T = Thread("T")
@@ -157,8 +169,12 @@ However, we provide some syntactic sugar for common kinds of updates.
             self.next_ticket.unchanged(),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
-        )
+        )  
+```
 
+Transition `step23`: a thread moves from pc2 to pc3 when its ticket is ready.
+This happens when the thread's ticket `k` is less than or equal to the current service.
+```python
     @transition
     def step23(self, t: Thread, k: Ticket) -> BoolRef:
         T = Thread("T")
@@ -176,8 +192,12 @@ However, we provide some syntactic sugar for common kinds of updates.
             self.next_ticket.unchanged(),
             # fairness
             ForAll(T, self.scheduled(T) == (T == t)),
-        )
+        )  
+```
 
+Transition `step31`: a thread completes service and returns to pc1.
+The service counter advances to the next ticket.
+```python
     @transition
     def step31(self, t: Thread) -> BoolRef:
         T = Thread("T")
@@ -218,4 +238,256 @@ class TicketProp(Prop[TicketSystem]):
                 ),
             ),
         )  
+```
+
+### Proof
+The proof class defines invariants and a ranking function to prove the temporal property.
+We use various types of invariants:
+- `@system_invariant`: invariants over the original system (without timers)
+- `@invariant`: invariants over the intersection system (with timers)
+- `@temporal_invariant`: temporal invariants expressing properties about timers
+We also use witnesses to provide existential witnesses for formulas.
+```python
+class TicketProof(Proof[TicketSystem], prop=TicketProp):
+    # <>
+```
+
+We use a temporal witness to provide a witness thread that violates the property.
+This witness thread will be used throughout the proof.
+```python
+    @temporal_witness
+    def skolem_thread(self, T: Thread) -> BoolRef:
+        return Not(
+            G(
+                Implies(
+                    self.sys.pc2(T),
+                    F(self.sys.pc3(T)),
+                )
+            )
+        )  
+```
+
+Temporal invariants and tracked formulas for the proof.
+```python
+    @temporal_invariant
+    @track
+    def skolem_thread_scheduled_infinitely_often(self) -> BoolRef:
+        return G(F(self.sys.scheduled(self.skolem_thread)))  
+```
+
+System invariants: properties that hold over the original system.
+These establish basic correctness properties of the protocol.
+```python
+    @system_invariant
+    def pc_at_least_one(self, T: Thread) -> BoolRef:
+        return Or(self.sys.pc1(T), self.sys.pc2(T), self.sys.pc3(T))
+
+    @system_invariant
+    def pc_at_most_one(self, T: Thread) -> BoolRef:
+        return And(
+            Or(Not(self.sys.pc1(T)), Not(self.sys.pc2(T))),
+            Or(Not(self.sys.pc1(T)), Not(self.sys.pc3(T))),
+            Or(Not(self.sys.pc2(T)), Not(self.sys.pc3(T))),
+        )  
+```
+
+Invariants over the intersection system: these can reference both the system state
+and timers. They establish relationships between the protocol state and the temporal
+properties we're tracking.
+```python
+    @invariant
+    def one_ticket_per_thread(self, T: Thread, K1: Ticket, K2: Ticket) -> BoolRef:
+        return Implies(And(self.sys.m(T, K1), self.sys.m(T, K2)), K1 == K2)
+
+    @invariant
+    def safety(self, T1: Thread, T2: Thread) -> BoolRef:
+        return Implies(And(self.sys.pc3(T1), self.sys.pc3(T2)), T1 == T2)
+
+    @invariant
+    def next_ticket_zero_then_all_zero(self, T: Thread) -> BoolRef:
+        return Implies(
+            self.sys.next_ticket == self.sys.zero, self.sys.m(T, self.sys.zero)
+        )
+
+    @invariant
+    def next_ticket_maximal(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.next_ticket != self.sys.zero, self.sys.m(T, K)),
+            Not(self.sys.le(self.sys.next_ticket, K)),
+        )
+
+    @invariant
+    def pc2_or_pc3_next_ticket_nonzero(self, T: Thread) -> BoolRef:
+        return Implies(
+            Or(self.sys.pc2(T), self.sys.pc3(T)), self.sys.next_ticket != self.sys.zero
+        )
+
+    @invariant
+    def one_nonzero_ticket_per_thread(
+        self, T1: Thread, T2: Thread, K: Ticket
+    ) -> BoolRef:
+        return Implies(
+            And(self.sys.m(T1, K), self.sys.m(T2, K), K != self.sys.zero), T1 == T2
+        )
+
+    @invariant
+    def pc2_ticket_larger_than_service(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.pc2(T), self.sys.m(T, K)), self.sys.le(self.sys.service, K)
+        )
+
+    @invariant
+    def pc3_then_service(self, T: Thread) -> BoolRef:
+        return Implies(self.sys.pc3(T), self.sys.m(T, self.sys.service))
+
+    @invariant
+    def service_before_next(self) -> BoolRef:
+        return self.sys.le(self.sys.service, self.sys.next_ticket)
+
+    @invariant
+    def unique_nonzero_tickets_for_non_pc1(self, T1: Thread, T2: Thread) -> BoolRef:
+        return Not(
+            And(
+                Not(self.sys.pc1(T1)),
+                Not(self.sys.pc1(T2)),
+                self.sys.m(T1, self.sys.zero),
+                self.sys.m(T2, self.sys.zero),
+                T1 != T2,
+            )
+        )
+
+    @invariant
+    def nonzero_pc1_ticket_already_serviced(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(self.sys.pc1(T), self.sys.m(T, K), K != self.sys.zero),
+            Not(self.sys.le(self.sys.service, K)),
+        )
+
+    @invariant
+    def ticket_between_service_and_next_not_pc1(self, T: Thread, K: Ticket) -> BoolRef:
+        return Implies(
+            And(
+                Not(self.sys.le(self.sys.next_ticket, K)),
+                self.sys.le(self.sys.service, K),
+            ),
+            Exists(T, And(self.sys.m(T, K), Not(self.sys.pc1(T)))),
+        )
+
+    @invariant
+    def skolem_has_ticket(self) -> BoolRef:
+        X = Ticket("X")
+        return Exists(X, self.sys.m(self.skolem_thread, X))  
+```
+
+Additional temporal invariants for the proof.
+```python
+    @temporal_invariant
+    def globally_eventually_scheduled(self, T: Thread) -> BoolRef:
+        return G(F(self.sys.scheduled(T)))
+
+    @temporal_invariant
+    @track
+    def timer_invariant(self, K: Ticket) -> BoolRef:
+        return Or(
+            F(
+                self.starved(),
+            ),
+            And(
+                G(Not(self.sys.pc3(self.skolem_thread))),
+                self.sys.pc2(self.skolem_thread),
+                Implies(
+                    self.sys.m(self.skolem_thread, K),
+                    self.sys.le(self.sys.service, K),
+                ),
+            ),
+        )  
+```
+
+Helper formulas used in the ranking function.
+```python
+    def starved(self) -> BoolRef:
+        return And(
+            self.sys.pc2(self.skolem_thread),
+            G(Not(self.sys.pc3(self.skolem_thread))),
+        )  
+```
+
+### Ranking Function
+The ranking function is a lexicographic combination of multiple ranks.
+Each rank component handles a different aspect of the proof.
+
+`rk1`: Timer rank for the starved condition.
+```python
+    def rk1(self) -> Rank:
+        return self.timer_rank(
+            self.starved(),
+            None,
+            None,
+        )  
+```
+
+`rk2`: Domain-pointwise rank over tickets between service and next_ticket.
+Uses a finite lemma to bound the number of such tickets.
+```python
+    def rk2_body(self, k: Ticket) -> BoolRef:
+        X = Ticket("X")
+        return And(
+            self.sys.le(self.sys.service, k),
+            Exists(X, And(self.sys.m(self.skolem_thread, X), self.sys.le(k, X))),
+        )
+
+    def rk2_finite_lemma(self, k: Ticket) -> BoolRef:
+        return self.sys.le(k, self.sys.next_ticket)
+
+    def rk2(self) -> Rank:
+        return DomainPointwiseRank.close(
+            BinRank(self.rk2_body),
+            FiniteLemma(self.rk2_finite_lemma),
+        )  
+```
+
+`rk3`: Binary rank checking if any thread is in pc3.
+```python
+    def rk3_body(self) -> BoolRef:
+        T = Thread("T")
+        return Not(Exists(T, self.sys.pc3(T)))
+
+    def rk3(self) -> Rank:
+        return BinRank(self.rk3_body)  
+```
+
+`rk4`: Conditional timer rank that tracks scheduling of non-pc1 threads.
+The condition ensures we only track threads that need service.
+```python
+    def scheduled(self, T: Thread) -> BoolRef:
+        return self.sys.scheduled(T)
+
+    def non_pc1_serviced(self, T: Thread) -> BoolRef:
+        return And(self.sys.m(T, self.sys.service), Not(self.sys.pc1(T)))
+
+    def rk4_finite_lemma(self, T: Thread) -> BoolRef:
+        return Not(self.sys.pc1(T))
+
+    def rk4(self) -> Rank:
+        return self.timer_rank(
+            self.scheduled,
+            self.non_pc1_serviced,
+            FiniteLemma(self.rk4_finite_lemma),
+        )  
+```
+
+The final ranking function combines all ranks lexicographically.
+The rank decreases when:
+- `rk1` decreases (timer for starvation decreases), or
+- `rk1` is conserved and rk2 decreases (tickets between service and next decrease), or
+- `rk1` and `rk2` are conserved and `rk3` decreases (no thread in `pc3`), or
+- `rk1`, `rk2`, and `rk3` are conserved and `rk4` decreases (scheduling timer decreases).
+```python
+    def rank(self) -> Rank:
+        return LexRank(self.rk1(), self.rk2(), self.rk3(), self.rk4())  
+```
+
+Finally, we run the proof check to verify all obligations.
+```python
+TicketProof().check()  
 ```
