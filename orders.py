@@ -34,7 +34,12 @@ __all__ = [
 
 
 class Order(ABC):
-    """Abstract base class for order constructors."""
+    """
+    Abstract base class for order constructors.
+
+    Orders are used in `ranks.DomainLexRank` to define lexicographic orderings
+    over domains.
+    """
 
     @property
     @abstractmethod
@@ -93,6 +98,11 @@ class RelOrder[T: Expr](Order):
         )
 
     def check_well_founded(self) -> bool:
+        """
+        Check whether the order is well-founded.
+
+        :return: True if the order is well-founded (either the sort is finite or the relation is declared well-founded).
+        """
         print(f"Checking {self} well-founded: ", end="", flush=True)
         if self.sort.finite():
             print(f"{self.sort.ref()} finite")
@@ -140,6 +150,11 @@ class FormulaOrder(Order):
         return ts_term(self.formula)
 
     def check_well_founded(self) -> bool:
+        """
+        Check whether the order is well-founded.
+
+        :return: True if all input sorts are finite.
+        """
         print(f"Checking {self} well-founded: ", end="", flush=True)
         for sort in self.ts_formula.spec.values():
             if not sort.finite():
@@ -195,6 +210,11 @@ class LexOrder(Order):
         return TSTerm(spec, actual_formula, str(self))
 
     def check_well_founded(self) -> bool:
+        """
+        Check whether the order is well-founded.
+
+        :return: True if all underlying orders are well-founded.
+        """
         return all(order.check_well_founded() for order in self.orders.values())
 
     def __str__(self) -> str:
@@ -249,6 +269,11 @@ class PointwiseOrder(Order):
         return TSTerm(spec, actual_formula, str(self))
 
     def check_well_founded(self) -> bool:
+        """
+        Check whether the order is well-founded.
+
+        :return: True if all underlying orders are well-founded.
+        """
         return all(order.check_well_founded() for order in self.orders.values())
 
     def __str__(self) -> str:

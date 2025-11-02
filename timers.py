@@ -136,21 +136,30 @@ def timer_valid(timer_expr: Time) -> z3.BoolRef:
 
 def timer_zero(timer_expr: Time) -> z3.BoolRef:
     """
-    :return: formula for `timer_expr` being zero.
+    Return a formula expressing that the timer expression is zero.
+
+    :param timer_expr: The timer expression to check.
+    :return: Formula expressing that the timer is zero.
     """
     return timer_expr == _zero
 
 
 def timer_nonzero(timer_expr: Time) -> z3.BoolRef:
     """
-    :return: formula for `timer_expr` being non-zero.
+    Return a formula expressing that the timer expression is non-zero.
+
+    :param timer_expr: The timer expression to check.
+    :return: Formula expressing that the timer is non-zero.
     """
     return timer_expr != _zero
 
 
 def timer_finite(timer_expr: Time) -> z3.BoolRef:
     """
-    :return: formula for `timer_expr` being finite.
+    Return a formula expressing that the timer expression is finite.
+
+    :param timer_expr: The timer expression to check.
+    :return: Formula expressing that the timer is finite.
     """
     if _UNINTERPRETED_TIMERS:
         return timer_expr != _inf
@@ -160,14 +169,20 @@ def timer_finite(timer_expr: Time) -> z3.BoolRef:
 
 def timer_infinite(timer_expr: Time) -> z3.BoolRef:
     """
-    :return: formula for `timer_expr` being infinite.
+    Return a formula expressing that the timer expression is infinite.
+
+    :param timer_expr: The timer expression to check.
+    :return: Formula expressing that the timer is infinite.
     """
     return timer_expr == _inf
 
 
 def timer_decreasable(timer_expr: Time) -> z3.BoolRef:
     """
-    :return: formula for `timer_expr` being decreasable (finite and non-zero).
+    Return a formula expressing that the timer expression is decreasable (finite and non-zero).
+
+    :param timer_expr: The timer expression to check.
+    :return: Formula expressing that the timer is decreasable.
     """
     if _UNINTERPRETED_TIMERS:
         return z3.And(timer_expr != _zero, timer_expr != _inf)

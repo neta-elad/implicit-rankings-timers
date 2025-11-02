@@ -16,12 +16,22 @@ _F = z3.Function("F", z3.BoolSort(), z3.BoolSort())
 
 
 def G(formula: z3.BoolRef) -> z3.BoolRef:
-    """The globally (G, ☐) temporal operator."""
+    """
+    The globally (G, ☐) temporal operator.
+
+    :param formula: The formula to apply the globally operator to.
+    :return: A formula expressing that the formula holds globally (in all future states).
+    """
     return _G(formula)  # type: ignore
 
 
 def F(formula: z3.BoolRef) -> z3.BoolRef:
-    """The eventually (F, ♢) temporal operator."""
+    """
+    The eventually (F, ♢) temporal operator.
+
+    :param formula: The formula to apply the eventually operator to.
+    :return: A formula expressing that the formula holds eventually (in some future state).
+    """
     return _F(formula)  # type: ignore
 
 
@@ -136,7 +146,9 @@ class Prop[T: TransitionSystem](ABC):
     @abstractmethod
     def prop(self) -> z3.BoolRef:
         """
-        :return: temporal property we wish to prove (non-negated).
+        Return the temporal property to prove (non-negated).
+
+        :return: Temporal property formula we wish to prove.
         """
 
     def __init__(self, sys: T) -> None:

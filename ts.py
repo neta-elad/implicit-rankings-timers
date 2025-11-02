@@ -83,7 +83,9 @@ class BaseTransitionSystem(ABC):
     @cached_property
     def next(self) -> Self:
         """
-        :return: a post-state version of the transition system.
+        Get the post-state version of the transition system.
+
+        :return: A transition system with suffix "'" representing the next state.
         """
         return self.clone(self.suffix + "'")
 
@@ -280,10 +282,24 @@ type TSFormula = TSTerm[z3.BoolRef]
 
 
 def universal_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
+    """
+    Return the universal closure of a formula over its parameters.
+
+    :param formula: The formula to close universally.
+    :param ts: The transition system context.
+    :return: A universally quantified formula.
+    """
     return quantify(True, formula.spec.consts(), formula(ts), qid=formula.name)
 
 
 def existential_closure(formula: TSFormula, ts: BaseTransitionSystem) -> z3.BoolRef:
+    """
+    Return the existential closure of a formula over its parameters.
+
+    :param formula: The formula to close existentially.
+    :param ts: The transition system context.
+    :return: An existentially quantified formula.
+    """
     return quantify(False, formula.spec.consts(), formula(ts), qid=formula.name)
 
 
@@ -595,10 +611,14 @@ def init[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
     """
-    Annotation (decorator) for defining a initial-state conjunct.
+    Decorator for defining an initial-state conjunct.
     Should only be used inside a subclass of `TransitionSystem`.
     Parameters to the decorated method are implicitly universally quantified.
 
+    :param fun: The formula function to mark as an initial state condition.
+    :return: The decorated function.
+
+    Example:
     ```python
     class TerminationSystem(TransitionSystem):
         # snip...
@@ -615,10 +635,14 @@ def axiom[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
     """
-    Annotation (decorator) for defining a axiom.
+    Decorator for defining an axiom.
     Should only be used inside a subclass of `TransitionSystem`.
     Parameters to the decorated method are implicitly universally quantified.
 
+    :param fun: The formula function to mark as an axiom.
+    :return: The decorated function.
+
+    Example:
     ```python
     class TerminationSystem(TransitionSystem):
         # snip...
@@ -635,10 +659,14 @@ def transition[T: BaseTransitionSystem, *Ts](
     fun: TypedFormula[T, *Ts],
 ) -> TypedFormula[T, *Ts]:
     """
-    Annotation (decorator) for defining a transition.
+    Decorator for defining a transition.
     Should only be used inside a subclass of `TransitionSystem`.
     Parameters to the decorated method are implicitly existentially quantified.
 
+    :param fun: The formula function to mark as a transition.
+    :return: The decorated function.
+
+    Example:
     ```python
     class TerminationSystem(TransitionSystem):
         # snip...
