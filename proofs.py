@@ -157,6 +157,43 @@ type PropProvider[T: TransitionSystem] = type[Prop[T]]
 
 
 class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
+    """
+    Base class for proving temporal properties over transition systems.
+
+    A proof constructs an intersection transition system between the original
+    system and a timer transition system for the negated property. The temporal
+    property is proven by showing termination of the intersection system using
+    a rank function constructed with implicit rankings.
+
+    Subclasses must:
+    - Define a `rank` method that returns a `ranks.Rank`
+    - Optionally define invariants using decorators
+    ([`@invariant`](#invariant), [`@system_invariant`](#system_invariant), [`@temporal_invariant`](#temporal_invariant))
+    - Optionally define witnesses using decorators
+    ([`@witness`](#witness), [`@temporal_witness`](#temporal_witness))
+
+    Example:
+    ```python
+    class Thread(Finite): ...
+
+    class System(TransitionSystem):
+        waiting: Rel[Thread]
+
+    class WaitingProp(Prop[System]):
+        def prop(self) -> BoolRef:
+            return F(ForAll([t: Thread], Not(self.sys.waiting(t))))
+
+    class WaitingProof(Proof[System], prop=WaitingProp):
+        @invariant
+        def no_waiting_implies_termination(self) -> BoolRef:
+            T = Thread("T")
+            return ForAll(T, Not(self.sys.waiting(T)))
+
+        def rank(self) -> Rank:
+            return self.timer_rank(self.sys.waiting(self.sys.first), None, None)
+    ```
+    """
+
     prop_type: PropProvider[T]
     ts: ClassVar[type[TransitionSystem]]
     _cache: ClassVar[dict[type[BaseTransitionSystem], type]] = {}
@@ -197,7 +234,52 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return cls._cache[item]
 
     @abstractmethod
-    def rank(self) -> Rank: ...
+    def rank(self) -> Rank:
+        """
+        Return the ranking function for proving termination.
+
+        This method must be implemented by all subclasses. The returned rank
+        is used to prove that the intersection transition system terminates,
+        which in turn proves the temporal property.
+
+        The rank should be closed (no free parameters). Common rank constructors
+        include `timer_rank`, `BinRank`, `LexRank`, `PointwiseRank`, and combinations thereof.
+
+        :return: A `ranks.Rank` object that decreases on all fair execution paths.
+
+        Example:
+        ```python
+        class Thread(Finite): ...
+
+        class System(TransitionSystem):
+            waiting: Rel[Thread]
+
+        class SysProof(Proof[System], prop=...):
+            def rank(self) -> Rank:
+                return self.timer_rank(self.sys.waiting(self.sys.first), None, None)
+        ```
+
+        Example with multiple ranks:
+        ```python
+        class Thread(Finite): ...
+
+        class System(TransitionSystem):
+            waiting: Rel[Thread]
+            first: Immutable[Thread]
+            second: Immutable[Thread]
+
+        class SysProof(Proof[System], prop=...):
+            def rank(self) -> Rank:
+                return PointwiseRank(
+                    self.timer_rank(self.sys.waiting(self.sys.first), None, None),
+                    self.timer_rank(self.sys.waiting(self.sys.second), None, None),
+                    LexRank(
+                        self.timer_rank(self.sys.some_condition(), None, None),
+                        self.timer_rank(self.sys.other_condition(), None, None)
+                    )
+                )
+        ```
+        """
 
     @cached_property
     def sys(self) -> T:
@@ -256,7 +338,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
     def t(self, temporal_formula: z3.BoolRef) -> TimeFun:
         """
-        :return: matching timer function for `temporal_formula`.
+        Get the timer function associated with a temporal formula.
+
+        :param temporal_formula: A temporal formula (may contain `temporal.F` and `temporal.G`).
+        :return: The timer function for this temporal formula.
         """
         temporal_formula = nnf(temporal_formula)
         return self.timers.t(f"t_<{str(temporal_formula).replace("'", "")}>")
@@ -379,7 +464,29 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         alpha: FormulaLike | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
-        """@public"""
+        """
+        Create a timer-based rank from a formula.
+
+        Automatically calculates the timer for `phi` and returns a `TimerRank`.
+        This is the recommended way to create timer-based ranks.
+
+        :param phi: The formula to create a timer rank for.
+        :param alpha: Optional conditional formula. If provided, the rank is conditional.
+        :param finite_lemma: Optional lemma for proving finiteness.
+        :return: A `TimerRank` that ranks by the timer for `phi`.
+
+        Example:
+        ```python
+        class Thread(Finite): ...
+
+        class System(TransitionSystem):
+            waiting: Rel[Thread]
+
+        class SysProof(Proof[System], prop=...):
+            def my_rank(self, t: Thread) -> Rank:
+                return self.timer_rank(self.sys.waiting(t), None, None)
+        ```
+        """
         ts_phi = ts_term(phi)
         timer_name = f"t_<{nnf(ts_phi(self))}>"
         spec = ts_phi.spec
@@ -403,6 +510,20 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         return phi_term
 
     def check(self, *, check_conserved: bool = False) -> bool:
+        """
+        Check all proof obligations for the temporal property.
+
+        Verifies:
+        - System sanity (initial state and transitions are satisfiable)
+        - Invariant inductiveness (invariants hold initially and are preserved)
+        - Rank is closed (no free parameters)
+        - Rank is conserved (optional, if `check_conserved=True`)
+        - Rank decreases in all transitions
+        - Soundness conditions hold
+
+        :param check_conserved: If True, also check that the rank is conserved.
+        :return: True if all checks pass, False otherwise.
+        """
         start_time = time.monotonic()
         if not self.sys.sanity_check():
             print("fail: sanity")
@@ -577,6 +698,31 @@ def system_invariant[T: Proof[Any], *Ts](
 def system_invariant[T: Proof[Any], *Ts](
     fun: Any | None = None, /, *, leaf: bool = False
 ) -> Any:
+    """
+    Decorator for defining system invariants.
+
+    System invariants are proven over the original system (without timers).
+    They must not contain temporal operators.
+
+    :param fun: The invariant formula function (if used as decorator).
+    :param leaf: If True, mark as a leaf invariant (not used in proving other invariants).
+
+    Example:
+    ```python
+    class System(TransitionSystem):
+        x: Int
+
+    class SysProof(Proof[System], prop=...):
+        @system_invariant
+        def x_non_negative(self) -> BoolRef:
+            return self.sys.x >= 0
+
+        @system_invariant(leaf=True)
+        def x_bounded(self) -> BoolRef:
+            return self.sys.x <= 100
+    ```
+    """
+
     def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
         if leaf:
             add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
@@ -602,6 +748,34 @@ def invariant[T: Proof[Any], *Ts](
 def invariant[T: Proof[Any], *Ts](
     fun: Any | None = None, /, *, leaf: bool = False
 ) -> Any:
+    """
+    Decorator for defining invariants.
+
+    Invariants are proven over the intersection system (with timers).
+    They express properties about the system state that are preserved
+    across transitions. They must not contain temporal operators.
+
+    :param fun: The invariant formula function (if used as decorator).
+    :param leaf: If True, mark as a leaf invariant (not used in proving other invariants).
+
+    Example:
+    ```python
+    class Round(Finite): ...
+    class Value(Finite): ...
+
+    class System(TransitionSystem):
+        proposal: Rel[Round, Value]
+
+    class SysProof(Proof[System], prop=...):
+        @invariant
+        def proposal_uniqueness(self, R: Round, V1: Value, V2: Value) -> BoolRef:
+            return Implies(
+                And(self.sys.proposal(R, V1), self.sys.proposal(R, V2)),
+                V1 == V2
+            )
+    ```
+    """
+
     def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
         if leaf:
             add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
@@ -627,6 +801,27 @@ def temporal_invariant[T: Proof[Any], *Ts](
 def temporal_invariant[T: Proof[Any], *Ts](
     fun: Any | None = None, /, *, leaf: bool = False
 ) -> Any:
+    """
+    Decorator for defining temporal invariants.
+
+    Temporal invariants express properties about temporal formulas and timers.
+    They are automatically converted to assertions that timers are zero.
+
+    :param fun: The temporal invariant formula function (if used as decorator).
+    :param leaf: If True, mark as a leaf invariant (not used in proving other invariants).
+
+    Example:
+    ```python
+    class System(TransitionSystem):
+        waiting: Rel[Thread]
+
+    class SysProof(Proof[System], prop=...):
+        @temporal_invariant
+        def eventually_not_waiting(self, t: Thread) -> BoolRef:
+            return F(Not(self.sys.waiting(t)))
+    ```
+    """
+
     def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
         if leaf:
             add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
@@ -641,14 +836,90 @@ def temporal_invariant[T: Proof[Any], *Ts](
 def track[T: Proof[Any], *Ts](
     fun: TypedProofFormula[T, *Ts],
 ) -> TypedProofFormula[T, *Ts]:
+    """
+    Decorator for marking temporal formulas to track.
+
+    Tracked formulas are used to create timers that are added to the timer
+    transition system. This is useful for formulas that do not necessarily appear in the property
+    but are needed for invariants.
+
+    :param fun: The temporal formula function to track.
+
+    Example:
+    ```python
+    class System(TransitionSystem):
+        waiting: Rel[Thread]
+
+    class SysProof(Proof[System], prop=...):
+        @track
+        def eventually_done(self, t: Thread) -> BoolRef:
+            return F(Not(self.sys.waiting(t)))
+    ```
+    """
     return add_marker(fun, _PROOF_TRACK_TEMPORAL)
 
 
 def witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
+    """
+    Decorator for defining witnesses.
+
+    A witness provides an existential witness for a formula. The witness
+    is a constant that can be used in invariants and ranks.
+
+    :param fun: A formula function that takes exactly one parameter (the witness sort).
+
+    Example:
+    ```python
+    class Thread(Finite): ...
+
+    class System(TransitionSystem):
+        waiting: Rel[Thread]
+
+    class SysProof(Proof[System], prop=...):
+        @witness
+        def waiting_thread(self, t: Thread) -> BoolRef:
+            return self.sys.waiting(t)
+
+        @invariant
+        def witness_invariant(self) -> BoolRef:
+            # self.waiting_thread is the witness constant
+            return Not(self.sys.waiting(self.waiting_thread))
+    ```
+    """
     return add_marker(fun, _PROOF_WITNESS)  # type: ignore
 
 
 def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
+    """
+    Decorator for defining temporal witnesses.
+
+    A temporal witness provides an existential witness for a temporal formula.
+    The witness is a constant that can be used in invariants and ranks.
+    Often used together with `@track` to ensure the temporal formula is tracked.
+
+    :param fun: A temporal formula function that takes exactly one parameter (the witness sort).
+
+    Example:
+    ```python
+    class Round(Finite): ...
+    class Value(Finite): ...
+
+    class System(TransitionSystem):
+        proposal: Rel[Round, Value]
+        r0: Immutable[Round]
+
+    class SysProof(Proof[System], prop=...):
+        @temporal_witness
+        @track
+        def eventually_proposed_value(self, V: Value) -> BoolRef:
+            return F(self.sys.proposal(self.sys.r0, V))
+
+        @invariant
+        def witness_invariant(self) -> BoolRef:
+            # self.eventually_proposed_value is the witness constant
+            return self.sys.proposal(self.sys.r0, self.eventually_proposed_value)
+    ```
+    """
     return add_marker(fun, _PROOF_TEMPORAL_WITNESS)  # type: ignore
 
 
