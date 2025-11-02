@@ -1,6 +1,6 @@
 VENV = .venv
 STAMP = $(VENV)/.stamp
-LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs
+LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs prelude
 
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
@@ -40,13 +40,21 @@ format: $(VENV)
 docs/examples/ticket.md:
 	make literate.py FILE=examples/ticket.py
 
-.PHONY: docs
-docs: docs/examples/ticket.md
+.PHONY: docs-server
+docs-server: docs/examples/ticket.md
 	$(DOCS) -n
 
-.PHONY: open_docs
-open-docs: docs/examples/ticket.md
+.PHONY: docs-server-open
+docs-server-open: docs/examples/ticket.md
 	$(DOCS)
+
+.PHONY: docs/out
+docs/out: docs/examples/ticket.md
+	$(DOCS) -o $@
+
+.PHONY: docs/out-open
+docs/out-open: docs/out
+	open docs/out/index.html
 
 
 .PHONY: $(VENV)

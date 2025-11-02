@@ -19,3 +19,4 @@ model-*.txt
 core-*.txt
 models/
 cores/
+docs/out
