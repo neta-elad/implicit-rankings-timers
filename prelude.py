@@ -43,6 +43,7 @@ from ranks import (
     LexRank,
     PointwiseRank,
     DomainPermutedRank,
+    TimerRank,
     FiniteLemma,
 )
 from temporal import G, F, Prop
@@ -144,6 +145,7 @@ __all__ = [
     "LexRank",
     "PointwiseRank",
     "DomainPermutedRank",
+    "TimerRank",
     "FiniteLemma",
     # re-exported Z3
     "BoolRef",

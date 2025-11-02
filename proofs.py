@@ -379,6 +379,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         alpha: FormulaLike | None,
         finite_lemma: FiniteLemma | None,
     ) -> Rank:
+        """@public"""
         ts_phi = ts_term(phi)
         timer_name = f"t_<{nnf(ts_phi(self))}>"
         spec = ts_phi.spec
