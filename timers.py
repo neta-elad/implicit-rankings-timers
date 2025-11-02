@@ -20,7 +20,9 @@ where `<mode>` is either `unint` or `int`.
 The default mode is `int` (interpreted integers).
 """
 
+import difflib
 import operator
+import textwrap
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from functools import cached_property, reduce
@@ -406,9 +408,17 @@ class TimerTransitionSystem(BaseTransitionSystem):
         return self.__class__(self.ts.clone(suffix), self.timers, self.root, suffix)
 
     def t(self, name: str) -> TimeFun:
-        assert (
-            name in self.symbols
-        ), f"No timer for formula {name}; has {self.symbols.keys()}"
+        if name not in self.symbols:
+            timer_names = [timer.name for timer in self.timers.values()]
+            (closest_match,) = difflib.get_close_matches(name, timer_names, 1)
+            assert False, (
+                f"No timer for {name}; "
+                f"closest match: {closest_match}. "
+                f"All timers:\n"
+                + "\n".join(
+                    textwrap.indent(timer_name, " " * 4) for timer_name in timer_names
+                )
+            )
         return cast(TimeFun, self.symbols[name])
 
     @property
