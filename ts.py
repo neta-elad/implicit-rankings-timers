@@ -145,10 +145,11 @@ class BaseTransitionSystem(ABC):
             print("timeout")
             return False
         else:
-            symbols = {symbol for symbol in self.symbols.values()}
+            # use dict to keep order
+            symbols = {symbol: None for symbol in self.symbols.values()}
             if with_next:
                 symbols |= {
-                    symbol
+                    symbol: None
                     for symbol in self.next.symbols.values()
                     if symbol not in symbols
                 }

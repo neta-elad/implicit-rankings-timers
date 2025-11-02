@@ -5,12 +5,12 @@ LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs prelude
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
     PYTHON = $(VENV)/Scripts/python
-    RM = rmdir /s /q $(VENV)
+    RM = rmdir /s /q
     TOUCH = powershell -Command "New-Item -ItemType File -Path $(STAMP) -Force"
 else
 	SYS_PYTHON = python3.13
 	PYTHON = PYTHONPATH=. $(VENV)/bin/python
-    RM = rm -rf $(VENV)
+    RM = rm -rf
     TOUCH = touch $(STAMP)
 endif
 
@@ -68,4 +68,7 @@ $(STAMP): requirements.txt
 
 .PHONY: clean
 clean:
-	$(RM)
+	$(RM) $(VENV)
+	$(RM) models
+	$(RM) cores
+	$(RM) docs/out
