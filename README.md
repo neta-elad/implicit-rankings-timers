@@ -63,7 +63,7 @@ TIMERS=unint make examples/ticket.py
 
 ### Optimizations
 - [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, 
-      and other such optimizations.
+      and other such optimizations or even a much bigger saving, of having timers only for formulas of the form F(..) or G(..)
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
 - [ ] (?) Timer semantics: inf > F(p) >= 0 implies F(p) = 0 ; F(p) in {0, inf}
 
@@ -71,13 +71,17 @@ TIMERS=unint make examples/ticket.py
 - [ ] In readme, write list of all features
 
 ### More Examples we can do
-- The rest of the liveness to safety examples: multi_paxos, stoppable_paxos, tlb_shootdown (huge). Possibly model paxos more accurately. 
-- Motivating examples from Towards Liveness Proofs at Scale, and possibly the apple memory model (huge)
-- Finish examples from implicit rankings paper - 3 other self-stabilization protocols (kind of annoying probably).
+- The rest of the liveness to safety examples: multi_paxos, stoppable_paxos. Model Paxos more accurately. 
+- Examples from Towards Liveness Proofs at Scale.
+- Finish examples from implicit rankings paper - 3 other self-stabilization protocols.
 - Shunting Yard and Dutch Flag from Manna & Dershovitz paper (easy)
+- Challenging future examples:
+- tlb_shootdown (in l2s, discuss with Oded) 
 - Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
 - Rabia Consensus Protocol: https://github.com/haochenpan/rabia/blob/88013ca8369a7ae3adfed44e3c226c8d97f11209/proofs/ivy/weak_mvc.ivy
-- Stretch: chord.
+- Chord: https://haslab.github.io/TRUST/papers/fm19.pdf
+- Sliding Window
+- (Parts of) the Apply Memory model
 
 ### Future Research 
 - [ ] Integration with invariant inference algorithm
