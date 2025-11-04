@@ -16,7 +16,7 @@ Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3
 # @status - done
 
 # <>
-# | We start by importing all symbols from the [`prelude`](prelude.html) module:
+# | We start by importing all symbols from the `prelude` module:
 from prelude import *  # </>
 
 
@@ -27,7 +27,7 @@ from prelude import *  # </>
 # | Instances of these classes
 # | represent constants in the signature of the transition system,
 # | or variables of the sort
-# | (see [`Expr`](typed_z3#Expr)).
+# | (see [`Expr`](typed_z3.html#Expr)).
 class Thread(Expr): ...
 
 

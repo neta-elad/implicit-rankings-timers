@@ -317,9 +317,9 @@ class TransitionSystem(BaseTransitionSystem, ABC):
     A transition system is defined by subclassing this class,
     declaring the signature using fields,
     and annotating methods as
-    conjuncts of the initial state ([`@init`](#init)),
-    transitions ([`@transition`](#transition)),
-    or axioms ([`@axiom`](#axiom)).
+    conjuncts of the initial state ([`@init`](ts.html#init)),
+    transitions ([`@transition`](ts.html#transition)),
+    or axioms ([`@axiom`](ts.html#axiom)).
 
     Symbols (constants, functions, relations)
     in the vocabulary of the transition system's state

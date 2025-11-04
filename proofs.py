@@ -168,9 +168,12 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     Subclasses must:
     - Define a `rank` method that returns a `ranks.Rank`
     - Optionally define invariants using decorators
-    ([`@invariant`](#invariant), [`@system_invariant`](#system_invariant), [`@temporal_invariant`](#temporal_invariant))
+    ([`@invariant`](proofs.html#invariant),
+    [`@system_invariant`](proofs.html#system_invariant),
+    [`@temporal_invariant`](proofs.html#temporal_invariant))
     - Optionally define witnesses using decorators
-    ([`@witness`](#witness), [`@temporal_witness`](#temporal_witness))
+    ([`@witness`](proofs.html#witness),
+    [`@temporal_witness`](proofs.html#temporal_witness))
 
     Example:
     ```python
@@ -905,7 +908,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
 
     A temporal witness provides an existential witness for a temporal formula.
     The witness is a constant that can be used in invariants and ranks.
-    Often used together with [`@track`](#track) to ensure the temporal formula is tracked.
+    Often used together with [`@track`](proofs.html#track) to ensure the temporal formula is tracked.
 
     :param fun: A temporal formula function that takes exactly one parameter (the witness sort).
 

@@ -1,6 +1,6 @@
 VENV = .venv
 STAMP = $(VENV)/.stamp
-LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs prelude
+LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs
 
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
