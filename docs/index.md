@@ -8,7 +8,7 @@ and temporal properties,
 and constructing proofs using implicit rankings and timers.
 
 ## Getting Started
-All necessary symbols are re-exported from the [`prelude`](prelude.html) 
+All necessary symbols are re-exported from the `prelude` 
 module, so you can start by simply writing:
 ```python
 from prelude import *

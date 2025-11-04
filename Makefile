@@ -1,6 +1,6 @@
 VENV = .venv
 STAMP = $(VENV)/.stamp
-LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs prelude
+LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs
 
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
@@ -18,6 +18,9 @@ DOCS = $(PYTHON) -m pdoc -t docs --no-include-undocumented --no-show-source $(LI
 
 .PHONY: precommit
 precommit: check format
+
+.PHONY: all
+all: $(wildcard examples/*.py)
 
 .PHONY: install
 install: $(VENV)

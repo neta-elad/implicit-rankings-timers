@@ -168,9 +168,12 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
     Subclasses must:
     - Define a `rank` method that returns a `ranks.Rank`
     - Optionally define invariants using decorators
-    ([`@invariant`](#invariant), [`@system_invariant`](#system_invariant), [`@temporal_invariant`](#temporal_invariant))
+    ([`@invariant`](proofs.html#invariant),
+    [`@system_invariant`](proofs.html#system_invariant),
+    [`@temporal_invariant`](proofs.html#temporal_invariant))
     - Optionally define witnesses using decorators
-    ([`@witness`](#witness), [`@temporal_witness`](#temporal_witness))
+    ([`@witness`](proofs.html#witness),
+    [`@temporal_witness`](proofs.html#temporal_witness))
 
     Example:
     ```python
@@ -524,6 +527,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         :param check_conserved: If True, also check that the rank is conserved.
         :return: True if all checks pass, False otherwise.
         """
+        print(f"Running proof of {self}")
         start_time = time.monotonic()
         if not self.sys.sanity_check():
             print("fail: sanity")
@@ -550,12 +554,18 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             return False
 
         end_time = time.monotonic()
-        print(f"All passed!")
-        print(f"Time: {end_time - start_time:.3f} seconds")
-        self.print_stats()
+        self.print_stats(end_time - start_time)
         return True
 
-    def print_stats(self) -> None:
+    def print_stats(self, duration: float | None = None) -> None:
+        print(f"Proof of {self}", end="")
+
+        if duration is not None:
+            print(": all passed!")
+            print(f"Time: {duration:.3f} seconds")
+        else:
+            print()
+
         print(f"Rank: {self.rank()}")
         print(f"Rank size: {self.rank().size}")
         print(f"Invariant count: {self.invariant_count}")
@@ -678,6 +688,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         else:
             print("Checking soundness: failed")
             return False
+
+    def __str__(self) -> str:
+        return f"{self.prop_type.__name__} for {self.sys.__class__.__name__}"
 
 
 type TypedProofFormula[T: Proof[Any], *Ts] = Callable[[T, *Ts], z3.BoolRef]
@@ -895,7 +908,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
 
     A temporal witness provides an existential witness for a temporal formula.
     The witness is a constant that can be used in invariants and ranks.
-    Often used together with `@track` to ensure the temporal formula is tracked.
+    Often used together with [`@track`](proofs.html#track) to ensure the temporal formula is tracked.
 
     :param fun: A temporal formula function that takes exactly one parameter (the witness sort).
 
