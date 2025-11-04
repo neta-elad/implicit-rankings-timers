@@ -62,17 +62,16 @@ TIMERS=unint make examples/ticket.py
 ## TODOs
 
 ### Optimizations
-- [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms, 
-      and other such optimizations or even a much bigger saving, of having timers only for formulas of the form F(..) or G(..)
-- [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G)
-- [ ] (?) Timer semantics: inf > F(p) >= 0 implies F(p) = 0 ; F(p) in {0, inf}
+- [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms.
+- [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G).
+- [ ] Axioms that may eliminate spurious phantom states, e.g. t_(p and q) >= t_p, t_q.
 
 ### For Artifact  
 - [ ] In readme, write list of all features
 
 ### More Examples we can do
 - The rest of the liveness to safety examples: multi_paxos, stoppable_paxos. Model Paxos more accurately. 
-- Examples from Towards Liveness Proofs at Scale.
+- 2 more examples from Towards Liveness Proofs at Scale.
 - Finish examples from implicit rankings paper - 3 other self-stabilization protocols.
 - Shunting Yard and Dutch Flag from Manna & Dershovitz paper (easy)
 - Challenging future examples:
