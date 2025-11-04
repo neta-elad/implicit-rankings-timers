@@ -905,7 +905,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
 
     A temporal witness provides an existential witness for a temporal formula.
     The witness is a constant that can be used in invariants and ranks.
-    Often used together with `@track` to ensure the temporal formula is tracked.
+    Often used together with [`@track`](#track) to ensure the temporal formula is tracked.
 
     :param fun: A temporal formula function that takes exactly one parameter (the witness sort).
 
