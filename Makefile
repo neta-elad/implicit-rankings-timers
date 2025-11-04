@@ -19,6 +19,9 @@ DOCS = $(PYTHON) -m pdoc -t docs --no-include-undocumented --no-show-source $(LI
 .PHONY: precommit
 precommit: check format
 
+.PHONY: all
+all: $(wildcard examples/*.py)
+
 .PHONY: install
 install: $(VENV)
 
