@@ -11,7 +11,7 @@ transmission over half-duplex links. Commun. ACM 12(5), 260–261 (May 1969), ht
 
 """
 
-# @status - done
+# @status - work in progress, see below.
 # Note: actually there is something problematic with the soundness condition
 # in the submission version we had Index(Finite), but i want to be more precise.
 
