@@ -10,7 +10,7 @@ From liveness to safety:
 Padon, O., Hoenicke, J., Losa, G., Podelski, A., Sagiv, M., Shoham, S.: Reducing liveness to safety in first-order logic.
 Proc. ACM Program. Lang. 2(POPL), 26:1–26:33 (2018). https://doi.org/10.1145/3158114
 
-We start by importing all symbols from the [`prelude`](prelude.html) module:
+We start by importing all symbols from the `prelude` module:
 ```python
 from prelude import *  
 ```
@@ -21,7 +21,7 @@ We declare the Thread and Ticket sorts of the system
 Instances of these classes
 represent constants in the signature of the transition system,
 or variables of the sort
-(see [`Expr`](typed_z3#Expr)).
+(see [`Expr`](typed_z3.html#Expr)).
 ```python
 class Thread(Expr): ...
 
