@@ -1,5 +1,5 @@
-# message queue with a sender and a receiver, example 1 from towards liveness proofs.
-# see @exampl.ivy
+# timestamped queue with a sender and a receiver, example 1 from towards liveness proofs.
+# see @exampl1.ivy
 
 # @status - works, but I had a bunch of normalization issues in the progress, discuss.
 
@@ -9,7 +9,7 @@ from prelude import *
 class SignalTime(Expr): ...
 
 
-class MessageQueue(TransitionSystem):
+class TimestampedQueue(TransitionSystem):
     time_lt: Immutable[WFRel[SignalTime]]
 
     sender_value: SignalTime
@@ -87,7 +87,7 @@ class MessageQueue(TransitionSystem):
         )
 
 
-class MessageQueueLiveness(Prop[MessageQueue]):
+class TimestampedQueueLiveness(Prop[TimestampedQueue]):
     def prop(self) -> BoolRef:
         X = SignalTime("X")
         return Implies(
@@ -104,7 +104,7 @@ class MessageQueueLiveness(Prop[MessageQueue]):
         )
 
 
-class MessageQueueProof(Proof[MessageQueue], prop=MessageQueueLiveness):
+class TimestampedQueueProof(Proof[TimestampedQueue], prop=TimestampedQueueLiveness):
 
     @temporal_invariant
     def infinitely_trying(self) -> BoolRef:
@@ -141,13 +141,6 @@ class MessageQueueProof(Proof[MessageQueue], prop=MessageQueueLiveness):
             And(self.sys.pending(self.skolem_time), self.never_receive_skolem()),
         )
 
-    @track
-    def something_good(self) -> BoolRef:
-        return Or(
-            self.send_skolem_never_receive(),
-            And(self.sys.pending(self.skolem_time), self.never_receive_skolem()),
-        )
-
     def pending_skolem_never_receive_timer_rank(self) -> Rank:
         return self.timer_rank(
             And(self.sys.pending(self.skolem_time), self.never_receive_skolem()),
@@ -181,6 +174,7 @@ class MessageQueueProof(Proof[MessageQueue], prop=MessageQueueLiveness):
             FiniteLemma(self.pending_less_than_skolem),
         )
 
+    # Note: this rank is a little more complex than it could be because of imprceise semantics of timers.
     def rank(self) -> Rank:
         return LexRank(
             self.pending_skolem_never_receive_timer_rank(),
@@ -189,13 +183,6 @@ class MessageQueueProof(Proof[MessageQueue], prop=MessageQueueLiveness):
             self.trying_timer_rank(),
         )
 
-    # normalizaiton issue - this doesn't verify in init.
-    # managaed to do without it, but required being way more clever.
-    # @track
-    # @temporal_invariant
-    # def eventually_something_good(self) -> BoolRef:
-    #     return F(self.never_receive_skolem())
 
-
-proof = MessageQueueProof()
+proof = TimestampedQueueProof()
 proof.check(check_conserved=True)
