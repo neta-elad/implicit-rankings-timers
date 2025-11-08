@@ -210,7 +210,7 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
         )
 
     @invariant
-    def pending1_greater_than_latest_sent2(self,X: SignalTime) -> BoolRef:
+    def pending1_greater_than_latest_sent2(self, X: SignalTime) -> BoolRef:
         return Implies(
             self.sys.pending1(X),
             self.sys.time_lt(self.sys.latest_sent2, X),
@@ -223,15 +223,15 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
             self.sys.latest_sent2 == self.sys.latest_sent1,
         )
 
-    @invariant 
-    def pending_less_than_latest_sent1(self,X: SignalTime) -> BoolRef:
+    @invariant
+    def pending_less_than_latest_sent1(self, X: SignalTime) -> BoolRef:
         return Implies(
             self.sys.pending1(X),
             Or(self.sys.time_lt(X, self.sys.latest_sent1), X == self.sys.latest_sent1),
         )
 
-    @invariant 
-    def pending_less_than_latest_sent2(self,X: SignalTime) -> BoolRef:
+    @invariant
+    def pending_less_than_latest_sent2(self, X: SignalTime) -> BoolRef:
         return Implies(
             self.sys.pending2(X),
             Or(self.sys.time_lt(X, self.sys.latest_sent2), X == self.sys.latest_sent2),
@@ -285,7 +285,7 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
         T = SignalTime("T")
         return self.timer_rank(
             self.sys.poll1_now,
-            Exists(T,self.pending1_less_or_equal_skolem(T)),
+            Exists(T, self.pending1_less_or_equal_skolem(T)),
             None,
         )
 
@@ -293,7 +293,7 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
         T = SignalTime("T")
         return self.timer_rank(
             self.sys.try_receive2_now,
-            Exists(T,self.pending2_less_or_equal_skolem(T)),
+            Exists(T, self.pending2_less_or_equal_skolem(T)),
             None,
         )
 
