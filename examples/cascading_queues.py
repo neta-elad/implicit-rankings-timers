@@ -11,7 +11,7 @@ class SignalTime(Expr): ...
 
 class CascadingQueue(TransitionSystem):
     time_lt: Immutable[WFRel[SignalTime]]
-    zero: SignalTime
+    zero: Immutable[SignalTime]
 
     # state
     pending1: Rel[SignalTime]
@@ -56,7 +56,6 @@ class CascadingQueue(TransitionSystem):
     def send1(self, x: SignalTime) -> BoolRef:
         return And(
             self.time_lt(self.latest_sent1, x),
-            self.latest_sent1.update(x),
             self.pending1.update({(x,): true}),
             self.sender_value == x,
             self.sender_now == True,
@@ -161,8 +160,6 @@ class CascadingQueueLiveness(Prop[CascadingQueue]):
 
 class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
 
-    # proof just at its start
-
     @temporal_invariant
     def infinitely_trying(self) -> BoolRef:
         return G(F(self.sys.try_receive2_now))
@@ -196,7 +193,6 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
 
     @temporal_invariant
     @track
-    # refine this invariant for this case, second case is not right.
     def violation_skolem(self) -> BoolRef:
         return Or(
             F(self.send_skolem_never_receive()),

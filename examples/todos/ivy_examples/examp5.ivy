@@ -204,6 +204,7 @@ isolate m = {
         }
     }
 
+    # clearly there is some typo here
     action poll2 = {
         var x : time;
         var ok : bool;
@@ -265,3 +266,9 @@ export m.poll1
 export m.poll2
 export m.q3.recv
 
+
+## the idea of this example is that messages from queue1
+## can be arbitarily passed by messages in queue2
+## but queue1 will be eventually polled
+## so while we don't know how many times it will be passed
+## we are guaranteed that it will be polled.

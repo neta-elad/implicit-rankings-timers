@@ -66,7 +66,6 @@ TIMERS=unint make examples/ticket.py
 - [ ] Axioms that may eliminate spurious phantom states, e.g. t_(p and q) >= t_p, t_q.
 
 ### Examples
-- Reordering example from Towards Liveness Proofs at Scale.
 - The rest of the liveness to safety examples: multi_paxos, stoppable_paxos. Model Paxos more accurately. 
 - Finish examples from implicit rankings paper - 3 other self-stabilization protocols.
 - Challenging future examples:
