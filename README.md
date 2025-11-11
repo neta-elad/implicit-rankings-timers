@@ -10,37 +10,31 @@ This repository contains the implementation of the methods described the paper "
     ```shell
     make install
     ```
+
+- To run a specific file, e.g., `examples/ticket.py`, run:
+    ```shell
+    make examples/ticket.py
+    ```
+
+- Open full docs by running
+    ```shell
+    make docs/out-open
+    ```
   
 - To check type annotations run:
     ```shell
     make check
     ```
-  
-- To run a specific file, e.g., `examples/ticket.py`, run:
-    ```shell
-    make examples/ticket.py
-    ```
-  
+
 - In case something goes wrong in install run:
     ```shell
     make clean 
     ```
-  
-- Before committing please run:
-    ```shell
-    make precommit
-    ```
-  
+
 - To count size of an Ivy proof, e.g., `ivy_examples/ticket.ivy`, run:
     ```shell
     make measure_ivy_proof.py IVY_FILE=ivy_examples/ticket.ivy
     ```
-  
-For a simple example, check out the `examples/trivial_termination.py` file.
-Open full docs by running
-```shell
-make docs/out-open
-```
 
 ## Features
 ### Timeout
