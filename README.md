@@ -1,4 +1,9 @@
 # Verifying First-Order Temporal Properties of Infinite States Systems via Implicit Rankings and Timers
+
+This repository contains the implementation of the methods described the paper "Verifying First-Order Temporal Properties of Infinite States Systems via Implicit Rankings and Timers" by Raz Lotan, Neta Elad, Oded Padon and Sharon Shoham. The tool allows encoding a transition system specified in first-order logic, and verifying first-order temporal properties of it. The verification is done via the timer reduction (Section 4) that reduces the verification of temporal properties to the verification of termination. Termination is then verified with the use of implicit rankings and invariants (Section 5).
+
+## Starting Out
+
 **First ensure you have Python 3.13 on your machine**
 
 - To install required dependencies run:
