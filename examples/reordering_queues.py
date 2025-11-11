@@ -138,11 +138,15 @@ class ReorderingQueue(TransitionSystem):
             ForAll(T, Implies(self.pending1(T), Or(self.time_lt(x, T), x == T))),
             self.pending1.update({(x,): false}),
             self.pending3.update({(x,): true}),
-            ForAll(T, self.next.arrival_times(T) == If(
-                T == x,
-                self.arrival_clock,
-                self.arrival_times(T),
-            )),
+            ForAll(
+                T,
+                self.next.arrival_times(T)
+                == If(
+                    T == x,
+                    self.arrival_clock,
+                    self.arrival_times(T),
+                ),
+            ),
             # self.arrival_times.update({(x,): self.arrival_clock}), #potentially buggy?
             self.arrival_time_successor(self.arrival_clock, self.next.arrival_clock),
             self.done.unchanged(),
@@ -293,7 +297,6 @@ class ReorderingQueueLiveness(Prop[ReorderingQueue]):
 
 
 class ReorderingQueueProof(Proof[ReorderingQueue], prop=ReorderingQueueLiveness):
-
 
     @invariant
     def pending1_greater_than_clock(self, X: SignalTime) -> BoolRef:
@@ -489,10 +492,6 @@ class ReorderingQueueProof(Proof[ReorderingQueue], prop=ReorderingQueueLiveness)
             self.try_receive_timer_rank(),
         )
 
-
-    # currently doesn't work.
-    # phantom state: 
-    # skolem is sent over queue2 
 
 proof = ReorderingQueueProof()
 proof.check()
