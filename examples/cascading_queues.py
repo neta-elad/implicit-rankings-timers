@@ -59,6 +59,7 @@ class CascadingQueue(TransitionSystem):
             self.pending1.update({(x,): true}),
             self.sender_value == x,
             self.sender_now == True,
+            self.latest_sent1.update(x),
             self.latest_sent2.unchanged(),
             self.pending2.unchanged(),
             self.poll1_now == False,
