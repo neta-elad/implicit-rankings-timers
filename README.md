@@ -59,17 +59,16 @@ TIMERS=unint make examples/ticket.py
 
 ## TODOs
 
+### Cleanup
+
+- Review size of proof, e.g why does DomLex not count the size of the order relation?
+
 ### Optimizations
 - [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms.
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G).
 - [ ] Axioms that may eliminate spurious phantom states, e.g. t_(p and q) >= t_p, t_q.
 
 ### Examples
-- The rest of the liveness to safety examples: multi_paxos, stoppable_paxos. Model Paxos more accurately. 
-- Finish examples from implicit rankings paper - 3 other self-stabilization protocols.
-- Challenging future examples:
-    - TLB Shootdown
-    - Sliding Window
-    - Stellar Consensus Protocol: https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
-    - Chord: https://haslab.github.io/TRUST/papers/fm19.pdf
-    - Apply Memory model
+- Clean up paxos. Add multi_paxos, stoppable_paxos.
+- Examples from implicit rankings: 3 other self-stabilization protocols, review Dijsktra k-state.
+- Challenging future examples: TLB Shootdown, Sliding Window, Stellar Consensus Protocol, Chord, Apple Memory model

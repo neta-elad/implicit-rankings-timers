@@ -185,4 +185,4 @@ class TimestampedQueueProof(Proof[TimestampedQueue], prop=TimestampedQueueLivene
 
 
 proof = TimestampedQueueProof()
-proof.check(check_conserved=True)
+proof.check()

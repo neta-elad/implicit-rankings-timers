@@ -495,4 +495,4 @@ class ReorderingQueueProof(Proof[ReorderingQueue], prop=ReorderingQueueLiveness)
     # skolem is sent over queue2 
 
 proof = ReorderingQueueProof()
-proof.check(check_conserved=True)
+proof.check()

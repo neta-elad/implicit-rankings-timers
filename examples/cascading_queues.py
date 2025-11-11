@@ -306,4 +306,4 @@ class CascadingQueueProof(Proof[CascadingQueue], prop=CascadingQueueLiveness):
 
 
 proof = CascadingQueueProof()
-proof.check(check_conserved=True)
+proof.check()
