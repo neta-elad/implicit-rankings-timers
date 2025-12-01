@@ -539,8 +539,8 @@ class AlternatingBitProtocolProof(
             ),
         )
 
-    @track
-    @temporal_invariant
+    # @track
+    # @temporal_invariant
     def eventually_sender_array_non_bottom_downward(
         self, I: Index, J: Index
     ) -> BoolRef:
@@ -577,6 +577,9 @@ class AlternatingBitProtocolProof(
             self.sys.le(i, self.skolem_index),
             self.sys.le(self.sys.sender_index, i),
         )
+
+    # min(skolem_index,sender_index) - receiver_index
+    # 
 
     def sender_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)

@@ -190,7 +190,7 @@ class PaxosSystem(TransitionSystem):
                         Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
                     ),
                 ),
-            ),
+            ), # check this without this weird assumption -- is Q in the wrong place.
             If(
                 And(
                     ForAll(V, Not(self.proposal(r, V))),
@@ -409,6 +409,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             And(self.sys.proposal(R, V1), self.sys.proposal(R, V2)), V1 == V2
         )
 
+    @omit_timer_init
     @invariant
     def vote_proposal_consistency(self, N: Node, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, R, V), self.sys.proposal(R, V))
