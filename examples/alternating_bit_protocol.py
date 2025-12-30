@@ -529,57 +529,28 @@ class AlternatingBitProtocolProof(
             G(self.sys.bottom == self.sys.receiver_array(self.skolem_index)),
         )
 
-    @invariant
-    def sender_array_non_bottom_downward(self, I: Index, J: Index) -> BoolRef:
-        return Implies(
-            self.sys.le(I, J),
-            Implies(
-                self.sys.sender_array(J) != self.sys.bottom,
-                self.sys.sender_array(I) != self.sys.bottom,
-            ),
-        )
+    # @invariant
+    # def sender_array_non_bottom_downward(self, I: Index, J: Index) -> BoolRef:
+    #     return Implies(
+    #         self.sys.le(I, J),
+    #         Implies(
+    #             self.sys.sender_array(J) != self.sys.bottom,
+    #             self.sys.sender_array(I) != self.sys.bottom,
+    #         ),
+    #     )
 
-    # @track
-    # @temporal_invariant
-    def eventually_sender_array_non_bottom_downward(
-        self, I: Index, J: Index
-    ) -> BoolRef:
-        return Implies(
-            self.sys.le(I, J),
-            Implies(
-                F(self.sys.sender_array(J) != self.sys.bottom),
-                F(self.sys.sender_array(I) != self.sys.bottom),
-            ),
-        )
-
-    # main rank part - differences between the current index for generation, sender and receiver and the skolem index, and the time until we write to skolem index
+    # main rank part - differences between the current index for sender and receiver and the skolem index, and the time until we write to skolem index
 
     def write_to_skolem(self) -> BoolRef:
         return self.sys.bottom != self.sys.sender_array(self.skolem_index)
-
-    # sk_index - sender_gen_i
-    def btw_gen_skolem(self, i: Index) -> BoolRef:
-        return And(
-            self.sys.le(i, self.skolem_index),
-            self.sys.le(self.sys.sender_gen_index, i),
-        )
-
-    # finitely many indices satisfy:
-    # def sender_array_non_bottom(self, i: Index) -> BoolRef:
-    #     return timer_zero(self.t(F(self.sys.sender_array(i) != self.sys.bottom))())
-
-    def gen_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.btw_gen_skolem), None)
 
     # sk_index - sender_i
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
+            self.sys.le(i,self.sys.sender_gen_index),
             self.sys.le(self.sys.sender_index, i),
         )
-
-    # min(skolem_index,sender_index) - receiver_index
-    #
 
     def sender_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)
@@ -588,6 +559,7 @@ class AlternatingBitProtocolProof(
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
+            self.sys.le(i,self.sys.sender_gen_index),
             self.sys.le(self.sys.receiver_index, i),
         )
 
@@ -597,7 +569,7 @@ class AlternatingBitProtocolProof(
     def primary_rank(self) -> Rank:
         return PointwiseRank(
             self.timer_rank(self.write_to_skolem, None, None),
-            self.gen_minus_sk(),
+            # self.gen_minus_sk(),
             self.sender_minus_sk(),
             self.receiver_minus_sk(),
         )

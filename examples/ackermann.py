@@ -14,7 +14,7 @@ A(m, 0) = A(m - 1, 1)
 A(m, n) = A(m - 1, A(m, n - 1))
 """
 
-# @status - done (except for wf check for order - simple)
+# @status - done
 
 from prelude import *
 
