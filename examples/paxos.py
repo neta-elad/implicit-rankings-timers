@@ -409,8 +409,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             And(self.sys.proposal(R, V1), self.sys.proposal(R, V2)), V1 == V2
         )
 
-    @omit_timer_init
-    @invariant
+    @system_invariant
     def vote_proposal_consistency(self, N: Node, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, R, V), self.sys.proposal(R, V))
 
@@ -502,7 +501,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.sys.one_a_received(N, self.sys.r0),
             Exists([R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)),
         )
-
+    
+    # @omit_timer_init -- this invariant follows completely from system_init
+    # but cannot be a system_invariant because tr step requires timers
     @invariant(leaf=True)
     # notice that because this talks about r0 it can't be a system_invariant
     def proposal_received_then_vote(self, N: Node, V: Value) -> BoolRef:
