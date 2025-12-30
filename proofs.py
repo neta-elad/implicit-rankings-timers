@@ -125,6 +125,7 @@ class TemporalWitness:
 class Invariant:
     source: TSFormula
     leaf: bool
+    omit_timer_axioms_in_init: bool
 
     def formula[T: TransitionSystem](self, ts: "Proof[T]") -> z3.BoolRef:
         return universal_closure(self.source, ts)
@@ -355,6 +356,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             name: Invariant(
                 method,
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+                True,
             )
             for name, method in _get_methods(self, _PROOF_SYSTEM_INVARIANT)
             if assert_no_temporal(name, method(self))
@@ -366,6 +368,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             name: Invariant(
                 method,
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+                has_marker(
+                    getattr(self.__class__, name),
+                    _PROOF_OMIT_TIMER_AXIOMS_IN_INIT_INVARIANT,
+                ),
             )
             for name, method in _get_methods(self, _PROOF_INVARIANT)
             if assert_no_temporal(name, method(self))
@@ -377,6 +383,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             name: TemporalInvariant(
                 method,
                 has_marker(getattr(self.__class__, name), _PROOF_LEAF_INVARIANT),
+                False,
             )
             for name, method in _get_methods(self, _PROOF_TEMPORAL_INVARIANT)
         }
@@ -580,8 +587,8 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 self.check_inductiveness(
                     lambda this: inv.formula(this),
                     name + "*",
-                    self.sys_with_witnesses,
-                    lambda this: z3.And(
+                    ts=self.sys_with_witnesses,
+                    assumption=lambda this: z3.And(
                         inv.formula(this), this.no_leaf_system_invariant
                     ),
                 )
@@ -589,12 +596,19 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
 
         # Regular invariants
         for name, inv in self.invariants.items():
+            init_axiom = None
+            if inv.omit_timer_axioms_in_init:
+                init_axiom = self.sys.axiom
+
             results.append(
                 self.check_inductiveness(
                     lambda this: inv.formula(this),
                     name,
-                    self,
-                    lambda this: z3.And(inv.formula(this), this.no_leaf_invariant),
+                    ts=self,
+                    assumption=lambda this: z3.And(
+                        inv.formula(this), this.no_leaf_invariant
+                    ),
+                    init_axiom=init_axiom,
                 )
             )
 
@@ -604,8 +618,10 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 self.check_inductiveness(
                     lambda this: inv.formula(this),
                     name,
-                    self,
-                    lambda this: z3.And(inv.formula(this), this.no_leaf_invariant),
+                    ts=self,
+                    assumption=lambda this: z3.And(
+                        inv.formula(this), this.no_leaf_invariant
+                    ),
                 )
             )
 
@@ -615,8 +631,11 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         self,
         inv: Callable[[Self], z3.BoolRef],
         inv_name: str = "?",
+        *,
         ts: BaseTransitionSystem | None = None,
         assumption: Callable[[Self], z3.BoolRef] | None = None,
+        init: z3.BoolRef | None = None,
+        init_axiom: z3.BoolRef | None = None,
     ) -> bool:
         if ts is None:
             ts = self
@@ -624,12 +643,18 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         if assumption is None:
             assumption = inv
 
+        if init is None:
+            init = ts.init
+
+        if init_axiom is None:
+            init_axiom = ts.axiom
+
         results = []
         results.append(
             self.check_and_print(
                 f"{inv_name} in init",
-                ts.axiom,
-                ts.init,
+                init_axiom,
+                init,
                 z3.Not(inv(self)),
                 with_axioms=False,
             )
@@ -748,7 +773,7 @@ def system_invariant[T: Proof[Any], *Ts](
 
 @overload
 def invariant[T: Proof[Any], *Ts](
-    *, leaf: bool = False
+    *, leaf: bool = False, omit_timer_axioms_in_init: bool = False
 ) -> Callable[[TypedProofFormula[T, *Ts]], TypedProofFormula[T, *Ts]]: ...
 
 
@@ -759,7 +784,11 @@ def invariant[T: Proof[Any], *Ts](
 
 
 def invariant[T: Proof[Any], *Ts](
-    fun: Any | None = None, /, *, leaf: bool = False
+    fun: Any | None = None,
+    /,
+    *,
+    leaf: bool = False,
+    omit_timer_axioms_in_init: bool = False,
 ) -> Any:
     """
     Decorator for defining invariants.
@@ -770,6 +799,7 @@ def invariant[T: Proof[Any], *Ts](
 
     :param fun: The invariant formula function (if used as decorator).
     :param leaf: If True, mark as a leaf invariant (not used in proving other invariants).
+    :param omit_timer_axioms_in_init: If True, do not use the timer axioms when checking the invariant in init.
 
     Example:
     ```python
@@ -792,6 +822,8 @@ def invariant[T: Proof[Any], *Ts](
     def wrapper(actual_fun: TypedProofFormula[T, *Ts]) -> TypedProofFormula[T, *Ts]:
         if leaf:
             add_marker(actual_fun, _PROOF_LEAF_INVARIANT)
+        if omit_timer_axioms_in_init:
+            add_marker(actual_fun, _PROOF_OMIT_TIMER_AXIOMS_IN_INIT_INVARIANT)
         return add_marker(actual_fun, _PROOF_INVARIANT)
 
     if fun is not None:
@@ -939,6 +971,7 @@ def temporal_witness[T: Proof[Any], W: Expr](fun: TypedProofFormula[T, W]) -> W:
 _PROOF_SYSTEM_INVARIANT = object()
 _PROOF_INVARIANT = object()
 _PROOF_LEAF_INVARIANT = object()
+_PROOF_OMIT_TIMER_AXIOMS_IN_INIT_INVARIANT = object()
 _PROOF_TEMPORAL_INVARIANT = object()
 _PROOF_WITNESS = object()
 _PROOF_TEMPORAL_WITNESS = object()

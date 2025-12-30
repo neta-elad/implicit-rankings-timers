@@ -190,7 +190,7 @@ class PaxosSystem(TransitionSystem):
                         Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
                     ),
                 ),
-            ), # check this without this weird assumption -- is Q in the wrong place.
+            ),  # check this without this weird assumption -- is Q in the wrong place.
             If(
                 And(
                     ForAll(V, Not(self.proposal(r, V))),
@@ -501,11 +501,10 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.sys.one_a_received(N, self.sys.r0),
             Exists([R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)),
         )
-    
-    # @omit_timer_init -- this invariant follows completely from system_init
-    # but cannot be a system_invariant because tr step requires timers
-    @invariant(leaf=True)
-    # notice that because this talks about r0 it can't be a system_invariant
+
+    @invariant(leaf=True, omit_timer_axioms_in_init=True)
+    # notice that because this talks about r0 it can't be a system_invariant,
+    # but it follows completely from init without timer axioms
     def proposal_received_then_vote(self, N: Node, V: Value) -> BoolRef:
         return Implies(
             self.sys.proposal_received(N, self.sys.r0, V),

@@ -579,7 +579,7 @@ class AlternatingBitProtocolProof(
         )
 
     # min(skolem_index,sender_index) - receiver_index
-    # 
+    #
 
     def sender_minus_sk(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)
