@@ -20,3 +20,6 @@ core-*.txt
 models/
 cores/
 docs/out
+
+# Artifact
+artifact-*.tar.gz

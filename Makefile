@@ -1,6 +1,11 @@
 VENV = .venv
 STAMP = $(VENV)/.stamp
 LIB_INTERFACE = typed_z3 ts temporal timers orders ranks proofs
+IMAGE_PREFIX = artifact
+
+remove-docker-image = docker image ls | grep -q $(1) && docker image rm $(IMAGE_PREFIX)-$(1) || echo Skipping $(1)
+build-docker-image = docker buildx build -t $(IMAGE_PREFIX)-$(1) --platform linux/$(1) .
+save-docker-image = docker image save $(IMAGE_PREFIX)-$(1) | gzip > $(IMAGE_PREFIX)-$(1).tar.gz
 
 ifeq ($(OS),Windows_NT)
 	SYS_PYTHON = py -3.13
@@ -59,6 +64,14 @@ docs/out: docs/examples/ticket.md
 docs/out-open: docs/out
 	open docs/out/index.html
 
+$(IMAGE_PREFIX)-%.tar.gz: FORCE
+	-$(call build-docker-image,$*)
+	-$(call save-docker-image,$*)
+	-$(call remove-docker-image,$*)
+
+$(IMAGE_PREFIX)-%: FORCE
+	-$(call build-docker-image,$*)
+
 
 .PHONY: $(VENV)
 $(VENV): $(STAMP)
@@ -75,3 +88,5 @@ clean:
 	$(RM) models
 	$(RM) cores
 	$(RM) docs/out
+
+FORCE:
