@@ -70,7 +70,6 @@ TIMERS=unint make examples/ticket.py
 
 ### Examples
 - Clean up paxos: review weird assumption and weird timeout.
-- Clean up abp: change rank a bit and add appropriate FiniteLemma.
 - review Dijsktra k-state - why does it work without temporal invariant?
 - multi_paxos, stoppable_paxos.
 - Examples from implicit rankings: 3 other self-stabilization protocols.

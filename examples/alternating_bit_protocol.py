@@ -11,9 +11,7 @@ transmission over half-duplex links. Commun. ACM 12(5), 260–261 (May 1969), ht
 
 """
 
-# @status - work in progress, see below.
-# Note: actually there is something problematic with the soundness condition
-# in the submission version we had Index(Finite), but i want to be more precise.
+# @status - done
 
 
 from prelude import *
@@ -553,7 +551,7 @@ class AlternatingBitProtocolProof(
         )
 
     def sender_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), None)
+        return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), FiniteLemma(self.btw_sender_skolem))
 
     # sk_index - receiver_i
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
@@ -564,10 +562,10 @@ class AlternatingBitProtocolProof(
         )
 
     def receiver_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.btw_receiver_skolem), None)
+        return DomainPointwiseRank.close(BinRank(self.btw_receiver_skolem), FiniteLemma(self.btw_receiver_skolem))
 
     def primary_rank(self) -> Rank:
-        return PointwiseRank(
+        return LexRank(
             self.timer_rank(self.write_to_skolem, None, None),
             # self.gen_minus_sk(),
             self.sender_minus_sk(),
