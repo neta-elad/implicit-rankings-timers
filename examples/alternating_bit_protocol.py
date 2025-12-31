@@ -546,23 +546,27 @@ class AlternatingBitProtocolProof(
     def btw_sender_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
-            self.sys.le(i,self.sys.sender_gen_index),
+            self.sys.le(i, self.sys.sender_gen_index),
             self.sys.le(self.sys.sender_index, i),
         )
 
     def sender_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.btw_sender_skolem), FiniteLemma(self.btw_sender_skolem))
+        return DomainPointwiseRank.close(
+            BinRank(self.btw_sender_skolem), FiniteLemma(self.btw_sender_skolem)
+        )
 
     # sk_index - receiver_i
     def btw_receiver_skolem(self, i: Index) -> BoolRef:
         return And(
             self.sys.le(i, self.skolem_index),
-            self.sys.le(i,self.sys.sender_gen_index),
+            self.sys.le(i, self.sys.sender_gen_index),
             self.sys.le(self.sys.receiver_index, i),
         )
 
     def receiver_minus_sk(self) -> Rank:
-        return DomainPointwiseRank.close(BinRank(self.btw_receiver_skolem), FiniteLemma(self.btw_receiver_skolem))
+        return DomainPointwiseRank.close(
+            BinRank(self.btw_receiver_skolem), FiniteLemma(self.btw_receiver_skolem)
+        )
 
     def primary_rank(self) -> Rank:
         return LexRank(
@@ -749,6 +753,9 @@ class AlternatingBitProtocolProof(
             self.rank_no_ack_fairness(),
             self.rank_no_data_fairness(),
         )
+
+    def l2s_ivy_file(self) -> str | None:
+        return "alternating_bit_protocol"
 
 
 AlternatingBitProtocolProof().check()

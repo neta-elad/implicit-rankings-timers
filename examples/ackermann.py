@@ -298,6 +298,9 @@ class AckermannProof(Proof[AckermannSystem], prop=AckermannProp):
             self.multiset_rank(),
         )
 
+    def l2s_ivy_file(self) -> str | None:
+        return "ackermann_termination_proof"
+
     # alternative idea for a proof: with DomLex over Nat and not Nat*Nat,
     # Oded suggested that we consider this but for the stack "extended" with (n+1) copies of (m-1/2), but I don't know how to do that.
     # lexicographic order with the more significant being the higher values (otherwise not well-founded)

@@ -11,7 +11,7 @@ Termination is then verified with the use of implicit rankings and invariants (S
 
 ## Using the Artifact Image
 Download the appropriate Docker image from 
-<https://doi.org/10.5281/zenodo.18094939>, 
+<https://doi.org/10.5281/zenodo.18094938>, 
 and load it by running:
 ```shell
 docker load -i artifact-<platform>.tar.gz
@@ -21,13 +21,15 @@ or `amd64`.
 
 Then run it with:
 ```shell
-docker run artifact-<platform> make all
+docker run artifact-<platform> make all QUIET=true
 ```
 
 You can run a specific example with:
 ```shell
-docker run artifact-<platform> make examples/ticket.py
+docker run artifact-<platform> make examples/ticket.py QUIET=true
 ```
+
+To get full log of a run, simply remove the `QUITE=true` environment variable.
 
 ## Running the Code Locally
 

@@ -434,7 +434,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def eventually_proposed_r0(self) -> BoolRef:
         return F(self.sys.proposed(self.sys.r0))
 
-
     @temporal_invariant
     def no_one_a_after_r0_temporal(self) -> BoolRef:
         R = Round("R")
@@ -477,7 +476,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def no_vote_after_r0(self, N: Node, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0))
 
-
     # @invariant(leaf=True)
     # #notice that because this talks about r0 it can't be a system_invariant
     # def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
@@ -494,7 +492,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     #         N, self.sys.r0, V
     #     )
 
-    @invariant(leaf=True,omit_timer_axioms_in_init=True)
+    @invariant(leaf=True, omit_timer_axioms_in_init=True)
     # notice that because this talks about r0 it can't be a system_invariant
     def one_a_received_then_one_b_max_vote(self, N: Node) -> BoolRef:
         R = Round("R")
@@ -552,7 +550,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
     # def proposal_received_timer_rank_node_and_value(self) -> Rank:
     #     return TimerPosInOrderRank(self.t(self.proposal_received_in_r0(N, V)))
-    
+
     # def conditional_proposal_received_timer_rank(self, N: Node, V: Value) -> Rank:
     #     return CondRank(self.proposal_received_timer_rank_node_and_value(N, V), self.value_proposed_in_r0(N, V))
 
@@ -601,7 +599,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.sys.proposal(self.sys.r0, self.eventually_proposed_value), None, None
         )
 
-
     @invariant(leaf=True)
     def violation_instantiated(self) -> BoolRef:
         N = Node("N")
@@ -619,6 +616,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
                 )
             )(self.sys.q0, self.eventually_proposed_value)
         )
+
+    def l2s_ivy_file(self) -> str | None:
+        return "paxos_liveness"
 
 
 proof = PaxosProof()

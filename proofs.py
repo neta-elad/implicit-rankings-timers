@@ -11,18 +11,31 @@ and the timer transition system for the negated property.
 Validity of the temporal property is then shown by proving termination
 of the intersection system with a rank function
 (constructed using implicit rankings).
+
+When running an example you can turn on quiet mode,
+and only get the bottom line result
+by setting the environment variable `QUIET` to `true`:
+```sh
+make examples/ticket.py QUIET=true
+```
 """
 
+import io
+import sys
 import time
 from abc import ABC, abstractmethod
 from collections.abc import Callable, Iterable
+from contextlib import redirect_stdout
 from dataclasses import dataclass
 from functools import cached_property
+from os import getenv
+from pathlib import Path
 from typing import ClassVar, cast, Any, Self, overload, Literal
 
 import z3
 
 from helpers import expr_size
+from measure_ivy_proof import measure_ivy_proof
 from metadata import add_marker, get_methods, has_marker
 from ranks import Rank, FiniteLemma, TimerRank
 from temporal import Prop, nnf, contains_temporal
@@ -53,6 +66,8 @@ __all__ = [
     "temporal_witness",
     "track",
 ]
+
+_QUIET = getenv("QUIET", "") in {"t", "true"}
 
 
 class WitnessSystem(BaseTransitionSystem):
@@ -236,6 +251,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             cls._cache[item] = type(f"ProofOf{item}", (cls,), {"ts": item}, prop=None)
 
         return cls._cache[item]
+
+    def l2s_ivy_file(self) -> str | None:
+        return None
 
     @abstractmethod
     def rank(self) -> Rank:
@@ -534,8 +552,25 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         :param check_conserved: If True, also check that the rank is conserved.
         :return: True if all checks pass, False otherwise.
         """
-        print(f"Running proof of {self}")
+
+        _print_if(f"| {str(self):<60} ", f"Running proof of {self}")
         start_time = time.monotonic()
+
+        stdout = sys.stdout
+        if _QUIET:
+            stdout = NullWriter()
+        with redirect_stdout(stdout):
+            result = self._run_checks(check_conserved=check_conserved)
+
+        if not result:
+            self.print_stats(None)
+            return False
+
+        end_time = time.monotonic()
+        self.print_stats(end_time - start_time)
+        return True
+
+    def _run_checks(self, *, check_conserved: bool = False) -> bool:
         if not self.sys.sanity_check():
             print("fail: sanity")
             return False
@@ -560,23 +595,42 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             print(f"fail: soundness")
             return False
 
-        end_time = time.monotonic()
-        self.print_stats(end_time - start_time)
         return True
 
     def print_stats(self, duration: float | None = None) -> None:
-        print(f"Proof of {self}", end="")
-
         if duration is not None:
-            print(": all passed!")
-            print(f"Time: {duration:.3f} seconds")
+            _print_if("", f"Proof of {self}: all passed!")
+            _print_if(f"| {duration:>8.3f} ", f"Time: {duration:.3f} seconds")
         else:
-            print()
+            _print_if(f"| {"fail":>8} ", f"Proof of {self}: failed")
 
-        print(f"Rank: {self.rank()}")
-        print(f"Rank size: {self.rank().size}")
-        print(f"Invariant count: {self.invariant_count}")
-        print(f"Proof size: {self.size}")
+        _print_if("", f"Rank: {self.rank()}")
+        _print_if(f"| {self.rank().size:>2} ", f"Rank size: {self.rank().size}")
+        _print_if(
+            f"| {self.invariant_count:>2} ", f"Invariant count: {self.invariant_count}"
+        )
+        _print_if(f"| {self.size:>4} ", f"Proof size: {self.size}")
+        _print_if(
+            f"| {self.measure_ivy():>4} ", f"Ivy proof size: {self.measure_ivy()}"
+        )
+
+        if _QUIET:
+            print("|")
+
+    def measure_ivy(self) -> str:
+        ivy_file_name = self.l2s_ivy_file()
+        if ivy_file_name is None:
+            return "---"
+
+        ivy_path = (
+            Path(__file__).parent
+            / "examples"
+            / "todos"
+            / "ivy_examples"
+            / ivy_file_name
+        ).with_suffix(".ivy")
+        size = measure_ivy_proof(ivy_path)
+        return str(size)
 
     def _check_inv(self) -> bool:
         results = []
@@ -715,7 +769,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
             return False
 
     def __str__(self) -> str:
-        return f"{self.prop_type.__name__} for {self.sys.__class__.__name__}"
+        return f"{self.sys.__class__.__name__}:{self.prop_type.__name__}"
 
 
 type TypedProofFormula[T: Proof[Any], *Ts] = Callable[[T, *Ts], z3.BoolRef]
@@ -981,3 +1035,18 @@ _PROOF_TRACK_TEMPORAL = object()
 def _get_methods(ts: Proof[Any], marker: object) -> Iterable[tuple[str, TSFormula]]:
     for name, member in get_methods(ts, marker):
         yield name, ts_term(member)
+
+
+def _print_if(if_quiet: str, if_loud: str) -> None:
+    if _QUIET:
+        print(if_quiet, end="", flush=True)
+    else:
+        print(if_loud)
+
+
+class NullWriter:
+    def write(self, _: Any) -> None:
+        pass
+
+    def flush(self) -> None:
+        pass

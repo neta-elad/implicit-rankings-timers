@@ -541,5 +541,8 @@ class RelayHRBProof(Proof[HybridReliableBroadcast], prop=RelayHRB):
             ),
         )
 
+    def l2s_ivy_file(self) -> str | None:
+        return "hybrid_reliable_broadcast_cisa_correctness"
+
 
 RelayHRBProof().check()

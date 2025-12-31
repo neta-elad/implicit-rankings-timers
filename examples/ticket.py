@@ -468,6 +468,9 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     def rank(self) -> Rank:
         return LexRank(self.rk1(), self.rk2(), self.rk3(), self.rk4())  # </>
 
+    def l2s_ivy_file(self) -> str | None:
+        return "ticket"
+
 
 # <>
 # | Finally, we run the proof check to verify all obligations.

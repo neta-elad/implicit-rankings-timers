@@ -23,7 +23,7 @@ def continuation(line: str) -> bool:
     return counted_expr.match(line) is not None
 
 
-def main(filename: Path) -> None:
+def measure_ivy_proof(filename: Path) -> int:
     size = 0
     in_invariant = False
 
@@ -37,7 +37,7 @@ def main(filename: Path) -> None:
         else:
             in_invariant = False
 
-    print(f"[{filename}] Proof size: {size}")
+    return size
 
 
 if __name__ == "__main__":
@@ -49,4 +49,5 @@ if __name__ == "__main__":
     if not ivy_path.exists() or not ivy_path.is_file():
         print(f"{ivy_file} is missing or not a file")
         exit(-1)
-    main(ivy_path)
+    size = measure_ivy_proof(ivy_path)
+    print(f"[{ivy_path}] Proof size: {size}")

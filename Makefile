@@ -41,7 +41,7 @@ format: $(VENV)
 .PHONY: %.py
 .PRECIOUS: %.py
 %.py: $(VENV) check
-	$(PYTHON) $@
+	@$(PYTHON) $@
 
 .PHONY: docs/examples/ticket.md
 .PRECIOUS: docs/examples/ticket.md

@@ -217,5 +217,8 @@ class CorrectnessHRBProof(Proof[HybridReliableBroadcast], prop=CorrectnessHRB):
             self.all_rcv_timers(),
         )
 
+    def l2s_ivy_file(self) -> str | None:
+        return "hybrid_reliable_broadcast_cisa_correctness"
+
 
 CorrectnessHRBProof().check()
