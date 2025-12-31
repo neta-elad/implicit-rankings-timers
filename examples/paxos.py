@@ -9,7 +9,7 @@ Protocol from:
 Lamport, L.: The part-time parliament. ACM Trans. Program. Lang. Syst. 16(2), 133–169 (Mar 1994). https://doi.org/10.1145/174674.174675
 """
 
-# @status - everything works except for 2 annoying invariant checks in init because of the quantifier altenration in init
+# @status - done
 
 from prelude import *
 
@@ -45,7 +45,6 @@ class PaxosSystem(TransitionSystem):
     proposed: Rel[Round]
     # invariant: proposed(R) <-> exists V . proposal(R,V)
     one_b_received: Rel[Round, Node]
-
     # invariant: one_b_received(R,N) <-> exists R2,V. one_b_max_vote_received(R,N,R2,V)
 
     @axiom
@@ -177,11 +176,16 @@ class PaxosSystem(TransitionSystem):
         return And(
             r != self.none,
             Implies(
-                ForAll(
-                    [N, Q],
-                    Implies(
-                        self.member(N, Q),
-                        Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
+                Exists(
+                    Q,
+                    ForAll(
+                        N,
+                        Implies(
+                            self.member(N, Q),
+                            Exists(
+                                [MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)
+                            ),
+                        ),
                     ),
                 ),
                 ForAll(
@@ -191,7 +195,7 @@ class PaxosSystem(TransitionSystem):
                         Exists([MAXR, V], self.one_b_max_vote_received(r, N, MAXR, V)),
                     ),
                 ),
-            ),  # check this without this weird assumption -- is Q in the wrong place.
+            ),
             If(
                 And(
                     ForAll(V, Not(self.proposal(r, V))),
@@ -277,7 +281,6 @@ class PaxosSystem(TransitionSystem):
                 ),
                 And(
                     self.vote.update({(n, r, v): true}),
-                    # here in ivy they use the violation -- this is a bit cheaty, the skolemization is a better approach (REIVIEW HERE)
                 ),
                 self.vote.unchanged(),
             ),
@@ -448,6 +451,47 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             )
         )
 
+    @temporal_witness
+    @track
+    def eventually_proposed_value(self, V: Value) -> BoolRef:
+        return F(self.sys.proposal(self.sys.r0, V))
+
+    @temporal_invariant(leaf=True)
+    @track
+    def eventually_proposed_value_definition(self) -> BoolRef:
+        V = Value("V")
+        return Implies(
+            Exists(V, F(self.sys.proposal(self.sys.r0, V))),
+            F(self.sys.proposal(self.sys.r0, self.eventually_proposed_value)),
+        )
+
+    @temporal_invariant(leaf=True)
+    @track
+    def proposal_implies_witness(self) -> BoolRef:
+        V = Value("V")
+        return Implies(
+            Exists(V, self.sys.proposal(self.sys.r0, V)),
+            Exists(V, F(self.sys.proposal(self.sys.r0, V))),
+        )
+
+    @invariant(leaf=True)
+    def violation_instantiated(self) -> BoolRef:
+        N = Node("N")
+        Q = Quorum("Q")
+        V = Value("V")
+        return timer_zero(
+            self.t(
+                G(
+                    Exists(
+                        N,
+                        And(
+                            self.sys.member(N, Q), Not(self.sys.vote(N, self.sys.r0, V))
+                        ),
+                    )
+                )
+            )(self.sys.q0, self.eventually_proposed_value)
+        )
+
     @invariant
     def no_one_a_after_r0(self, R: Round) -> BoolRef:
         return Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0))
@@ -477,24 +521,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def no_vote_after_r0(self, N: Node, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, R, V), self.sys.le(R, self.sys.r0))
 
-    # @invariant(leaf=True)
-    # #notice that because this talks about r0 it can't be a system_invariant
-    # def one_a_received_iff_one_b_max_vote(self, N: Node) -> BoolRef:
-    #     R = Round("R")
-    #     V = Value("V")
-    #     return self.sys.one_a_received(N, self.sys.r0) == Exists(
-    #         [R, V], self.sys.one_b_max_vote(N, self.sys.r0, R, V)
-    #     )
-
-    # @invariant(leaf=True)
-    # #notice that because this talks about r0 it can't be a system_invariant
-    # def proposal_received_iff_vote(self, N: Node, V: Value) -> BoolRef:
-    #     return self.sys.proposal_received(N, self.sys.r0, V) == self.sys.vote(
-    #         N, self.sys.r0, V
-    #     )
-
     @invariant(leaf=True, omit_timer_axioms_in_init=True)
-    # notice that because this talks about r0 it can't be a system_invariant
     def one_a_received_then_one_b_max_vote(self, N: Node) -> BoolRef:
         R = Round("R")
         V = Value("V")
@@ -504,8 +531,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
         )
 
     @invariant(leaf=True, omit_timer_axioms_in_init=True)
-    # notice that because this talks about r0 it can't be a system_invariant,
-    # but it follows completely from init without timer axioms
     def proposal_received_then_vote(self, N: Node, V: Value) -> BoolRef:
         return Implies(
             self.sys.proposal_received(N, self.sys.r0, V),
@@ -533,45 +558,29 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def proposal_received_in_r0(self, N: Node, V: Value) -> BoolRef:
         return self.sys.proposal_received(N, self.sys.r0, V)
 
-    def value_proposed_in_r0(self, N: Node, V: Value) -> BoolRef:
+    def value_proposed_in_r0(self, V: Value) -> BoolRef:
         return self.sys.proposal(self.sys.r0, V)
 
-    def value_proposed_in_r0_no_N(self, V: Value) -> BoolRef:
-        return self.sys.proposal(self.sys.r0, V)
-
-    # doesn't work because maybe there's inf N but only fin V
-    # but we know only finite N
-    # so we need to do it in two steps, to utilise the two different finiteness approaches.
-    def proposal_received_timer_rank(self) -> Rank:
-        return self.timer_rank(
-            self.proposal_received_in_r0,
-            self.value_proposed_in_r0,
-            FiniteLemma(self.value_proposed_in_r0),
-        )
-
-    # tried to come up with a solution but its complex:
-    # our syntax doesn't really allow it
-
-    def proposal_received_timer_rank_node_and_value(self) -> Rank:
+    def proposal_received_timer(self) -> Rank:
         return self.timer_pos_in_order_rank(self.proposal_received_in_r0)
 
-    def conditional_proposal_received_timer_rank(self) -> Rank:
-        return CondRank(
-            self.proposal_received_timer_rank_node_and_value(),
-            self.value_proposed_in_r0,
-        )
-
-    def conditional_prop_recv_timers_for_all_nodes(self) -> Rank:
+    def proposal_received_timer_all_nodes(self) -> Rank:
         return DomainPointwiseRank(
-            self.conditional_proposal_received_timer_rank(),
+            self.proposal_received_timer(),
             ParamSpec(N=Node),
             None,
         )
 
-    def conditional_prop_recv_timers_for_all_nodes_agg(self) -> Rank:
+    def cond_prop_recv_timer_all_nodes(self) -> Rank:
+        return CondRank(
+            self.proposal_received_timer_all_nodes(),
+            self.value_proposed_in_r0,
+        )
+
+    def cond_prop_recv_timer_all_nodes_and_values(self) -> Rank:
         return DomainPointwiseRank.close(
-            self.conditional_prop_recv_timers_for_all_nodes(),
-            FiniteLemma(self.value_proposed_in_r0_no_N),
+            self.cond_prop_recv_timer_all_nodes(),
+            FiniteLemma(self.value_proposed_in_r0),
         )
 
     def rank(self) -> Rank:
@@ -581,34 +590,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.one_b_received_timer_rank(),
             LexRank(
                 self.proposed_r0_timer_rank(),
-                # self.proposal_received_timer_rank(),
-                self.conditional_prop_recv_timers_for_all_nodes_agg(),
+                self.cond_prop_recv_timer_all_nodes_and_values(),
             ),
             self.proposal_eventually_proposed_value_timer_rank(),
-        )
-
-    # we add this temporal witness, which we use to instantiate the negated property.
-    @temporal_witness
-    @track
-    def eventually_proposed_value(self, V: Value) -> BoolRef:
-        return F(self.sys.proposal(self.sys.r0, V))
-
-    @temporal_invariant(leaf=True)
-    @track
-    def eventually_proposed_value_definition(self) -> BoolRef:
-        V = Value("V")
-        return Implies(
-            Exists(V, F(self.sys.proposal(self.sys.r0, V))),
-            F(self.sys.proposal(self.sys.r0, self.eventually_proposed_value)),
-        )
-
-    @temporal_invariant(leaf=True)
-    @track
-    def proposal_implies_witness(self) -> BoolRef:
-        V = Value("V")
-        return Implies(
-            Exists(V, self.sys.proposal(self.sys.r0, V)),
-            Exists(V, F(self.sys.proposal(self.sys.r0, V))),
         )
 
     def proposal_eventually_proposed_value_timer_rank(self) -> Rank:
@@ -616,31 +600,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.sys.proposal(self.sys.r0, self.eventually_proposed_value), None, None
         )
 
-    @invariant(leaf=True)
-    def violation_instantiated(self) -> BoolRef:
-        N = Node("N")
-        Q = Quorum("Q")
-        V = Value("V")
-        return timer_zero(
-            self.t(
-                G(
-                    Exists(
-                        N,
-                        And(
-                            self.sys.member(N, Q), Not(self.sys.vote(N, self.sys.r0, V))
-                        ),
-                    )
-                )
-            )(self.sys.q0, self.eventually_proposed_value)
-        )
-
     def l2s_ivy_file(self) -> str | None:
         return "paxos_liveness"
 
 
 proof = PaxosProof()
-# proof._check_conserved()
-proof._check_decreases()
-proof._check_soundness()
-# proof.check(check_conserved=True)
-# proof._check_inv()
+proof.check()
