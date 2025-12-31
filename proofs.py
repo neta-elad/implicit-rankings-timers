@@ -37,7 +37,7 @@ import z3
 from helpers import expr_size
 from measure_ivy_proof import measure_ivy_proof
 from metadata import add_marker, get_methods, has_marker
-from ranks import Rank, FiniteLemma, TimerRank
+from ranks import Rank, FiniteLemma, TimerRank, TimerPosInOrderRank
 from temporal import Prop, nnf, contains_temporal
 from timers import TimerTransitionSystem, create_timers, TimeFun, Time, timer_zero
 from ts import (
@@ -515,14 +515,48 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 return self.timer_rank(self.sys.waiting(t), None, None)
         ```
         """
+        phi_term, ts_phi = self.compile_phi_to_timer_term(phi)
+        phi_size = expr_size(ts_phi(self))
+
+        return TimerRank(phi_term, phi_size, alpha, finite_lemma)
+
+    def timer_pos_in_order_rank(
+        self,
+        phi: FormulaLike,
+    ) -> Rank:
+        """
+        Create a timer position-in-order rank from a formula.
+
+        Automatically calculates the timer for `phi` and returns a `TimerPosInOrderRank`.
+        This can be used when more control is needed (over `timer_rank`).
+
+        :param phi: The formula to create a timer rank for.
+        :return: A `TimerPosInOrderRank` that ranks by the timer for `phi`.
+
+        Example:
+        ```python
+        class Thread(Finite): ...
+
+        class System(TransitionSystem):
+            waiting: Rel[Thread]
+
+        class SysProof(Proof[System], prop=...):
+            def my_rank(self, t: Thread) -> Rank:
+                return self.timer_pos_in_order(self.sys.waiting(t))
+        ```
+        """
+        phi_term, _ = self.compile_phi_to_timer_term(phi)
+        return TimerPosInOrderRank(phi_term)
+
+    def compile_phi_to_timer_term(
+        self, phi: FormulaLike
+    ) -> tuple[TSTerm[Time], TSTerm[z3.BoolRef]]:
         ts_phi = ts_term(phi)
         timer_name = f"t_<{nnf(ts_phi(self))}>"
         spec = ts_phi.spec
 
-        phi_size = expr_size(ts_phi(self))
         phi_term = self.compile_timer(timer_name, spec)
-
-        return TimerRank(phi_term, phi_size, alpha, finite_lemma)
+        return phi_term, ts_phi
 
     @staticmethod
     def compile_timer(timer_name: str, spec: ParamSpec | None = None) -> TSTerm[Time]:

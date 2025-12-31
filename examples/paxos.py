@@ -45,6 +45,7 @@ class PaxosSystem(TransitionSystem):
     proposed: Rel[Round]
     # invariant: proposed(R) <-> exists V . proposal(R,V)
     one_b_received: Rel[Round, Node]
+
     # invariant: one_b_received(R,N) <-> exists R2,V. one_b_max_vote_received(R,N,R2,V)
 
     @axiom
@@ -535,6 +536,9 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     def value_proposed_in_r0(self, N: Node, V: Value) -> BoolRef:
         return self.sys.proposal(self.sys.r0, V)
 
+    def value_proposed_in_r0_no_N(self, V: Value) -> BoolRef:
+        return self.sys.proposal(self.sys.r0, V)
+
     # doesn't work because maybe there's inf N but only fin V
     # but we know only finite N
     # so we need to do it in two steps, to utilise the two different finiteness approaches.
@@ -548,25 +552,38 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
     # tried to come up with a solution but its complex:
     # our syntax doesn't really allow it
 
-    # def proposal_received_timer_rank_node_and_value(self) -> Rank:
-    #     return TimerPosInOrderRank(self.t(self.proposal_received_in_r0(N, V)))
+    def proposal_received_timer_rank_node_and_value(self) -> Rank:
+        return self.timer_pos_in_order_rank(self.proposal_received_in_r0)
 
-    # def conditional_proposal_received_timer_rank(self, N: Node, V: Value) -> Rank:
-    #     return CondRank(self.proposal_received_timer_rank_node_and_value(N, V), self.value_proposed_in_r0(N, V))
+    def conditional_proposal_received_timer_rank(self) -> Rank:
+        return CondRank(
+            self.proposal_received_timer_rank_node_and_value(),
+            self.value_proposed_in_r0,
+        )
 
-    # def conditional_prop_recv_timers_for_all_nodes(self) -> Rank:
-    #     return DomainPointwiseRank(
-    #         self.conditional_proposal_received_timer_rank(),
-    #         ParamSpec(N=Node),
-    #         None,
-    #     )
+    def conditional_prop_recv_timers_for_all_nodes(self) -> Rank:
+        return DomainPointwiseRank(
+            self.conditional_proposal_received_timer_rank(),
+            ParamSpec(N=Node),
+            None,
+        )
+
+    def conditional_prop_recv_timers_for_all_nodes_agg(self) -> Rank:
+        return DomainPointwiseRank.close(
+            self.conditional_prop_recv_timers_for_all_nodes(),
+            FiniteLemma(self.value_proposed_in_r0_no_N),
+        )
 
     def rank(self) -> Rank:
         return PointwiseRank(
             self.one_a_r0_timer_rank(),
             self.one_a_received_timer_rank(),
             self.one_b_received_timer_rank(),
-            LexRank(self.proposed_r0_timer_rank(), self.proposal_received_timer_rank()),
+            LexRank(
+                self.proposed_r0_timer_rank(),
+                # self.proposal_received_timer_rank(),
+                self.conditional_prop_recv_timers_for_all_nodes_agg(),
+            ),
             self.proposal_eventually_proposed_value_timer_rank(),
         )
 
@@ -623,6 +640,7 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
 
 proof = PaxosProof()
 # proof._check_conserved()
-# proof._check_decreases()
-proof.check(check_conserved=True)
+proof._check_decreases()
+proof._check_soundness()
+# proof.check(check_conserved=True)
 # proof._check_inv()
