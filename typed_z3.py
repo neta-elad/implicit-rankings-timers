@@ -299,7 +299,7 @@ class Enum(Expr, ABC):
 
         enum_values: list[Self] = []
         for name, value in zip(names, values):
-            enum_value: Self = cls(name, False, const=value)  # type: ignore
+            enum_value: Self = cls(name, mutable=False, const=value)  # type: ignore
             setattr(cls, name, enum_value)
             enum_values.append(enum_value)
 

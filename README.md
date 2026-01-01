@@ -98,18 +98,13 @@ make examples/ticket.py TIMERS=unint
 
 ## TODOs
 
-### Cleanup
-
-- Review size of proof, e.g why does DomLex not count the size of the order relation?
-
 ### Optimizations
 - [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms.
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G).
 - [ ] Axioms that may eliminate spurious phantom states, e.g. t_(p and q) >= t_p, t_q.
 
-### Examples
-- Clean up paxos: review weird assumption and weird timeout.
-- review Dijsktra k-state - why does it work without temporal invariant?
+### More Examples
+- Dijsktra k-state.
 - multi_paxos, stoppable_paxos.
 - Examples from implicit rankings: 3 other self-stabilization protocols.
 - Challenging future examples: TLB Shootdown, Sliding Window, Stellar Consensus Protocol, Chord, Apple Memory model

@@ -620,9 +620,16 @@ class PosInOrderRank[T: Expr](Rank):
     def size(self) -> int:
         return 1
 
+    def order_expr_size(self, ts: BaseTransitionSystem) -> int:
+        order_rel = self.ts_order(ts)
+        sort = order_rel.signature[0]
+        x = z3.Const("_x", sort.ref())
+        y = z3.Const("_y", sort.ref())
+        return expr_size(order_rel.fun(x, y))
+
     def expr_size(self, ts: BaseTransitionSystem) -> int:
         # rank + order + term
-        return 1 + 1 + expr_size(self.ts_term(ts))
+        return 1 + self.order_expr_size(ts) + expr_size(self.ts_term(ts))
 
     def __str__(self) -> str:
         return f"Pos({self.ts_term.name})"
@@ -1356,9 +1363,10 @@ class DomainLexRank(Rank):
         return expr_size(self.order_pred(ts)(*xs, *ys))
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
-        # rank + order + lemma + hints
+        # rank + sub-rank + order + lemma + hints
         return (
             1
+            + self.rank.expr_size(ts)
             + self.order_expr_size(ts)
             + lemma_size(ts, self.finite_lemma)
             + hint_size(ts, self.conserved_hints)
@@ -1624,9 +1632,10 @@ class DomainPermutedRank(Rank):
         return 1 + self.rank.size
 
     def expr_size(self, ts: BaseTransitionSystem) -> int:
-        # rank + ys + k + lemma + hints
+        # rank + sub-rank + ys + k + lemma + hints
         return (
             1
+            + self.rank.expr_size(ts)
             + len(self.quant_spec)
             + 1
             + lemma_size(ts, self.finite_lemma)
