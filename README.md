@@ -98,6 +98,8 @@ make examples/ticket.py TIMERS=unint
 
 ## TODOs
 
+Fix missing axiom relating phi and Not(phi)
+
 ### Optimizations
 - [ ] Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms.
 - [ ] Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G).
