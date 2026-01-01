@@ -176,6 +176,7 @@ class DijkstraKStateSystem(TransitionSystem):
         X = Node("X")
         return ForAll(X, Implies(X != self.bot, self.a(X) != self.a(self.bot)))
 
+
 # prop1 - F(bot_is_scheuled) works
 # maybe we need to show G(F(bot_scheduled)) to be more complete.
 class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
@@ -184,6 +185,7 @@ class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
             G(F(self.sys.bot_is_scheduled())),
             F(self.sys.bot_holds_unique_value()),
         )
+
 
 class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
 
