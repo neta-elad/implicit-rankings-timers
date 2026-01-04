@@ -1,7 +1,8 @@
 """
 Trivial Termination System
 
-A simple example demonstrating termination properties.
+A simple example demonstrating the use of timers
+to prove a liveness example with fairness
 """
 
 # @status - done

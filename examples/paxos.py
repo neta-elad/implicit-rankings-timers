@@ -30,8 +30,6 @@ class PaxosSystem(TransitionSystem):
     none: Immutable[Round]
     le: Immutable[Rel[Round, Round]]  # total order on rounds
     member: Immutable[Rel[Node, Quorum]]  # quorum membership
-    r0: Immutable[Round]  # the round after which no ballot must be started
-    q0: Immutable[Quorum]  # the quorum that must be responsive
 
     one_a: Rel[Round]
     one_b_max_vote: Rel[Node, Round, Round, Value]
@@ -46,6 +44,10 @@ class PaxosSystem(TransitionSystem):
     # invariant: proposed(R) <-> exists V . proposal(R,V)
     one_b_received: Rel[Round, Node]
     # invariant: one_b_received(R,N) <-> exists R2,V. one_b_max_vote_received(R,N,R2,V)
+
+    # fairness variables
+    r0: Immutable[Round]  # the round after which no ballot must be started
+    q0: Immutable[Quorum]  # the quorum that must be responsive
 
     @axiom
     def total_order_axioms(self, X: Round, Y: Round, Z: Round) -> BoolRef:
@@ -537,6 +539,8 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             self.sys.vote(N, self.sys.r0, V),
         )
 
+    # ranks
+
     def one_a_r0_timer_rank(self) -> Rank:
         return self.timer_rank(self.sys.one_a(self.sys.r0), None, None)
 
@@ -583,6 +587,11 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
             FiniteLemma(self.value_proposed_in_r0),
         )
 
+    def proposal_eventually_proposed_value_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            self.sys.proposal(self.sys.r0, self.eventually_proposed_value), None, None
+        )
+
     def rank(self) -> Rank:
         return PointwiseRank(
             self.one_a_r0_timer_rank(),
@@ -593,11 +602,6 @@ class PaxosProof(Proof[PaxosSystem], prop=PaxosProperty):
                 self.cond_prop_recv_timer_all_nodes_and_values(),
             ),
             self.proposal_eventually_proposed_value_timer_rank(),
-        )
-
-    def proposal_eventually_proposed_value_timer_rank(self) -> Rank:
-        return self.timer_rank(
-            self.sys.proposal(self.sys.r0, self.eventually_proposed_value), None, None
         )
 
     def l2s_ivy_file(self) -> str | None:

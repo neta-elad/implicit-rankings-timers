@@ -3,6 +3,8 @@ Stellar Consensus Protocol (SCP)
 
 The Stellar Consensus Protocol provides federated Byzantine agreement.
 This implementation is based on the Ivy specification.
+
+https://github.com/stellar/scp-proofs/blob/3e0428acc78e598a227a866b99fe0b3ad4582914/SCP.ivy
 """
 
 # pretty sure this can't work, i looked at the proof and it seems super complicated and requires using the cascade theorem in a complicated way.
