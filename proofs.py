@@ -451,7 +451,7 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
                 len(method.spec) == 1
             ), f"Witness method {method_name} must except exactly one argument"
             ((param, sort),) = method.spec.items()
-            symbol = sort(witness_name + self.suffix, True)
+            symbol = sort(witness_name + self.suffix, mutable=True)
             axiom = z3.Implies(
                 existential_closure(method, self), method(self, {param: symbol})
             )
