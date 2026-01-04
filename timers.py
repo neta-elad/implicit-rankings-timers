@@ -452,7 +452,7 @@ class TimerTransitionSystem(BaseTransitionSystem):
                 body = z3.ForAll(list(params.values()), body)
             axioms[timer.name] = body
 
-        return axioms | self.refinement_axioms
+        return axioms | self.refinement_axioms | self.negation_axioms
 
     @property
     def refinement_axioms(self) -> dict[str, z3.BoolRef]:
@@ -474,6 +474,27 @@ class TimerTransitionSystem(BaseTransitionSystem):
                         t1.term(self, params) == t2.term(self, spec.params()),
                     )
                     axioms[f"{phi1} => {phi2}"] = axiom
+
+        return axioms
+
+    @property
+    def negation_axioms(self) -> dict[str, z3.BoolRef]:
+        axioms = {}
+
+        for phi1, t1 in self.timers.items():
+            for phi2, t2 in self.timers.items():
+                if phi1 == phi2:
+                    continue
+                neg_phi2 = TimerId(nnf(phi2.formula, True))
+                if phi1 == neg_phi2:
+                    assert t1.params == t2.params
+                    params = {param: sort(param) for param, sort in t1.params.items()}
+                    body = timer_zero(t1.term(self, params)) == timer_nonzero(
+                        t2.term(self, params)
+                    )
+                    if params:
+                        body = z3.ForAll(list(params.values()), body)
+                    axioms[f"{phi1} <=> ~{phi2}"] = body
 
         return axioms
 
@@ -597,7 +618,7 @@ def create_timers[T: BaseTransitionSystem](
             return add(NegationTimer(formula, child_timer.params, child_timer))
         elif is_G(formula):
             (child,) = formula.children()
-            negated_child = nnf(z3.Not(cast(z3.BoolRef, child)))
+            negated_child = nnf(cast(z3.BoolRef, child), True)
 
             child_timer = create_timer(child)
             negated_child_timer = create_timer(negated_child)
