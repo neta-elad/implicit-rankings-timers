@@ -31,12 +31,12 @@ class DijkstraKStateSystem(TransitionSystem):
     witness_value: Value
     skd: Node
 
-    @axiom
+    # @axiom
     def at_least_2_nodes_axiom(self) -> BoolRef:
         X = Node("X")
         return Exists(X, X != self.bot)
 
-    @axiom
+    # @axiom
     def leq_node_axioms(self, X: Node, Y: Node, Z: Node) -> BoolRef:
         return And(
             Implies(And(self.leq_node(X, Y), self.leq_node(Y, Z)), self.leq_node(X, Z)),
@@ -58,7 +58,7 @@ class DijkstraKStateSystem(TransitionSystem):
             ),
         )
 
-    @axiom
+    # @axiom
     def leq_value_axioms(self, S: Value, T: Value, R: Value) -> BoolRef:
         return And(
             Implies(
@@ -96,14 +96,14 @@ class DijkstraKStateSystem(TransitionSystem):
 
     # There is an assumption in the protocol that the number of values is larger than the number of nodes
     # This cannot be encoded directly, so we encode the consequence we need of it.
-    @axiom
+    # @axiom
     def more_values_than_nodes_axiom(self) -> BoolRef:
         R = Value("R")
         X = Node("X")
         return Exists(R, ForAll(X, self.a(X) != R))
 
     # defining 'witness value' as minimal missing value in ring
-    @axiom
+    # @axiom
     def witness_definition(self) -> BoolRef:
         X = Node("X")
         S = Value("S")
@@ -123,7 +123,7 @@ class DijkstraKStateSystem(TransitionSystem):
 
     # Some of our safety premises only hold in finite models, and so we use induction axioms to prove them
     # Our use of induction axioms is based on "Elad, N., Shoham, S.: Axe 'em: Eliminating spurious states with induction axioms."
-    @axiom
+    # @axiom
     def well_founded_axiom(self, X: Node, Y: Node) -> BoolRef:
         return Implies(
             Exists(X, self.a(X) != self.a(self.bot)),
@@ -149,16 +149,19 @@ class DijkstraKStateSystem(TransitionSystem):
     def wakeup(self, n: Node) -> BoolRef:
         X = Node("X")
         return And(
-            self.skd == n,
+            # self.skd == n,
             self.priv(n),
-            If(
-                n == self.bot,
-                And(
-                    self.succ_value(self.a(self.prev(n)), self.next.a(n)),
-                    ForAll(X, Implies(X != n, self.next.a(X) == self.a(X))),
-                ),
-                self.a.update({(n,): self.a(self.prev(n))}),
-            ),
+            n != self.bot,
+            self.a.update({(n,): self.a(self.prev(n))}),
+            # If(
+            #     n == self.bot,
+            #     false,
+            #     # And(
+            #     #     self.succ_value(self.a(self.prev(n)), self.next.a(n)),
+            #     #     ForAll(X, Implies(X != n, self.next.a(X) == self.a(X))),
+            #     # ),
+            #     self.a.update({(n,): self.a(self.prev(n))}),
+            # ),
         )
 
     def unique_privilege(self) -> BoolRef:
@@ -178,26 +181,28 @@ class DijkstraKStateSystem(TransitionSystem):
 
 
 # prop1 - F(bot_is_scheuled) works
+# prop GF bot=skd -> F bot holds unique value works
+# prop F bot holds unique value works works - i have suspicion about this
 # maybe we need to show G(F(bot_scheduled)) to be more complete.
 class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
     def prop(self) -> BoolRef:
-        return Implies(
-            G(F(self.sys.bot_is_scheduled())),
-            F(self.sys.bot_holds_unique_value()),
-        )
+        return false
+        F(self.sys.unique_privilege())
 
 
 class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
 
-    @temporal_invariant
-    def fairness(self) -> BoolRef:
-        return G(F(self.sys.bot_is_scheduled()))
+    @track
+    def test(self) -> BoolRef:
+        N = Node("N")
+        return Exists(N, self.sys.priv(N))
 
-    @temporal_invariant
+    # why does the proof go through without this invariant??
+    # @temporal_invariant
     def violation(self) -> BoolRef:
         return G(Not(self.sys.bot_holds_unique_value()))
 
-    @invariant(leaf=True)
+    # @invariant(leaf=True)
     def exists_privilege(self) -> BoolRef:
         N = Node("N")
         return Exists(N, self.sys.priv(N))
@@ -231,12 +236,15 @@ class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
         )
 
     def rank(self) -> Rank:
-        return LexRank(
+        return BinRank(true)
+        LexRank(
             self.all_values_bot_needs_to_pass(),
             # self.lexicographic_privileges(),
-            self.bot_is_scheduled_timer_rank(),
+            # self.bot_is_scheduled_timer_rank(),
         )
 
 
 proof = DijsktraKStateProof()
-proof.check(check_conserved=True)
+proof.check(
+    # check_conserved=True
+)
