@@ -1,8 +1,9 @@
 # Implicit Rankings with Timers
 This is the Python library accompanying the
+TACAS 2026 paper
 "*Verifying First-Order Temporal Properties 
 of Infinite States Systems via Timers and Rankings*"
-paper.
+by Raz Lotan, Neta Elad, Oded Padon and Sharon Shoham.
 It allows for easy, type-safe definitions of transition systems
 and temporal properties,
 and constructing proofs using implicit rankings and timers.
