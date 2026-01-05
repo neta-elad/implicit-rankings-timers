@@ -5,7 +5,6 @@ Based on the Ivy implementation in multi_paxos_liveness.ivy
 """
 
 # @status - todo
-# we want to improve the model to be a bit more accurate, without cheats
 
 from prelude import *
 
@@ -38,7 +37,7 @@ class MultiPaxosSystem(TransitionSystem):
         Inst
     ]  # the instance in which nothing is chosen (from negation of liveness property)
 
-    # Functions for votemap operations
+    # Functions for votemap type
     maxr: Immutable[
         Fun[Votemap, Inst, Round]
     ]  # maxr(M,I) = the round of the max vote for instance I in votemap M
@@ -68,9 +67,6 @@ class MultiPaxosSystem(TransitionSystem):
     one_b_received: Rel[
         Round, Node
     ]  # invariant: one_b_received(R,N) <-> exists M . one_b_votemap_received(R,N,M)
-    skolem_value: Immutable[
-        Value
-    ]  # skolem_value that will be proposed in r0 and voted for in i0 ### not sure this works, but temp
 
     @axiom
     def total_order_axioms(self, X: Round, Y: Round, Z: Round) -> BoolRef:
@@ -120,7 +116,6 @@ class MultiPaxosSystem(TransitionSystem):
             Not(self.one_a(r)),
             ForAll(R, Not(self.join_acks_called(R))),
             ForAll([R, I], Not(self.propose_called(R, I))),
-            # self.le(r, self.r0),  # assumption for liveness (the "fairness" assumption) # will be added to property
             # updates
             self.one_a.update({(r,): true}),
             # other relations unchanged
@@ -232,14 +227,17 @@ class MultiPaxosSystem(TransitionSystem):
         return And(
             # guard
             r != self.none,
-            ForAll(R, self.join_acks_called(R) == (R == r)),
-            ForAll([R, I], Not(self.propose_called(R, I))),
+            ForAll(R, self.join_acks_called(R) == (R == r)),  # fairness relations
+            ForAll([R, I], Not(self.propose_called(R, I))),  # fairness relations
             Implies(
-                ForAll(
-                    [N, Q],
-                    Implies(
-                        self.member(N, Q),
-                        Exists(M, self.one_b_votemap_received(r, N, M)),
+                Exists(
+                    Q,
+                    ForAll(
+                        N,
+                        Implies(
+                            self.member(N, Q),
+                            Exists(M, self.one_b_votemap_received(r, N, M)),
+                        ),
                     ),
                 ),
                 ForAll(
@@ -308,17 +306,24 @@ class MultiPaxosSystem(TransitionSystem):
                     self.active.update({(r,): true}),
                     # propose in all instances in which some vote was reported
                     ForAll(
-                        [I, V],
-                        self.next.proposal(I, r, V)
+                        [I, R, V],
+                        self.next.proposal(I, R, V)
                         == Or(
-                            self.proposal(I, r, V),
-                            And(self.maxr(m, I) != self.none, V == self.maxv(m, I)),
-                        ),
+                            self.proposal(I, R, V),
+                            And(
+                                R == r,
+                                self.maxr(m, I) != self.none,
+                                V == self.maxv(m, I),
+                            ),
+                        ),  # this is what the ivy syntax unpacks to.
                     ),
                     ForAll(
-                        I,
-                        self.next.proposed(I, r)
-                        == Or(self.proposed(I, r), self.maxr(m, I) != self.none),
+                        [I, R],
+                        self.next.proposed(I, R)
+                        == Or(
+                            self.proposed(I, R),
+                            And(R == r, self.maxr(m, I) != self.none),
+                        ),
                     ),
                 ),
                 And(
@@ -346,7 +351,7 @@ class MultiPaxosSystem(TransitionSystem):
             # guard
             r != self.none,
             ForAll(R, Not(self.join_acks_called(R))),
-            ForAll([R, I], self.propose_called(R, I) == (R == r and I == i)),
+            ForAll([R, I], self.propose_called(R, I) == And(R == r, I == i)),
             If(
                 And(self.active(r), ForAll(V, Not(self.proposal(i, r, V)))),
                 And(
@@ -389,12 +394,6 @@ class MultiPaxosSystem(TransitionSystem):
                 ),
                 And(
                     self.vote.update({(n, i, r, v): true}),
-                    # (in ivy)
-                    # from negation of the liveness property:
-                    # if i = i0 & exists Q . forall N . member(N,Q) -> vote(N,i0,r0,v) {
-                    #     assume false
-                    # }
-                    # This is handled by the property, not here
                 ),
                 self.vote.unchanged(),
             ),
@@ -475,15 +474,13 @@ class MultiPaxosProperty(Prop[MultiPaxosSystem]):
         )
 
         liveness_property = Exists(
-            [Q],
+            [V, Q, I],
             F(
                 ForAll(
                     N,
                     Implies(
                         self.sys.member(N, Q),
-                        self.sys.vote(
-                            N, self.sys.i0, self.sys.r0, self.sys.skolem_value
-                        ),
+                        self.sys.vote(N, self.sys.i0, self.sys.r0, V),
                     ),
                 )
             ),
@@ -530,7 +527,7 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
                                     self.sys.one_b_msg(N, self.sys.r0, M),
                                     F(self.sys.one_b_received(self.sys.r0, N)),
                                 )
-                            ),  # this is slightly different from the ivy comment, which doesn't make sense
+                            ),
                         ),
                         ForAll(
                             [I, V],
@@ -546,28 +543,22 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             ),
             ForAll(
                 I,
-                G(
-                    F(self.sys.propose_called(self.sys.r0, I))
-                ),  # slightly different from ivy, we use propose_called
+                G(F(self.sys.propose_called(self.sys.r0, I))),
             ),
-            G(
-                F(self.sys.join_acks_called(self.sys.r0))
-            ),  # slightly different from ivy, we use join_acks_called
+            G(F(self.sys.join_acks_called(self.sys.r0))),
         )
 
-    # Proposals are unique per round
-    # @invariant
-    def active_implies_no_proposal(self, R: Round, I: Inst, V: Value) -> BoolRef:
+    @system_invariant
+    def not_active_implies_no_proposal(self, R: Round, I: Inst, V: Value) -> BoolRef:
         return Implies(Not(self.sys.active(R)), Not(self.sys.proposal(I, R, V)))
 
-    # @invariant
+    @system_invariant
     def proposal_uniqueness(self, I: Inst, R: Round, V1: Value, V2: Value) -> BoolRef:
         return Implies(
             And(self.sys.proposal(I, R, V1), self.sys.proposal(I, R, V2)), V1 == V2
         )
 
-    # Only vote for proposed values
-    # @invariant
+    @system_invariant
     def vote_proposal_consistency(
         self, N: Node, I: Inst, R: Round, V: Value
     ) -> BoolRef:
@@ -578,11 +569,11 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     def no_one_a_after_r0(self, R: Round) -> BoolRef:
         return Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0))
 
-    @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def no_one_b_msg_after_r0(self, N: Node, R: Round, M: Votemap) -> BoolRef:
         return Implies(self.sys.one_b_msg(N, R, M), self.sys.le(R, self.sys.r0))
 
-    @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def no_one_b_votemap_received_after_r0(
         self, R: Round, N: Node, M: Votemap
     ) -> BoolRef:
@@ -598,31 +589,31 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             self.sys.one_b_msg(N, R, M), self.sys.le(self.sys.maxr(M, I), self.sys.r0)
         )
 
-    @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def no_proposal_after_r0(self, I: Inst, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.proposal(I, R, V), self.sys.le(R, self.sys.r0))
 
-    @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def no_vote_after_r0(self, N: Node, I: Inst, R: Round, V: Value) -> BoolRef:
         return Implies(self.sys.vote(N, I, R, V), self.sys.le(R, self.sys.r0))
 
-    # @invariant
+    @invariant
     def no_active_after_r0(self, R: Round) -> BoolRef:
         return Implies(self.sys.active(R), self.sys.le(R, self.sys.r0))
 
     # Projection properties
-    # @invariant
+    @system_invariant
     def projection_proposal(self, I: Inst, R: Round) -> BoolRef:
         V = Value("V")
         return self.sys.proposed(I, R) == Exists(V, self.sys.proposal(I, R, V))
 
-    # @invariant
+    @system_invariant
     def proposal_received_implies_proposed(
         self, N: Node, I: Inst, R: Round, V: Value
     ) -> BoolRef:
         return Implies(self.sys.proposal_received(N, I, R, V), self.sys.proposed(I, R))
 
-    # @invariant
+    @system_invariant
     def one_b_received_projection(self, R: Round, N: Node) -> BoolRef:
         M = Votemap("M")
         return self.sys.one_b_received(R, N) == Exists(
@@ -630,19 +621,20 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
         )
 
     # Progress conjectures for r0 and i0 - if msg a is received, msg b is sent
-    # @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def one_a_received_iff_one_b_msg(self, N: Node) -> BoolRef:
         M = Votemap("M")
         return self.sys.one_a_received(N, self.sys.r0) == Exists(
             M, self.sys.one_b_msg(N, self.sys.r0, M)
         )
 
-    # @invariant
+    @invariant(omit_timer_axioms_in_init=True)
     def proposal_received_iff_vote(self, N: Node, V: Value) -> BoolRef:
         return self.sys.proposal_received(
             N, self.sys.i0, self.sys.r0, V
         ) == self.sys.vote(N, self.sys.i0, self.sys.r0, V)
 
+    # need to think about this:
     # Once a proposal is sent, we will always wait for at least one node
     # @invariant
     # def exists_node_not_voted(self) -> BoolRef:
@@ -650,9 +642,203 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     #     V = Value("V")
     #     return Exists(N, ForAll(V, And(self.sys.member(N, self.sys.q0), Not(self.sys.vote(N, self.sys.i0, self.sys.r0, V)))))
 
+    # ranks
+
+    def one_a_r0_timer_rank(self) -> Rank:
+        return self.timer_rank(self.sys.one_a(self.sys.r0), None, None)
+
+    def one_a_received_r0(self, N: Node) -> BoolRef:
+        return self.sys.one_a_received(N, self.sys.r0)
+
+    def one_a_received_timer_rank(self) -> Rank:
+        return self.timer_rank(self.one_a_received_r0, None, None)
+
+    def one_b_received_r0(self, N: Node) -> BoolRef:
+        return self.sys.one_b_received(self.sys.r0, N)
+
+    def one_b_received_timer_rank(self) -> Rank:
+        return self.timer_rank(self.one_b_received_r0, None, None)
+
+    # rank that decreases when a proposal is made
+    def no_proposed_in_r0_and_i0(self) -> BoolRef:
+        return Not(self.sys.proposed(self.sys.i0, self.sys.r0))
+
+    def binary_no_proposed_in_r0_and_i0(self) -> Rank:
+        return BinRank(self.no_proposed_in_r0_and_i0())
+
+    def r0_not_active(self) -> BoolRef:
+        return Not(self.sys.active(self.sys.r0))
+
+    def binary_r0_not_active(self) -> Rank:
+        return BinRank(self.r0_not_active())
+
+    def proposal_received_in_r0(self, N: Node, I: Inst, V: Value) -> BoolRef:
+        return self.sys.proposal_received(N, I, self.sys.r0, V)
+
+    def proposal_receiver_in_r0_timer(self) -> Rank:
+        return self.timer_pos_in_order_rank(self.proposal_received_in_r0)
+
+    def proposal_received_timer_rank_in_r0_all_nodes(self) -> Rank:
+        return DomainPointwiseRank(
+            self.proposal_receiver_in_r0_timer(),
+            ParamSpec(N=Node),
+            None,
+        )
+
+    # no reason to actually do this like that but it doesn't work if I remove I from parameters
+    # otherwise we get the error AssertionError: No timer for t_<proposal_received(N, i0, r0, V)>; closest match: t_<proposal_received(N, I, r0, V)>. All timers:
+    def value_proposed_in_r0_and_i0(self, V: Value, I: Inst) -> BoolRef:
+        return And(self.sys.proposal(I, self.sys.r0, V), I == self.sys.i0)
+
+    def cond_prop_recv_timer_in_r0_all_nodes(self) -> Rank:
+        return CondRank(
+            self.proposal_received_timer_rank_in_r0_all_nodes(),
+            self.value_proposed_in_r0_and_i0,
+        )
+
+    def cond_prop_recv_timer_in_r0_all_nodes_values_instances(self) -> Rank:
+        return DomainPointwiseRank.close(
+            self.cond_prop_recv_timer_in_r0_all_nodes(),
+            FiniteLemma(self.value_proposed_in_r0_and_i0),
+        )
+
+    def join_acks_called_in_r0(self) -> BoolRef:
+        return self.sys.join_acks_called(self.sys.r0)
+
+    def join_acks_helpful(self) -> BoolRef:
+        N = Node("N")
+        M = Votemap("M")
+        return And(
+            Not(self.sys.active(self.sys.r0)),
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    Exists(M, self.sys.one_b_votemap_received(self.sys.r0, N, M)),
+                ),
+            ),
+        )
+
+    # in ivy they have the conjecture
+    # conjecture l2s.saved & ~l2s.w_process_join_acks_r0 & ~l2s.s_active(r0) & (exists Q . forall N . member(N,Q) -> l2s.s_one_b_received(r0,N)) -> active(r0)
+    # that is probably related to what I'm trying to do here.
+
+    def join_acks_called_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            self.join_acks_called_in_r0, self.join_acks_helpful, None
+        )
+
+    # no reason to actually do this like that but it doesn't work if I remove I from parameters
+    # because it does not recognize propose_called(r0,i0) as an instantiation of propose_called(r0,I)
+    def propose_called_in_r0_and_I(self, I: Inst) -> BoolRef:
+        return self.sys.propose_called(self.sys.r0, I)
+
+    def propose_helpful(self, I: Inst) -> BoolRef:
+        return And(
+            self.sys.active(self.sys.r0),
+            I == self.sys.i0,
+            self.no_proposed_in_r0_and_i0(),
+        )
+
+    # seems to possibly increase in propose and process_join_acks
+    # process_join_acks - can set to true, needs to decrease some previous lex component
+    # propose - usual fairness thing, needs to guarantee that the propose action decreases some previous lex componenet
+    def propose_called_timer_rank_if_active(self) -> Rank:
+        return self.timer_rank(
+            self.propose_called_in_r0_and_I,
+            self.propose_helpful,
+            None,
+        )
+
+    # currently conserved doesn't work for
+    # join_acks_called_timer_rank
+    # i guess this is because of states where helpful becomes true
     def rank(self) -> Rank:
-        return BinRank(true)
+        return PointwiseRank(
+            LexRank(
+                PointwiseRank(
+                    self.one_a_r0_timer_rank(),
+                    self.one_a_received_timer_rank(),
+                    self.one_b_received_timer_rank(),
+                ),
+                PointwiseRank(
+                    self.binary_r0_not_active(),
+                    # self.binary_no_proposed_in_r0_and_i0(),
+                ),
+                PointwiseRank(
+                    # self.cond_prop_recv_timer_in_r0_all_nodes_values_instances(),
+                    self.join_acks_called_timer_rank(),
+                    # self.propose_called_timer_rank_if_active(),
+                ),
+            )
+        )
+
+    # cases for debugging - don't affect final proof.
+
+    # decreases one_a_r0_timer_rank
+    def case_1(self) -> BoolRef:
+        return Not(self.sys.one_a(self.sys.r0))
+
+    # decreases one_a_received_timer_rank
+    def case_2(self) -> BoolRef:
+        N = Node("N")
+        return And(
+            self.sys.one_a(self.sys.r0),
+            Exists(
+                N,
+                And(
+                    self.sys.member(N, self.sys.q0),
+                    Not(self.sys.one_a_received(N, self.sys.r0)),
+                ),
+            ),
+        )
+
+    # decreases one_b_received_timer_rank
+    def case_3(self) -> BoolRef:
+        N = Node("N")
+        return And(
+            self.sys.one_a(self.sys.r0),
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    self.sys.one_a_received(N, self.sys.r0),
+                ),
+            ),
+            Exists(
+                N,
+                And(
+                    self.sys.member(N, self.sys.q0),
+                    Not(self.sys.one_b_received(self.sys.r0, N)),
+                ),
+            ),
+        )
+
+    # decreases binary_r0_not_active
+    def case_4(self) -> BoolRef:
+        N = Node("N")
+        M = Votemap("M")
+        return And(
+            self.sys.one_a(self.sys.r0),
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    self.sys.one_a_received(N, self.sys.r0),
+                ),
+            ),
+            ForAll(
+                N,
+                Implies(
+                    self.sys.member(N, self.sys.q0),
+                    Exists(M, self.sys.one_b_votemap_received(self.sys.r0, N, M)),
+                ),
+            ),
+            Not(self.sys.active(self.sys.r0)),
+        )
 
 
 proof = MultiPaxosProof()
-proof.check()
+# proof.check(check_conserved=True)
+proof._check_conserved(assumption=proof.case_4())
+proof._check_decreases(assumption=proof.case_4())
