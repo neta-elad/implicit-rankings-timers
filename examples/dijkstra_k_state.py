@@ -2,14 +2,14 @@
 Dijkstra's k-state Self-stabilization Protocol
 
 From Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
+Note we encode like the original system where only privileged nodes are scheduled, instead of allowing non-privileged nodes to be scheduled and idle.
 
 Protocol from:
 Dijkstra, E.W.: Self-stabilizing systems in spite of distributed control.
 Commun. ACM 17(11), 643–644 (nov 1974), https://doi.org/10.1145/361179.361202
 """
 
-# @status - start
-# review this because something didn't make sense to me before, it looked too simple.
+# @status - done
 
 from prelude import *
 
@@ -22,56 +22,19 @@ class Value(Finite): ...
 
 class DijkstraKStateSystem(TransitionSystem):
     # Immutable constants and relations
-    skd: Immutable[Node]
     bot: Immutable[Node]
-    witness_value: Immutable[Value]
-    # node_h: Immutable[Node]
     leq_node: Immutable[Rel[Node, Node]]
     leq_value: Immutable[Rel[Value, Value]]
-
-    # Mutable state variables
-    a: Fun[Node, Value]
     prev: Immutable[Fun[Node, Node]]
 
-    def succ_node(self, u: Node, v: Node) -> BoolRef:
-        W = Node("W")
-        return Or(
-            ForAll(W, And(self.leq_node(v, W), self.leq_node(W, u))),
-            And(
-                u != v,
-                self.leq_node(u, v),
-                ForAll(W, Or(self.leq_node(v, W), self.leq_node(W, u))),
-            ),
-        )
+    a: Fun[Node, Value]
+    witness_value: Value
+    skd: Node
 
-    def btw(self, v1: Value, v2: Value, v3: Value) -> BoolRef:
-        return And(
-            v1 != v2,
-            v2 != v3,
-            v3 != v1,
-            Or(
-                And(self.leq_value(v1, v2), self.leq_value(v2, v3)),
-                And(self.leq_value(v1, v2), self.leq_value(v3, v1)),
-                And(self.leq_value(v2, v3), self.leq_value(v3, v1)),
-            ),
-        )
-
-    def succ_value(self, u: Value, v: Value) -> BoolRef:
-        U = Value("U")
-        return Or(
-            ForAll(U, And(self.leq_value(v, U), self.leq_value(U, u))),
-            And(
-                u != v,
-                self.leq_value(u, v),
-                ForAll(U, Or(self.leq_value(v, U), self.leq_value(U, u))),
-            ),
-        )
-
-    def priv(self, i: Node) -> BoolRef:
-        return Or(
-            And(i == self.bot, self.a(i) == self.a(self.prev(i))),
-            And(i != self.bot, self.a(i) != self.a(self.prev(i))),
-        )
+    @axiom
+    def at_least_2_nodes_axiom(self) -> BoolRef:
+        X = Node("X")
+        return Exists(X, X != self.bot)
 
     @axiom
     def leq_node_axioms(self, X: Node, Y: Node, Z: Node) -> BoolRef:
@@ -81,6 +44,18 @@ class DijkstraKStateSystem(TransitionSystem):
             Or(self.leq_node(X, Y), self.leq_node(Y, X)),
             self.leq_node(self.bot, X),
             self.succ_node(self.prev(X), X),
+        )
+
+    def succ_node(self, u: Node, v: Node) -> BoolRef:
+        # successor in a ring
+        W = Node("W")
+        return Or(
+            ForAll(W, And(self.leq_node(v, W), self.leq_node(W, u))),
+            And(
+                u != v,
+                self.leq_node(u, v),
+                ForAll(W, Or(self.leq_node(v, W), self.leq_node(W, u))),
+            ),
         )
 
     @axiom
@@ -94,22 +69,53 @@ class DijkstraKStateSystem(TransitionSystem):
             Or(self.leq_value(S, R), self.leq_value(R, S)),
         )
 
-    # this should be with @witness - TODO
-    # defining 'witness value' as epsilon(minimal missing value in ring)
-    @axiom
-    def witness_definition(self, R: Value, X: Node, S: Value) -> BoolRef:
-        return Implies(
-            Exists(R, ForAll(X, self.a(X) != R)),
+    def succ_value(self, u: Value, v: Value) -> BoolRef:
+        # successor in a ring
+        W = Value("W")
+        return Or(
+            ForAll(W, And(self.leq_value(v, W), self.leq_value(W, u))),
             And(
-                ForAll(X, self.a(X) != self.witness_value),
-                ForAll(
-                    S,
-                    Implies(
-                        ForAll(X, self.a(X) != S),
-                        Or(
-                            S == self.witness_value,
-                            self.btw(self.a(self.bot), self.witness_value, S),
-                        ),
+                u != v,
+                self.leq_value(u, v),
+                ForAll(W, Or(self.leq_value(v, W), self.leq_value(W, u))),
+            ),
+        )
+
+    def btw(self, v1: Value, v2: Value, v3: Value) -> BoolRef:
+        # betweenness relation in the ring of values
+        return And(
+            v1 != v2,
+            v2 != v3,
+            v3 != v1,
+            Or(
+                And(self.leq_value(v1, v2), self.leq_value(v2, v3)),
+                And(self.leq_value(v1, v2), self.leq_value(v3, v1)),
+                And(self.leq_value(v2, v3), self.leq_value(v3, v1)),
+            ),
+        )
+
+    # There is an assumption in the protocol that the number of values is larger than the number of nodes
+    # This cannot be encoded directly, so we encode the consequence we need of it.
+    @axiom
+    def more_values_than_nodes_axiom(self) -> BoolRef:
+        R = Value("R")
+        X = Node("X")
+        return Exists(R, ForAll(X, self.a(X) != R))
+
+    # defining 'witness value' as minimal missing value in ring
+    @axiom
+    def witness_definition(self) -> BoolRef:
+        X = Node("X")
+        S = Value("S")
+        return And(
+            ForAll(X, self.a(X) != self.witness_value),
+            ForAll(
+                S,
+                Implies(
+                    ForAll(X, self.a(X) != S),
+                    Or(
+                        S == self.witness_value,
+                        self.btw(self.a(self.bot), self.witness_value, S),
                     ),
                 ),
             ),
@@ -133,67 +139,66 @@ class DijkstraKStateSystem(TransitionSystem):
             ),
         )
 
-    # There is an assumption in the protocol that the number of values is larger than the number of nodes
-    # This cannot be encoded directly, so we encode the consequence we need of it.
-    @axiom
-    def more_values_than_nodes_axiom(self, R: Value, X: Node) -> BoolRef:
-        return Exists(R, ForAll(X, self.a(X) != R))
+    def priv(self, i: Node) -> BoolRef:
+        return Or(
+            And(i == self.bot, self.a(i) == self.a(self.prev(i))),
+            And(i != self.bot, self.a(i) != self.a(self.prev(i))),
+        )
 
     @transition
     def wakeup(self, n: Node) -> BoolRef:
         X = Node("X")
         return And(
             self.skd == n,
+            self.priv(n),
             If(
-                self.priv(n),
-                If(
-                    n == self.bot,
-                    And(
-                        self.succ_value(self.a(self.prev(n)), self.next.a(n)),
-                        ForAll(X, Implies(X != n, self.next.a(X) == self.a(X))),
-                    ),
-                    self.a.update({(n,): self.a(self.prev(n))}),
+                n == self.bot,
+                And(
+                    self.succ_value(self.a(self.prev(n)), self.next.a(n)),
+                    ForAll(X, Implies(X != n, self.next.a(X) == self.a(X))),
                 ),
-                self.a.unchanged(),
+                self.a.update({(n,): self.a(self.prev(n))}),
             ),
         )
 
-
-class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
-    # as long as privileged nodes are infinitely scheduled then eventually there is a unique privilege
-    def prop(self) -> BoolRef:
+    def unique_privilege(self) -> BoolRef:
         X = Node("X")
         Y = Node("Y")
-        return Implies(
-            G(F(Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd)))),
-            F(
-                G(
-                    ForAll(
-                        [X, Y], Implies(And(self.sys.priv(X), self.sys.priv(Y)), X == Y)
-                    )
-                )
-            ),
+        return ForAll(
+            [X, Y],
+            Implies(And(self.priv(X), self.priv(Y)), X == Y),
         )
 
+    def bot_holds_unique_value(self) -> BoolRef:
+        X = Node("X")
+        return ForAll(X, Implies(X != self.bot, self.a(X) != self.a(self.bot)))
 
-class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
+    def only_bot_priv(self) -> BoolRef:
+        X = Node("X")
+        return And(
+            self.priv(self.bot),
+            ForAll(X, Implies(X != self.bot, Not(self.priv(X)))),
+        )
 
-    @invariant
+# we prove self-stabilization by proving 3 temporal properties:
+# 1. F(bot_holds_unique_value)
+# 2. bot_holds_unique_value -> F(only_bot_priv)
+# 3. only_bot_priv -> G(unique_privilege)
+
+class DijkstraKStateProp1(Prop[DijkstraKStateSystem]):
+    def prop(self) -> BoolRef:
+        return F(self.sys.bot_holds_unique_value())
+
+class DijsktraKStateProof1(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp1):
+
+    @temporal_invariant
+    def violation(self) -> BoolRef:
+        return G(Not(self.sys.bot_holds_unique_value()))
+
+    @invariant(leaf=True)
     def exists_privilege(self) -> BoolRef:
         N = Node("N")
         return Exists(N, self.sys.priv(N))
-
-    @temporal_invariant
-    def scheduling_of_privileged_nodes(self) -> BoolRef:
-        X = Node("X")
-        return G(F(Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd))))
-
-    def privileged_node_scheduled(self) -> BoolRef:
-        X = Node("X")
-        return Implies(Exists(X, self.sys.priv(X)), self.sys.priv(self.sys.skd))
-
-    def timer_scheduling(self) -> Rank:
-        return self.timer_rank(self.privileged_node_scheduled, None, None)
 
     def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
         return And(
@@ -216,14 +221,90 @@ class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
     def all_values_bot_needs_to_pass(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.value_bot_needs_to_pass), None)
 
-    # this works but im not sure why? why is it not using the violation of the property
     def rank(self) -> Rank:
         return LexRank(
             self.all_values_bot_needs_to_pass(),
             self.lexicographic_privileges(),
-            self.timer_scheduling(),
+        )
+
+class DijkstraKStateProp2(Prop[DijkstraKStateSystem]):
+    def prop(self) -> BoolRef:
+        return Implies(
+            self.sys.bot_holds_unique_value(),
+            F(self.sys.only_bot_priv()),
+        )
+
+class DijsktraKStateProof2(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp2):
+    
+    @invariant
+    def a_equals_a_bot_downward_closure(self) -> BoolRef:
+        X = Node("X")
+        Y = Node("Y")
+        return ForAll([X,Y],Implies(
+            And(
+                self.sys.leq_node(X,Y),
+                self.sys.a(Y)==self.sys.a(self.sys.bot),
+            ),
+            self.sys.a(X)==self.sys.a(self.sys.bot)
+            ),
+        )
+
+    @temporal_invariant
+    def violation(self) -> BoolRef:
+        return G(Not(self.sys.only_bot_priv()))
+
+    @invariant(leaf=True)
+    def exists_privilege(self) -> BoolRef:
+        N = Node("N")
+        return Exists(N, self.sys.priv(N))
+
+    def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
+        return And(
+            i1 != i2,
+            Or(And(self.sys.leq_node(i2, i1), i2 != self.sys.bot), i1 == self.sys.bot),
+        )
+
+    def priv(self, i: Node) -> BoolRef:
+        return self.sys.priv(i)
+
+    def lexicographic_privileges(self) -> Rank:
+        return DomainLexRank(BinRank(self.priv), self.lt_reversed_bot_minimal, None)
+
+    def rank(self) -> Rank:
+        return self.lexicographic_privileges()
+
+
+class DijkstraKStateProp3(Prop[DijkstraKStateSystem]):
+    def prop(self) -> BoolRef:
+        return Implies(
+            self.sys.only_bot_priv(),
+            G(self.sys.unique_privilege()),
         )
 
 
-proof = DijsktraKStateProof()
-proof.check()
+class DijsktraKStateProof3(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp3):
+
+    @invariant
+    def unique_privilege_invariant(self) -> BoolRef:
+        return self.sys.unique_privilege()
+
+    @temporal_invariant
+    def violation(self) -> BoolRef:
+        return F(Not(self.sys.unique_privilege()))
+    
+    def non_unique_privilege_timer_rank(self) -> Rank:
+        return self.timer_rank(
+            Not(self.sys.unique_privilege()),
+            None,
+            None,
+        )
+
+    def rank(self) -> Rank:
+        return self.non_unique_privilege_timer_rank()
+
+proof1 = DijsktraKStateProof1()
+proof1.check()
+proof2 = DijsktraKStateProof2()
+proof2.check()
+proof3 = DijsktraKStateProof3()
+proof3.check()
