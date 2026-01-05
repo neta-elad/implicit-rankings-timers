@@ -14,6 +14,13 @@ The complete docs for how to use the Python library are available at
 <https://neta-elad.github.io/implicit-rankings-timers/>,
 but can also be built locally (see below).
 
+## Artifact Note
+Since the submission of the paper we added 3 examples to the benchmark 
+and made minor changes and fixes to some examples. 
+Due to this, the entries of the evaluation table are slightly different 
+from those that appear in the submission version. 
+In particular, we split the Dijsktra-k-state example to 3 separate examples.
+
 ## Using the Artifact Image
 Download the appropriate Docker image from 
 <https://doi.org/10.5281/zenodo.18094938>, 
@@ -21,17 +28,17 @@ and load it by running:
 ```shell
 docker load -i artifact-<platform>.tar.gz
 ```
-where `<platform>` is either `arm64` (for Mac M1/M2/M3)
+where `<platform>` is either `arm64` (for Mac M*)
 or `amd64`.
 
-Then run it with:
-```shell
-docker run artifact-<platform> make all QUIET=true
-```
-
-You can run a specific example with:
+As a simple smoke test, run a specific file like `examples/ticket.py`:
 ```shell
 docker run artifact-<platform> make examples/ticket.py QUIET=true
+```
+
+Run the full benchmark with:
+```shell
+docker run artifact-<platform> make all QUIET=true
 ```
 
 To get full log of a run, simply remove the `QUITE=true` environment variable.
@@ -49,15 +56,15 @@ To get full log of a run, simply remove the `QUITE=true` environment variable.
     ```shell
     make install
     ```
+  
+- As a simple smoke test, you can run a specific file like `examples/ticket.py`:
+    ```shell
+    make examples/ticket.py QUIET=true
+    ```
 
 - To run all examples, run:
     ```shell
-    make all
-    ```
-  
-- To run a specific file, e.g., `examples/ticket.py`, run:
-    ```shell
-    make examples/ticket.py
+    make all QUIET=true
     ```
 
 - Build docs locally and open them by running
@@ -70,7 +77,7 @@ To get full log of a run, simply remove the `QUITE=true` environment variable.
     make check
     ```
 
-- In case something goes wrong in install run:
+- In case something goes wrong during install run:
     ```shell
     make clean 
     ```
@@ -80,7 +87,7 @@ To get full log of a run, simply remove the `QUITE=true` environment variable.
     make measure_ivy_proof.py IVY_FILE=ivy_files/ticket.ivy
     ```
 
-## Features
+## Flags
 ### Timeout
 Set global timeout (in milliseconds) for SMT queries
 with the `TIMEOUT_MS` environment variable:
@@ -107,3 +114,5 @@ use the flag `QUIET=true`:
 ```shell
 make examples/ticket.py QUIET=true
 ```
+
+If you want a full log of the proof run, remove the `QUIET=true` flag.

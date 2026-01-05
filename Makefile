@@ -69,6 +69,13 @@ $(IMAGE_PREFIX)-%.tar.gz: FORCE
 	-$(call save-docker-image,$*)
 	-$(call remove-docker-image,$*)
 
+artifact.zip: README.md LICENSE
+	zip -j $@ $^
+
+.PHONY: artifact
+artifact: $(IMAGE_PREFIX)-amd64.tar.gz $(IMAGE_PREFIX)-arm64.tar.gz artifact.zip
+
+
 $(IMAGE_PREFIX)-%: FORCE
 	-$(call build-docker-image,$*)
 
