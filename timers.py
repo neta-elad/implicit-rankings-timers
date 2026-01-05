@@ -668,17 +668,22 @@ def get_params(root_expr: z3.ExprRef, excluded: set[str]) -> ParamSpec:
 def _replace_symbols_in_formula(
     formula: z3.BoolRef, sym: "TimerTransitionSystem", params: Params
 ) -> z3.BoolRef:
-    if not z3.is_eq(formula) and formula.decl().kind() != z3.Z3_OP_UNINTERPRETED:
-        return formula
     terms = [
         _replace_symbols_in_term(child, sym, params) for child in formula.children()
     ]
     if z3.is_eq(formula):
         left, right = terms
         return left == right
-    pred = formula.decl().name()
-    assert pred in sym.symbols, f"Missing {pred} in symbols"
-    return cast(z3.BoolRef, sym[pred](*terms))
+    elif z3.is_distinct(formula):
+        return z3.Distinct(*terms)
+    elif formula.decl().kind() == z3.Z3_OP_UNINTERPRETED:
+        pred = formula.decl().name()
+        assert pred in sym.symbols, f"Missing {pred} in symbols"
+        return cast(z3.BoolRef, sym[pred](*terms))
+    elif z3.is_true(formula) or z3.is_false(formula):
+        return formula
+    else:
+        assert False, f"Unknown atomic formula {formula}"
 
 
 def _replace_symbols_in_term(
