@@ -656,13 +656,9 @@ class Proof[T: TransitionSystem](BaseTransitionSystem, ABC):
         if ivy_file_name is None:
             return "---"
 
-        ivy_path = (
-            Path(__file__).parent
-            / "examples"
-            / "todos"
-            / "ivy_examples"
-            / ivy_file_name
-        ).with_suffix(".ivy")
+        ivy_path = (Path(__file__).parent / "ivy_files" / ivy_file_name).with_suffix(
+            ".ivy"
+        )
         size = measure_ivy_proof(ivy_path)
         return str(size)
 
