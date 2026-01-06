@@ -2,8 +2,8 @@
 # <>!
 ## Ticket protocol example
 Running example from
-"*Verifying First-Order Temporal Properties
-of Infinite States Systems via Timers and Rankings*"
+"*Verifying First-Order Temporal Properties of
+Infinite-State Systems via Timers and Rankings*"
 paper (Sec. 2),
 a variant of Lamport's bakery algorithm.
 

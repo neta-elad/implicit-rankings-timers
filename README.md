@@ -1,8 +1,9 @@
-# Verifying First-Order Temporal Properties of Infinite States Systems via Implicit Rankings and Timers
+# Verifying First-Order Temporal Properties of Infinite-State Systems via Timers and Rankings
 
 This repository contains the implementation of the methods described 
 in the TACAS 2026 paper 
-"Verifying First-Order Temporal Properties of Infinite States Systems via Implicit Rankings and Timers" 
+"Verifying First-Order Temporal Properties of
+Infinite-State Systems via Timers and Rankings" 
 by Raz Lotan, Neta Elad, Oded Padon and Sharon Shoham. 
 The tool allows encoding a transition system specified in first-order logic, 
 and verifying first-order temporal properties of it. 
