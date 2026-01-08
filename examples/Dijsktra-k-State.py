@@ -3,6 +3,9 @@ Dijkstra's k-state Self-stabilization Protocol
 
 From Implicit Rankings for Verification of Liveness Properties in First-Order Logic / Raz Lotan & Sharon Shoham
 Note we encode like the original system where only privileged nodes are scheduled, instead of allowing non-privileged nodes to be scheduled and idle.
+We prove the main property: eventually only a single privileged node exists
+Together with the safety property that uniqueness is maintained you get the stabilization property.
+Another, easier property, is that once stable, every node is infinitely often scheduled.
 
 Protocol from:
 Dijkstra, E.W.: Self-stabilizing systems in spite of distributed control.
@@ -180,25 +183,44 @@ class DijkstraKStateSystem(TransitionSystem):
             ForAll(X, Implies(X != self.bot, Not(self.priv(X)))),
         )
 
-# we prove self-stabilization by proving 3 temporal properties:
-# 1. F(bot_holds_unique_value)
-# 2. bot_holds_unique_value -> F(only_bot_priv)
-# 3. only_bot_priv -> G(unique_privilege)
 
-class DijkstraKStateProp1(Prop[DijkstraKStateSystem]):
+
+class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
     def prop(self) -> BoolRef:
-        return F(self.sys.bot_holds_unique_value())
+        return F(self.sys.unique_privilege())
 
-class DijsktraKStateProof1(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp1):
+
+class DijsktraKStateProof(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp):
 
     @temporal_invariant
     def violation(self) -> BoolRef:
-        return G(Not(self.sys.bot_holds_unique_value()))
+        return G(Not(self.sys.unique_privilege()))
 
     @invariant(leaf=True)
     def exists_privilege(self) -> BoolRef:
         N = Node("N")
         return Exists(N, self.sys.priv(N))
+
+    def a_equals_a_bot_downward_closure(self) -> BoolRef:
+        X = Node("X")
+        Y = Node("Y")
+        return ForAll(
+            [X, Y],
+            Implies(
+                And(
+                    self.sys.leq_node(X, Y),
+                    self.sys.a(Y) == self.sys.a(self.sys.bot),
+                ),
+                self.sys.a(X) == self.sys.a(self.sys.bot),
+            ),
+        )
+
+    @invariant
+    def downward_closure_or_bot_not_unique(self) -> BoolRef:
+        return Or(
+            self.a_equals_a_bot_downward_closure(),
+            Not(self.sys.bot_holds_unique_value()),
+        )
 
     def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
         return And(
@@ -221,90 +243,16 @@ class DijsktraKStateProof1(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp1
     def all_values_bot_needs_to_pass(self) -> Rank:
         return DomainPointwiseRank.close(BinRank(self.value_bot_needs_to_pass), None)
 
+    def binrank_downward_closure(self) -> Rank:
+        return BinRank(Not(self.a_equals_a_bot_downward_closure()))
+
     def rank(self) -> Rank:
         return LexRank(
+            self.binrank_downward_closure(),
             self.all_values_bot_needs_to_pass(),
             self.lexicographic_privileges(),
         )
 
-class DijkstraKStateProp2(Prop[DijkstraKStateSystem]):
-    def prop(self) -> BoolRef:
-        return Implies(
-            self.sys.bot_holds_unique_value(),
-            F(self.sys.only_bot_priv()),
-        )
 
-class DijsktraKStateProof2(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp2):
-    
-    @invariant
-    def a_equals_a_bot_downward_closure(self) -> BoolRef:
-        X = Node("X")
-        Y = Node("Y")
-        return ForAll([X,Y],Implies(
-            And(
-                self.sys.leq_node(X,Y),
-                self.sys.a(Y)==self.sys.a(self.sys.bot),
-            ),
-            self.sys.a(X)==self.sys.a(self.sys.bot)
-            ),
-        )
-
-    @temporal_invariant
-    def violation(self) -> BoolRef:
-        return G(Not(self.sys.only_bot_priv()))
-
-    @invariant(leaf=True)
-    def exists_privilege(self) -> BoolRef:
-        N = Node("N")
-        return Exists(N, self.sys.priv(N))
-
-    def lt_reversed_bot_minimal(self, i1: Node, i2: Node) -> BoolRef:
-        return And(
-            i1 != i2,
-            Or(And(self.sys.leq_node(i2, i1), i2 != self.sys.bot), i1 == self.sys.bot),
-        )
-
-    def priv(self, i: Node) -> BoolRef:
-        return self.sys.priv(i)
-
-    def lexicographic_privileges(self) -> Rank:
-        return DomainLexRank(BinRank(self.priv), self.lt_reversed_bot_minimal, None)
-
-    def rank(self) -> Rank:
-        return self.lexicographic_privileges()
-
-
-class DijkstraKStateProp3(Prop[DijkstraKStateSystem]):
-    def prop(self) -> BoolRef:
-        return Implies(
-            self.sys.only_bot_priv(),
-            G(self.sys.unique_privilege()),
-        )
-
-
-class DijsktraKStateProof3(Proof[DijkstraKStateSystem], prop=DijkstraKStateProp3):
-
-    @invariant
-    def unique_privilege_invariant(self) -> BoolRef:
-        return self.sys.unique_privilege()
-
-    @temporal_invariant
-    def violation(self) -> BoolRef:
-        return F(Not(self.sys.unique_privilege()))
-    
-    def non_unique_privilege_timer_rank(self) -> Rank:
-        return self.timer_rank(
-            Not(self.sys.unique_privilege()),
-            None,
-            None,
-        )
-
-    def rank(self) -> Rank:
-        return self.non_unique_privilege_timer_rank()
-
-proof1 = DijsktraKStateProof1()
-proof1.check()
-proof2 = DijsktraKStateProof2()
-proof2.check()
-proof3 = DijsktraKStateProof3()
-proof3.check()
+proof = DijsktraKStateProof()
+proof.check()
