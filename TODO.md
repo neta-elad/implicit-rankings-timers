@@ -12,5 +12,4 @@
 
 ## More Examples
 - multi_paxos, stoppable_paxos.
-- Examples from implicit rankings: 3 other self-stabilization protocols.
 - Challenging future examples: TLB Shootdown, Sliding Window, Stellar Consensus Protocol, Chord, Apple Memory model
