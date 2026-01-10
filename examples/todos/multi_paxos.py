@@ -754,23 +754,12 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     # join_acks_called_timer_rank
     # i guess this is because of states where helpful becomes true
     def rank(self) -> Rank:
-        return PointwiseRank(
-            LexRank(
-                PointwiseRank(
-                    self.one_a_r0_timer_rank(),
-                    self.one_a_received_timer_rank(),
-                    self.one_b_received_timer_rank(),
-                ),
-                PointwiseRank(
-                    self.binary_r0_not_active(),
-                    # self.binary_no_proposed_in_r0_and_i0(),
-                ),
-                PointwiseRank(
-                    # self.cond_prop_recv_timer_in_r0_all_nodes_values_instances(),
-                    self.join_acks_called_timer_rank(),
-                    # self.propose_called_timer_rank_if_active(),
-                ),
-            )
+        return LexRank(
+            self.one_a_r0_timer_rank(),
+            self.one_a_received_timer_rank(),
+            self.one_b_received_timer_rank(),
+            self.binary_r0_not_active(),
+            self.join_acks_called_timer_rank()
         )
 
     # cases for debugging - don't affect final proof.
@@ -840,5 +829,23 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
 
 proof = MultiPaxosProof()
 # proof.check(check_conserved=True)
+
+print("case1")
+proof._check_conserved(assumption=proof.case_1())
+proof._check_decreases(assumption=proof.case_1())
+
+print("case2")
+proof._check_conserved(assumption=proof.case_2())
+proof._check_decreases(assumption=proof.case_2())
+
+print("case3")
+proof._check_conserved(assumption=proof.case_3())
+proof._check_decreases(assumption=proof.case_3())
+
+print("case4")
 proof._check_conserved(assumption=proof.case_4())
 proof._check_decreases(assumption=proof.case_4())
+
+print("all cases")
+proof._check_conserved()
+proof._check_decreases()
