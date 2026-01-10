@@ -10,7 +10,7 @@ then eventually all correct nodes accept.
 
 from prelude import *
 
-from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
+from hrb import HybridReliableBroadcast, Node, QuorumA, QuorumB
 
 
 class RelayHRB(Prop[HybridReliableBroadcast]):

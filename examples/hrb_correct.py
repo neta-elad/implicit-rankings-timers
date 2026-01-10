@@ -10,7 +10,7 @@ then eventually some node accepts
 
 from prelude import *
 
-from hybrid_reliable_broadcast import HybridReliableBroadcast, Node, QuorumA, QuorumB
+from hrb import HybridReliableBroadcast, Node, QuorumA, QuorumB
 
 
 class CorrectnessHRB(Prop[HybridReliableBroadcast]):
