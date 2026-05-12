@@ -5,6 +5,7 @@
 - Better normalization, maybe pnf? For example, G(ForAll) ~ ForAll(G).
 - Axioms that may eliminate spurious phantom states, e.g. t_(p and q) >= t_p, t_q.
 - Assume in post-state for invariants
+- A "Decreasing Counter-Abstraction" for timers: instead of encoding timers as natural numbers consider only 0, fin, inf, but such that timers still decrease between two copies of fin in transitions. Maybe this improves performance? should be sound.
 
 ## Aesthetics
 
