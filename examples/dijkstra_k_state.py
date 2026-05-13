@@ -184,7 +184,6 @@ class DijkstraKStateSystem(TransitionSystem):
         )
 
 
-
 class DijkstraKStateProp(Prop[DijkstraKStateSystem]):
     def prop(self) -> BoolRef:
         return F(self.sys.unique_privilege())
