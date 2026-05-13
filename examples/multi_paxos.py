@@ -236,7 +236,9 @@ class MultiPaxosSystem(TransitionSystem):
                         N,
                         Implies(
                             self.member(N, Q),
-                            Exists(M, self.one_b_votemap_received(r, N, M)),
+                            self.one_b_received(
+                                r, N
+                            ),  # rewrote here with one_b_received projection instead of one_b_votemap_received
                         ),
                     ),
                 ),
@@ -244,7 +246,7 @@ class MultiPaxosSystem(TransitionSystem):
                     N,
                     Implies(
                         self.member(N, q),
-                        Exists(M, self.one_b_votemap_received(r, N, M)),
+                        self.one_b_received(r, N),
                     ),
                 ),
             ),
@@ -255,7 +257,7 @@ class MultiPaxosSystem(TransitionSystem):
                         N,
                         Implies(
                             self.member(N, q),
-                            Exists(M, self.one_b_votemap_received(r, N, M)),
+                            self.one_b_received(r, N),
                         ),
                     ),
                 ),
@@ -409,8 +411,6 @@ class MultiPaxosSystem(TransitionSystem):
         )
 
 
-# to review
-# Property: For every instance, a quorum of nodes eventually votes for the same value in round r0
 class MultiPaxosProperty(Prop[MultiPaxosSystem]):
     def prop(self) -> BoolRef:
         V = Value("V")
@@ -474,7 +474,7 @@ class MultiPaxosProperty(Prop[MultiPaxosSystem]):
         )
 
         liveness_property = Exists(
-            [V, Q, I],
+            [V, Q],
             F(
                 ForAll(
                     N,
@@ -548,6 +548,26 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             G(F(self.sys.join_acks_called(self.sys.r0))),
         )
 
+    @temporal_invariant
+    def violation(self) -> BoolRef:
+        N = Node("N")
+        V = Value("V")
+        Q = Quorum("Q")
+        return Not(
+            Exists(
+                [V, Q],
+                F(
+                    ForAll(
+                        N,
+                        Implies(
+                            self.sys.member(N, Q),
+                            self.sys.vote(N, self.sys.i0, self.sys.r0, V),
+                        ),
+                    )
+                ),
+            )
+        )
+
     @system_invariant
     def not_active_implies_no_proposal(self, R: Round, I: Inst, V: Value) -> BoolRef:
         return Implies(Not(self.sys.active(R)), Not(self.sys.proposal(I, R, V)))
@@ -564,7 +584,6 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     ) -> BoolRef:
         return Implies(self.sys.vote(N, I, R, V), self.sys.proposal(I, R, V))
 
-    # Nothing happens after r0
     @invariant
     def no_one_a_after_r0(self, R: Round) -> BoolRef:
         return Implies(self.sys.one_a(R), self.sys.le(R, self.sys.r0))
@@ -601,7 +620,6 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     def no_active_after_r0(self, R: Round) -> BoolRef:
         return Implies(self.sys.active(R), self.sys.le(R, self.sys.r0))
 
-    # Projection properties
     @system_invariant
     def projection_proposal(self, I: Inst, R: Round) -> BoolRef:
         V = Value("V")
@@ -620,7 +638,6 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             M, self.sys.one_b_votemap_received(R, N, M)
         )
 
-    # Progress conjectures for r0 and i0 - if msg a is received, msg b is sent
     @invariant(omit_timer_axioms_in_init=True)
     def one_a_received_iff_one_b_msg(self, N: Node) -> BoolRef:
         M = Votemap("M")
@@ -633,14 +650,6 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
         return self.sys.proposal_received(
             N, self.sys.i0, self.sys.r0, V
         ) == self.sys.vote(N, self.sys.i0, self.sys.r0, V)
-
-    # need to think about this:
-    # Once a proposal is sent, we will always wait for at least one node
-    # @invariant
-    # def exists_node_not_voted(self) -> BoolRef:
-    #     N = Node("N")
-    #     V = Value("V")
-    #     return Exists(N, ForAll(V, And(self.sys.member(N, self.sys.q0), Not(self.sys.vote(N, self.sys.i0, self.sys.r0, V)))))
 
     # ranks
 
@@ -659,12 +668,8 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
     def one_b_received_timer_rank(self) -> Rank:
         return self.timer_rank(self.one_b_received_r0, None, None)
 
-    # rank that decreases when a proposal is made
     def no_proposed_in_r0_and_i0(self) -> BoolRef:
         return Not(self.sys.proposed(self.sys.i0, self.sys.r0))
-
-    def binary_no_proposed_in_r0_and_i0(self) -> Rank:
-        return BinRank(self.no_proposed_in_r0_and_i0())
 
     def r0_not_active(self) -> BoolRef:
         return Not(self.sys.active(self.sys.r0))
@@ -707,21 +712,16 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
 
     def join_acks_helpful(self) -> BoolRef:
         N = Node("N")
-        M = Votemap("M")
         return And(
             Not(self.sys.active(self.sys.r0)),
             ForAll(
                 N,
                 Implies(
                     self.sys.member(N, self.sys.q0),
-                    Exists(M, self.sys.one_b_votemap_received(self.sys.r0, N, M)),
+                    self.sys.one_b_received(self.sys.r0, N),
                 ),
             ),
         )
-
-    # in ivy they have the conjecture
-    # conjecture l2s.saved & ~l2s.w_process_join_acks_r0 & ~l2s.s_active(r0) & (exists Q . forall N . member(N,Q) -> l2s.s_one_b_received(r0,N)) -> active(r0)
-    # that is probably related to what I'm trying to do here.
 
     def join_acks_called_timer_rank(self) -> Rank:
         return self.timer_rank(
@@ -740,9 +740,6 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             self.no_proposed_in_r0_and_i0(),
         )
 
-    # seems to possibly increase in propose and process_join_acks
-    # process_join_acks - can set to true, needs to decrease some previous lex component
-    # propose - usual fairness thing, needs to guarantee that the propose action decreases some previous lex componenet
     def propose_called_timer_rank_if_active(self) -> Rank:
         return self.timer_rank(
             self.propose_called_in_r0_and_I,
@@ -750,102 +747,218 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
             None,
         )
 
-    # currently conserved doesn't work for
-    # join_acks_called_timer_rank
-    # i guess this is because of states where helpful becomes true
     def rank(self) -> Rank:
         return LexRank(
             self.one_a_r0_timer_rank(),
             self.one_a_received_timer_rank(),
             self.one_b_received_timer_rank(),
             self.binary_r0_not_active(),
-            self.join_acks_called_timer_rank()
+            self.join_acks_called_timer_rank(),
+            self.propose_called_timer_rank_if_active(),
+            self.cond_prop_recv_timer_in_r0_all_nodes_values_instances(),
         )
 
     # cases for debugging - don't affect final proof.
 
-    # decreases one_a_r0_timer_rank
-    def case_1(self) -> BoolRef:
-        return Not(self.sys.one_a(self.sys.r0))
+    # # decreases one_a_r0_timer_rank
+    # def case_1(self) -> BoolRef:
+    #     return Not(self.sys.one_a(self.sys.r0))
 
-    # decreases one_a_received_timer_rank
-    def case_2(self) -> BoolRef:
-        N = Node("N")
-        return And(
-            self.sys.one_a(self.sys.r0),
-            Exists(
-                N,
-                And(
-                    self.sys.member(N, self.sys.q0),
-                    Not(self.sys.one_a_received(N, self.sys.r0)),
-                ),
+    # # decreases one_a_received_timer_rank
+    # def case_2(self) -> BoolRef:
+    #     N = Node("N")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         Exists(
+    #             N,
+    #             And(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 Not(self.sys.one_a_received(N, self.sys.r0)),
+    #             ),
+    #         ),
+    #     )
+
+    # # decreases one_b_received_timer_rank
+    # def case_3(self) -> BoolRef:
+    #     N = Node("N")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_a_received(N, self.sys.r0),
+    #             ),
+    #         ),
+    #         Exists(
+    #             N,
+    #             And(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 Not(self.sys.one_b_received(self.sys.r0, N)),
+    #             ),
+    #         ),
+    #     )
+
+    # # decreases binary_r0_not_active
+    # def case_4(self) -> BoolRef:
+    #     N = Node("N")
+    #     M = Votemap("M")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_a_received(N, self.sys.r0),
+    #             ),
+    #         ),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 Exists(M, self.sys.one_b_votemap_received(self.sys.r0, N, M)),
+    #             ),
+    #         ),
+    #         Not(self.sys.active(self.sys.r0)),
+    #     )
+
+    # def case_5(self) -> BoolRef:
+    #     N = Node("N")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_a_received(N, self.sys.r0),
+    #             ),
+    #         ),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_b_received(self.sys.r0, N),
+    #             ),
+    #         ),
+    #         self.sys.active(self.sys.r0),
+    #         self.no_proposed_in_r0_and_i0(),
+    #     )
+
+    # def case_6(self) -> BoolRef:
+    #     N = Node("N")
+    #     V = Value("V")
+    #     I = Inst("I")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_a_received(N, self.sys.r0),
+    #             ),
+    #         ),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_b_received(self.sys.r0, N),
+    #             ),
+    #         ),
+    #         self.sys.active(self.sys.r0),
+    #         Exists(
+    #             [I, V, N],
+    #             And(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 And(self.sys.proposal(I, self.sys.r0, V), I == self.sys.i0),
+    #                 Not(self.sys.proposal_received(N, I, self.sys.r0, V)),
+    #             ),
+    #         ),
+    #     )
+
+    # def case_7(self) -> BoolRef:
+    #     N = Node("N")
+    #     V = Value("V")
+    #     I = Inst("I")
+    #     return And(
+    #         self.sys.one_a(self.sys.r0),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_a_received(N, self.sys.r0),
+    #             ),
+    #         ),
+    #         ForAll(
+    #             N,
+    #             Implies(
+    #                 self.sys.member(N, self.sys.q0),
+    #                 self.sys.one_b_received(self.sys.r0, N),
+    #             ),
+    #         ),
+    #         self.sys.active(self.sys.r0),
+    #         Exists(
+    #             [I, V],
+    #             And(
+    #                 I == self.sys.i0,
+    #                 self.sys.proposal(I, self.sys.r0, V),
+    #                 ForAll(
+    #                     N,
+    #                     Implies(
+    #                         self.sys.member(N, self.sys.q0),
+    #                         self.sys.proposal_received(N, I, self.sys.r0, V),
+    #                     ),
+    #                 ),
+    #                 Exists(
+    #                     N,
+    #                     And(
+    #                         self.sys.member(N, self.sys.q0),
+    #                         Not(self.sys.vote(N, I, self.sys.r0, V)),
+    #                     ),
+    #                 ),
+    #             ),
+    #         ),
+    #     )
+
+    # def case_8(self) -> BoolRef:
+    #     I = Inst("I")
+    #     V = Value("V")
+    #     N = Node("N")
+    #     return Exists(
+    #         [I, V],
+    #         And(
+    #             I == self.sys.i0,
+    #             self.sys.proposal(I, self.sys.r0, V),
+    #             ForAll(
+    #                 N,
+    #                 Implies(
+    #                     self.sys.member(N, self.sys.q0),
+    #                     self.sys.vote(N, I, self.sys.r0, V),
+    #                 ),
+    #             ),
+    #         ),
+    #     )
+
+    def case_join_acks_r0(self) -> BoolRef:
+        return self.sys.join_acks_called(self.sys.r0)
+
+    def case_join_acks_not_r0(self) -> BoolRef:
+        R = Round("R")
+        return Exists(
+            R,
+            And(
+                self.sys.join_acks_called(R),
+                R != self.sys.r0,
             ),
         )
 
-    # decreases one_b_received_timer_rank
-    def case_3(self) -> BoolRef:
-        N = Node("N")
-        return And(
-            self.sys.one_a(self.sys.r0),
-            ForAll(
-                N,
-                Implies(
-                    self.sys.member(N, self.sys.q0),
-                    self.sys.one_a_received(N, self.sys.r0),
-                ),
-            ),
-            Exists(
-                N,
-                And(
-                    self.sys.member(N, self.sys.q0),
-                    Not(self.sys.one_b_received(self.sys.r0, N)),
-                ),
-            ),
-        )
+    def case_not_join_acks(self) -> BoolRef:
+        R = Round("R")
+        return ForAll(R, Not(self.sys.join_acks_called(R)))
 
-    # decreases binary_r0_not_active
-    def case_4(self) -> BoolRef:
-        N = Node("N")
-        M = Votemap("M")
-        return And(
-            self.sys.one_a(self.sys.r0),
-            ForAll(
-                N,
-                Implies(
-                    self.sys.member(N, self.sys.q0),
-                    self.sys.one_a_received(N, self.sys.r0),
-                ),
-            ),
-            ForAll(
-                N,
-                Implies(
-                    self.sys.member(N, self.sys.q0),
-                    Exists(M, self.sys.one_b_votemap_received(self.sys.r0, N, M)),
-                ),
-            ),
-            Not(self.sys.active(self.sys.r0)),
-        )
-
+    def l2s_ivy_file(self) -> str | None:
+        return "multi_paxos_liveness.ivy"
 
 proof = MultiPaxosProof()
-# proof.check(check_conserved=True)
+proof.check()
+# proof should work in all cases, just timing out currently.
 
-print("case1")
-proof._check_conserved(assumption=proof.case_1())
-proof._check_decreases(assumption=proof.case_1())
-
-print("case2")
-proof._check_conserved(assumption=proof.case_2())
-proof._check_decreases(assumption=proof.case_2())
-
-print("case3")
-proof._check_conserved(assumption=proof.case_3())
-proof._check_decreases(assumption=proof.case_3())
-
-print("case4")
-proof._check_conserved(assumption=proof.case_4())
-proof._check_decreases(assumption=proof.case_4())
-
-print("all cases")
-proof._check_conserved()
-proof._check_decreases()
