@@ -960,5 +960,5 @@ class MultiPaxosProof(Proof[MultiPaxosSystem], prop=MultiPaxosProperty):
 
 proof = MultiPaxosProof()
 proof.check()
-# proof should work in all cases, just timing out currently.
-
+# proof should work in all cases, just timing out for process_join_acks but verified in exhaustive cases.
+# soundness passes 
