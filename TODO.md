@@ -12,7 +12,8 @@
 - when printing a rank, do not print formulas, only constructors and names of formulas, currently this is inconsistent.
 
 ## More Examples
-- From L2S: multi_paxos, stoppable_paxos.
-- From Implicit Rankings: other Dijkstra 3-State, Dijkstra 4-State, Ghosh.
-- From Liveness to Safety for Distributed Systems: Spanning Tree, Leader Election, Maximal Independent Set.
-- Challenging future examples: TLB Shootdown, Sliding Window, Stellar Consensus Protocol, Chord, Apple Memory model
+- From L2S: stoppable_paxos, TLB shootdown (perhaps there was a bug in the original proof?)
+- From Liveness to Safety for Distributed Systems: Spanning Tree, Leader Election, Maximal Independent Set.ֿ
+- From Runtime squeezers: subsets, monotone sequences.
+- From first implicit rankings paper: other Dijkstra 3-State, Dijkstra 4-State, Ghosh. (These require annoying abstraction details and offer no new insights)
+- Challenging future examples: Sliding Window, Stellar Consensus Protocol, Chord, Apple Memory model
