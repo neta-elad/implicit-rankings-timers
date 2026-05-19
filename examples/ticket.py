@@ -247,6 +247,8 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     # <>
     # | We use a temporal witness to provide a witness thread that violates the property.
     # | This witness thread will be used throughout the proof.
+    # | The witness skolem_thread is added to the signature and can be referenced as self.skolem_thread
+    # | Additionally this adds the axiom forall T. Implies(witness_property(T),witness_property(skolem_thread))
     @temporal_witness
     def skolem_thread(self, T: Thread) -> BoolRef:
         return Not(
@@ -260,6 +262,8 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
 
     # <>
     # | Temporal invariants and tracked formulas for the proof.
+    # | the @track decorator adds timers for all subformulas of the given temporal formula.
+    # | @temporal_invariant converts a temporal property phi to the invariant t_(phi) = 0
     @temporal_invariant
     @track
     def skolem_thread_scheduled_infinitely_often(self) -> BoolRef:
@@ -268,6 +272,8 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     # <>
     # | System invariants: properties that hold over the original system.
     # | These establish basic correctness properties of the protocol.
+    # | @system_invariant means these invariants are only over the original system, and cannot reference timers.
+    # | This is just an optimization over using @invariant.
     @system_invariant
     def pc_at_least_one(self, T: Thread) -> BoolRef:
         return Or(self.sys.pc1(T), self.sys.pc2(T), self.sys.pc3(T))
@@ -404,6 +410,11 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     # | Each rank component handles a different aspect of the proof.
     # |
     # | `rk1`: Timer rank for the starved condition.
+    # | timer_rank is syntactic sugar for constructing a ranking that uses timers:
+    # | it accepts 3 arguments:
+    # | - a temporal formula (the timer being used), 
+    # | - a formula (a condition for when this timer should decrease),
+    # | - a finite lemma (a condition that only finitely many values of the free variables satisfy the condition).
     def rk1(self) -> Rank:
         return self.timer_rank(
             self.starved(),
@@ -412,8 +423,10 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
         )  # </>
 
     # <>
-    # | `rk2`: Domain-pointwise rank over tickets between service and next_ticket.
-    # | Uses a finite lemma to bound the number of such tickets.
+    # | `rk2`: captures the number of tickets between service and the ticket held by skolem_thread.
+    # | Uses the DomainPointwiseRank constructor to approximate the set cardinality
+    # | The DomainPointwiseRank constructor accepts an input rank - in this case a BinaryRank,
+    # | and a finite lemma to verify the soundness condition - only finitely many inputs have non-minimal rank.
     def rk2_body(self, k: Ticket) -> BoolRef:
         X = Ticket("X")
         return And(
@@ -424,6 +437,8 @@ class TicketProof(Proof[TicketSystem], prop=TicketProp):
     def rk2_finite_lemma(self, k: Ticket) -> BoolRef:
         return self.sys.le(k, self.sys.next_ticket)
 
+    # <>
+    # | The keyword .close indicates quantifying over all free variables.
     def rk2(self) -> Rank:
         return DomainPointwiseRank.close(
             BinRank(self.rk2_body),
