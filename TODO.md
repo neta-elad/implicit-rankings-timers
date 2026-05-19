@@ -1,10 +1,16 @@
 # TODOs / Future Work
 
+## Documentation
+
+- More documentation in ticket example - about the different constructors, temporal invariant, temporal witness, etc.
+- Documentation of debugging features.
+
 ## Features
 
 - Better support for native z3 integers
 - Constructor for integers (check that varaible is >= 0), tau_> = (x > x') & x' >= 0 & x >= 0
 - Maybe "negated cond" constructor - where the elements that don't satisfy alpha are larger.
+- Easier to print formulas that go to solver?
 
 ## Optimizations
 - Optimize the number of timers by stopping the recursion on any non-temporal formula and not only atoms.
