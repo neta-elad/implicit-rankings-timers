@@ -1,0 +1,2 @@
+This folder contains student projects from the 'Automatic Verification of Systems' course given by Sharon Shoham in 2026.
+These examples were written and proved by students, each file with the names of the students that worked on it.
